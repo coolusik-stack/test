@@ -1,67 +1,202 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+
 :root {
-    --background-color: #f0f2f5;
-    --text-color: #333;
-    --container-bg-color: #fff;
-    --button-bg-color: #007bff;
-    --button-hover-bg-color: #0056b3;
-    --lotto-ball-bg-color: #3498db;
+    --background-color: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    --text-color: #1a1a2e;
+    --container-bg-color: rgba(255, 255, 255, 0.95);
+    --button-bg-color: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    --button-hover-bg-color: linear-gradient(135deg, #5a67d8 0%, #6b46a1 100%);
+    --button-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+    --card-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
+    --toggle-bg: #e2e8f0;
+    --toggle-icon: #667eea;
 }
 
 body.dark-mode {
-    --background-color: #2c3e50;
-    --text-color: #ecf0f1;
-    --container-bg-color: #34495e;
-    --button-bg-color: #2ecc71;
-    --button-hover-bg-color: #27ae60;
-    --lotto-ball-bg-color: #9b59b6;
+    --background-color: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+    --text-color: #e2e8f0;
+    --container-bg-color: rgba(30, 41, 59, 0.95);
+    --button-bg-color: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+    --button-hover-bg-color: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+    --button-shadow: 0 4px 15px rgba(99, 102, 241, 0.4);
+    --card-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
+    --toggle-bg: #334155;
+    --toggle-icon: #fbbf24;
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
 }
 
 body {
-    font-family: sans-serif;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
     display: flex;
     justify-content: center;
     align-items: center;
     min-height: 100vh;
-    background-color: var(--background-color);
+    background: var(--background-color);
     color: var(--text-color);
-    transition: background-color 0.3s ease, color 0.3s ease;
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    padding: 1rem;
 }
 
 .container {
     text-align: center;
-    padding: 2rem;
+    padding: 3rem 3.5rem;
     background-color: var(--container-bg-color);
-    border-radius: 10px;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-    transition: background-color 0.3s ease;
+    border-radius: 24px;
+    box-shadow: var(--card-shadow);
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    backdrop-filter: blur(10px);
+    position: relative;
+    max-width: 500px;
+    width: 100%;
 }
 
-#generate-btn, #theme-toggle-btn {
-    margin-top: 1.5rem;
-    padding: 0.8rem 1.5rem;
-    font-size: 1rem;
-    color: #fff;
-    background-color: var(--button-bg-color);
+h1 {
+    font-size: 1.75rem;
+    font-weight: 700;
+    margin-bottom: 0.5rem;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+body.dark-mode h1 {
+    background: linear-gradient(135deg, #a5b4fc 0%, #c4b5fd 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.subtitle {
+    font-size: 0.9rem;
+    color: #64748b;
+    margin-bottom: 2rem;
+}
+
+body.dark-mode .subtitle {
+    color: #94a3b8;
+}
+
+#theme-toggle-btn {
+    position: absolute;
+    top: 1.5rem;
+    right: 1.5rem;
+    width: 44px;
+    height: 44px;
+    padding: 0;
     border: none;
-    border-radius: 5px;
+    border-radius: 50%;
+    background: var(--toggle-bg);
+    color: var(--toggle-icon);
     cursor: pointer;
-    transition: background-color 0.3s ease;
-    margin-left: 10px; /* Add some spacing */
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.25rem;
 }
 
-#generate-btn:hover, #theme-toggle-btn:hover {
-    background-color: var(--button-hover-bg-color);
+#theme-toggle-btn:hover {
+    transform: scale(1.1) rotate(15deg);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+#generate-btn {
+    margin-top: 2rem;
+    padding: 1rem 2.5rem;
+    font-size: 1rem;
+    font-weight: 600;
+    color: #fff;
+    background: var(--button-bg-color);
+    border: none;
+    border-radius: 50px;
+    cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: var(--button-shadow);
+    letter-spacing: 0.025em;
+}
+
+#generate-btn:hover {
+    background: var(--button-hover-bg-color);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(102, 126, 234, 0.5);
+}
+
+#generate-btn:active {
+    transform: translateY(0);
+}
+
+/* Lotto ball colors based on number ranges */
+.ball-1-10 { background: linear-gradient(145deg, #fbbf24 0%, #f59e0b 100%); }
+.ball-11-20 { background: linear-gradient(145deg, #3b82f6 0%, #2563eb 100%); }
+.ball-21-30 { background: linear-gradient(145deg, #ef4444 0%, #dc2626 100%); }
+.ball-31-40 { background: linear-gradient(145deg, #6b7280 0%, #4b5563 100%); }
+.ball-41-45 { background: linear-gradient(145deg, #22c55e 0%, #16a34a 100%); }
+
+@keyframes bounceIn {
+    0% {
+        opacity: 0;
+        transform: scale(0.3) translateY(20px);
+    }
+    50% {
+        transform: scale(1.05) translateY(-5px);
+    }
+    70% {
+        transform: scale(0.95) translateY(2px);
+    }
+    100% {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+    }
+}
+
+@keyframes pulse {
+    0%, 100% {
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+    }
+    50% {
+        box-shadow: 0 4px 25px rgba(0, 0, 0, 0.3);
+    }
 }
 
 .lotto-ball {
-    width: 50px;
-    height: 50px;
+    width: 56px;
+    height: 56px;
     border-radius: 50%;
     display: flex;
     justify-content: center;
     align-items: center;
-    font-size: 1.2rem;
-    font-weight: bold;
+    font-size: 1.25rem;
+    font-weight: 700;
     color: #fff;
-    background-color: var(--lotto-ball-bg-color); /* Use CSS variable */
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2), inset 0 -3px 6px rgba(0, 0, 0, 0.1);
+    animation: bounceIn 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.55) forwards;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+
+.lotto-ball:hover {
+    animation: pulse 1s ease-in-out infinite;
+    cursor: default;
+}
+
+/* Responsive */
+@media (max-width: 480px) {
+    .container {
+        padding: 2rem 1.5rem;
+    }
+
+    h1 {
+        font-size: 1.5rem;
+    }
+
+    .lotto-ball {
+        width: 46px;
+        height: 46px;
+        font-size: 1.1rem;
+    }
 }
