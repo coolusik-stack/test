@@ -52,3 +52,40 @@ customElements.define('lotto-numbers', LottoNumbers);
 document.getElementById('generate-btn').addEventListener('click', () => {
     document.querySelector('lotto-numbers').generateNumbers();
 });
+
+// Theme toggle functionality
+const themeToggleBtn = document.getElementById('theme-toggle-btn');
+const body = document.body;
+
+// Function to set the theme
+const setTheme = (theme) => {
+    if (theme === 'dark') {
+        body.classList.add('dark-mode');
+        localStorage.setItem('theme', 'dark');
+    } else {
+        body.classList.remove('dark-mode');
+        localStorage.setItem('theme', 'light');
+    }
+};
+
+// Check for saved theme in localStorage
+const savedTheme = localStorage.getItem('theme');
+if (savedTheme) {
+    setTheme(savedTheme);
+} else {
+    // Check for system preference
+    if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+        setTheme('dark');
+    } else {
+        setTheme('light');
+    }
+}
+
+// Event listener for the theme toggle button
+themeToggleBtn.addEventListener('click', () => {
+    if (body.classList.contains('dark-mode')) {
+        setTheme('light');
+    } else {
+        setTheme('dark');
+    }
+});
