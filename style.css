@@ -131,6 +131,78 @@ body.dark-mode .subtitle {
     transform: translateY(0);
 }
 
+.weekly-link {
+    display: inline-flex;
+    margin-top: 1.25rem;
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: #ea580c;
+    text-decoration: none;
+    border-bottom: 2px solid transparent;
+    transition: all 0.2s ease;
+}
+
+.weekly-link:hover {
+    border-bottom-color: #ea580c;
+    transform: translateY(-1px);
+}
+
+.weekly .weekly-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 1rem;
+    margin: 1.5rem 0 0.5rem;
+}
+
+.weekly .day-card {
+    background: rgba(255, 255, 255, 0.9);
+    border-radius: 18px;
+    padding: 1.25rem;
+    box-shadow: 0 10px 30px rgba(15, 23, 42, 0.08);
+    border: 1px solid rgba(15, 23, 42, 0.08);
+    text-align: left;
+}
+
+body.dark-mode .weekly .day-card {
+    background: rgba(15, 23, 42, 0.85);
+    border: 1px solid rgba(148, 163, 184, 0.15);
+}
+
+.weekly .day-label {
+    font-weight: 700;
+    font-size: 1rem;
+    margin-bottom: 0.75rem;
+    color: #0f172a;
+}
+
+body.dark-mode .weekly .day-label {
+    color: #e2e8f0;
+}
+
+.weekly .meal-row {
+    font-size: 0.92rem;
+    color: #44403c;
+    margin-bottom: 0.5rem;
+}
+
+body.dark-mode .weekly .meal-row {
+    color: #cbd5f5;
+}
+
+.weekly .meal-tag {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 44px;
+    padding: 0.15rem 0.5rem;
+    margin-right: 0.5rem;
+    border-radius: 999px;
+    font-size: 0.7rem;
+    font-weight: 700;
+    color: #fff;
+    background: linear-gradient(135deg, #f97316 0%, #fb7185 100%);
+}
+
 @media (max-width: 480px) {
     .container {
         padding: 2rem 1.5rem;
@@ -143,5 +215,9 @@ body.dark-mode .subtitle {
     #generate-btn {
         padding: 0.9rem 2rem;
         font-size: 1rem;
+    }
+
+    .weekly .weekly-grid {
+        grid-template-columns: 1fr;
     }
 }
