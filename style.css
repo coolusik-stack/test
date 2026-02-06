@@ -51,7 +51,7 @@ body {
     transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
     backdrop-filter: blur(10px);
     position: relative;
-    max-width: 500px;
+    max-width: 760px;
     width: 100%;
 }
 
@@ -75,7 +75,7 @@ body.dark-mode h1 {
 .subtitle {
     font-size: 0.95rem;
     color: #78716c;
-    margin-bottom: 0.5rem;
+    margin-bottom: 1.25rem;
 }
 
 body.dark-mode .subtitle {
