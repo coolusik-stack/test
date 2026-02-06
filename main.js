@@ -1,168 +1,200 @@
-class LottoNumbers extends HTMLElement {
+const menuData = {
+    korean: {
+        name: '한식',
+        emoji: '🍚',
+        items: ['김치찌개', '된장찌개', '비빔밥', '불고기', '삼겹살', '갈비찜', '제육볶음', '순두부찌개', '냉면', '칼국수', '떡볶이', '김밥', '삼계탕', '감자탕', '부대찌개']
+    },
+    chinese: {
+        name: '중식',
+        emoji: '🥡',
+        items: ['짜장면', '짬뽕', '탕수육', '마파두부', '깐풍기', '양장피', '볶음밥', '마라탕', '훠궈', '유린기', '꿔바로우', '짜장밥', '울면']
+    },
+    japanese: {
+        name: '일식',
+        emoji: '🍣',
+        items: ['초밥', '라멘', '돈카츠', '우동', '카레', '사시미', '규동', '오코노미야키', '타코야키', '덴푸라', '가츠동', '소바']
+    },
+    western: {
+        name: '양식',
+        emoji: '🍝',
+        items: ['파스타', '피자', '스테이크', '햄버거', '리조또', '샐러드', '오믈렛', '그라탕', '치킨', '바베큐', '샌드위치']
+    },
+    asian: {
+        name: '아시안',
+        emoji: '🍜',
+        items: ['쌀국수', '팟타이', '똠얌꿍', '월남쌈', '반미', '카오팟', '나시고렝', '분짜', '커리']
+    }
+};
+
+class MenuRecommendation extends HTMLElement {
     constructor() {
         super();
         this.attachShadow({ mode: 'open' });
-        this.sets = [];
-        this.setCount = 5;
+        this.recommendation = null;
     }
 
     connectedCallback() {
-        this.generateNumbers();
+        this.generateRecommendation();
     }
 
-    getBallClass(num) {
-        if (num <= 10) return 'ball-1-10';
-        if (num <= 20) return 'ball-11-20';
-        if (num <= 30) return 'ball-21-30';
-        if (num <= 40) return 'ball-31-40';
-        return 'ball-41-45';
-    }
+    generateRecommendation() {
+        const categories = Object.keys(menuData);
+        const randomCategory = categories[Math.floor(Math.random() * categories.length)];
+        const category = menuData[randomCategory];
+        const randomMenu = category.items[Math.floor(Math.random() * category.items.length)];
 
-    generateNumberSet() {
-        const newNumbers = new Set();
-        while (newNumbers.size < 6) {
-            newNumbers.add(Math.floor(Math.random() * 45) + 1);
-        }
-        return Array.from(newNumbers).sort((a, b) => a - b);
-    }
+        this.recommendation = {
+            category: category.name,
+            emoji: category.emoji,
+            menu: randomMenu
+        };
 
-    generateNumbers() {
-        this.sets = Array.from({ length: this.setCount }, () => this.generateNumberSet());
         this.render();
     }
 
     render() {
+        if (!this.recommendation) return;
+
         this.shadowRoot.innerHTML = `
             <style>
-                .sets {
-                    display: flex;
-                    flex-direction: column;
-                    gap: 1.25rem;
-                    margin-top: 1.5rem;
+                .recommendation-card {
+                    margin-top: 2rem;
+                    padding: 2rem;
+                    background: linear-gradient(135deg, rgba(255,255,255,0.8) 0%, rgba(255,255,255,0.6) 100%);
+                    border-radius: 20px;
+                    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+                    border: 1px solid rgba(255, 255, 255, 0.5);
+                    animation: fadeInUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
                 }
-                .set-card {
-                    background: rgba(255, 255, 255, 0.6);
-                    border-radius: 18px;
-                    padding: 1rem 1.25rem;
-                    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+
+                :host-context(body.dark-mode) .recommendation-card {
+                    background: linear-gradient(135deg, rgba(30, 41, 59, 0.8) 0%, rgba(30, 41, 59, 0.6) 100%);
                     border: 1px solid rgba(148, 163, 184, 0.2);
                 }
-                :host-context(.dark-mode) .set-card {
-                    background: rgba(15, 23, 42, 0.6);
-                    border: 1px solid rgba(148, 163, 184, 0.1);
+
+                .emoji {
+                    font-size: 4rem;
+                    margin-bottom: 1rem;
+                    animation: bounce 0.6s cubic-bezier(0.68, -0.55, 0.265, 1.55) 0.3s forwards;
+                    opacity: 0;
+                    transform: scale(0);
                 }
-                .set-label {
-                    font-weight: 700;
-                    letter-spacing: 0.04em;
-                    text-transform: uppercase;
-                    font-size: 0.75rem;
+
+                .category {
+                    font-size: 0.9rem;
+                    font-weight: 600;
                     color: #64748b;
-                    margin-bottom: 0.75rem;
-                    text-align: left;
+                    text-transform: uppercase;
+                    letter-spacing: 0.1em;
+                    margin-bottom: 0.5rem;
                 }
-                :host-context(.dark-mode) .set-label {
+
+                :host-context(body.dark-mode) .category {
                     color: #94a3b8;
                 }
-                .lotto-container {
-                    display: flex;
-                    gap: 0.75rem;
-                    justify-content: center;
-                    flex-wrap: wrap;
-                }
-                .lotto-ball {
-                    width: 56px;
-                    height: 56px;
-                    border-radius: 50%;
-                    display: flex;
-                    justify-content: center;
-                    align-items: center;
-                    font-size: 1.25rem;
+
+                .menu-name {
+                    font-size: 2.5rem;
                     font-weight: 700;
-                    color: #fff;
-                    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2), inset 0 -3px 6px rgba(0, 0, 0, 0.1);
-                    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
-                    animation: bounceIn 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.55) forwards;
+                    background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
+                    -webkit-background-clip: text;
+                    -webkit-text-fill-color: transparent;
+                    background-clip: text;
+                    margin: 0;
+                    animation: slideIn 0.5s cubic-bezier(0.16, 1, 0.3, 1) 0.2s forwards;
                     opacity: 0;
+                    transform: translateY(20px);
                 }
-                .lotto-ball:hover {
-                    animation: pulse 1s ease-in-out infinite;
-                    cursor: default;
-                }
-                .ball-1-10 { background: linear-gradient(145deg, #fbbf24 0%, #f59e0b 100%); }
-                .ball-11-20 { background: linear-gradient(145deg, #3b82f6 0%, #2563eb 100%); }
-                .ball-21-30 { background: linear-gradient(145deg, #ef4444 0%, #dc2626 100%); }
-                .ball-31-40 { background: linear-gradient(145deg, #6b7280 0%, #4b5563 100%); }
-                .ball-41-45 { background: linear-gradient(145deg, #22c55e 0%, #16a34a 100%); }
 
-                @keyframes bounceIn {
-                    0% {
+                :host-context(body.dark-mode) .menu-name {
+                    background: linear-gradient(135deg, #fb923c 0%, #fdba74 100%);
+                    -webkit-background-clip: text;
+                    -webkit-text-fill-color: transparent;
+                    background-clip: text;
+                }
+
+                .suggestion {
+                    margin-top: 1.5rem;
+                    font-size: 0.95rem;
+                    color: #64748b;
+                }
+
+                :host-context(body.dark-mode) .suggestion {
+                    color: #94a3b8;
+                }
+
+                @keyframes fadeInUp {
+                    from {
                         opacity: 0;
-                        transform: scale(0.3) translateY(20px);
+                        transform: translateY(30px);
                     }
-                    50% {
-                        transform: scale(1.05) translateY(-5px);
-                    }
-                    70% {
-                        transform: scale(0.95) translateY(2px);
-                    }
-                    100% {
+                    to {
                         opacity: 1;
-                        transform: scale(1) translateY(0);
+                        transform: translateY(0);
                     }
                 }
 
-                @keyframes pulse {
-                    0%, 100% {
-                        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+                @keyframes bounce {
+                    from {
+                        opacity: 0;
+                        transform: scale(0);
                     }
                     50% {
-                        box-shadow: 0 4px 25px rgba(0, 0, 0, 0.3);
+                        transform: scale(1.2);
+                    }
+                    to {
+                        opacity: 1;
+                        transform: scale(1);
+                    }
+                }
+
+                @keyframes slideIn {
+                    from {
+                        opacity: 0;
+                        transform: translateY(20px);
+                    }
+                    to {
+                        opacity: 1;
+                        transform: translateY(0);
                     }
                 }
 
                 @media (max-width: 480px) {
-                    .set-card {
-                        padding: 0.85rem 0.9rem;
+                    .recommendation-card {
+                        padding: 1.5rem;
                     }
-                    .lotto-ball {
-                        width: 46px;
-                        height: 46px;
-                        font-size: 1.1rem;
+                    .emoji {
+                        font-size: 3rem;
+                    }
+                    .menu-name {
+                        font-size: 1.8rem;
                     }
                 }
             </style>
-            <div class="sets">
-                ${this.sets.map((setNumbers, setIndex) => `
-                    <div class="set-card">
-                        <div class="set-label">Set ${setIndex + 1}</div>
-                        <div class="lotto-container">
-                            ${setNumbers.map((num, index) => `
-                                <div class="lotto-ball ${this.getBallClass(num)}" style="animation-delay: ${index * 0.08}s">${num}</div>
-                            `).join('')}
-                        </div>
-                    </div>
-                `).join('')}
+            <div class="recommendation-card">
+                <div class="emoji">${this.recommendation.emoji}</div>
+                <p class="category">${this.recommendation.category}</p>
+                <h2 class="menu-name">${this.recommendation.menu}</h2>
+                <p class="suggestion">오늘 저녁은 이거 어때요?</p>
             </div>
         `;
     }
 }
 
-customElements.define('lotto-numbers', LottoNumbers);
+customElements.define('menu-recommendation', MenuRecommendation);
 
 document.getElementById('generate-btn').addEventListener('click', () => {
-    document.querySelector('lotto-numbers').generateNumbers();
+    document.querySelector('menu-recommendation').generateRecommendation();
 });
 
 // Theme toggle functionality
 const themeToggleBtn = document.getElementById('theme-toggle-btn');
 const body = document.body;
 
-// Function to update the theme icon
 const updateThemeIcon = (theme) => {
     themeToggleBtn.textContent = theme === 'dark' ? '🌙' : '☀️';
 };
 
-// Function to set the theme
 const setTheme = (theme) => {
     if (theme === 'dark') {
         body.classList.add('dark-mode');
@@ -174,12 +206,10 @@ const setTheme = (theme) => {
     updateThemeIcon(theme);
 };
 
-// Check for saved theme in localStorage
 const savedTheme = localStorage.getItem('theme');
 if (savedTheme) {
     setTheme(savedTheme);
 } else {
-    // Check for system preference
     if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
         setTheme('dark');
     } else {
@@ -187,7 +217,6 @@ if (savedTheme) {
     }
 }
 
-// Event listener for the theme toggle button
 themeToggleBtn.addEventListener('click', () => {
     if (body.classList.contains('dark-mode')) {
         setTheme('light');
