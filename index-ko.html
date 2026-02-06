@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>건강식 하루 메뉴 추천</title>
+    <meta name="description" content="아침, 점심, 저녁 건강식 메뉴를 칼로리 정보와 함께 매일 추천받으세요.">
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -11,10 +12,10 @@
         <button id="theme-toggle-btn" aria-label="테마 변경">☀️</button>
         <h1>건강식 하루 메뉴</h1>
         <p class="subtitle">아침·점심·저녁을 균형 있게 추천해드려요</p>
-        <div class="lang-toggle" role="navigation" aria-label="언어 선택">
+        <nav class="lang-toggle" aria-label="언어 선택">
             <a class="lang-option" href="index.html">EN</a>
             <a class="lang-option" href="index-ko.html" aria-current="page">KO</a>
-        </div>
+        </nav>
         <daily-menus></daily-menus>
         <button id="generate-btn">오늘의 건강식 추천</button>
         <a class="weekly-link" href="weekly.html">1주일치 건강식 플랜 보기</a>
@@ -37,9 +38,10 @@
         </div>
 
         <div id="disqus_thread"></div>
-        <noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+        <noscript>댓글을 보려면 JavaScript를 활성화해 주세요. <a href="https://disqus.com/?ref_noscript">Disqus 제공 댓글.</a></noscript>
     </div>
-    <script src="main-ko.js"></script>
+    <script src="theme.js"></script>
+    <script src="main.js"></script>
     <script src="lang.js"></script>
     <script>
         var disqus_config = function () {

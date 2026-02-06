@@ -38,7 +38,7 @@ body {
     min-height: 100vh;
     background: var(--background-color);
     color: var(--text-color);
-    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: background 0.4s cubic-bezier(0.4, 0, 0.2, 1), color 0.4s cubic-bezier(0.4, 0, 0.2, 1);
     padding: 1rem;
 }
 
@@ -334,6 +334,20 @@ body.dark-mode .weekly .meal-row {
     font-weight: 700;
     color: #fff;
     background: linear-gradient(135deg, #f97316 0%, #fb7185 100%);
+}
+
+@media (max-width: 768px) {
+    .container {
+        padding: 2.5rem 2rem;
+    }
+
+    .weekly .weekly-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .grocery-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
 }
 
 @media (max-width: 480px) {

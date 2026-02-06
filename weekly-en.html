@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>7-Day Healthy Meal Plan</title>
+    <meta name="description" content="Plan your week with balanced, healthy meals for breakfast, lunch, and dinner.">
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -11,10 +12,10 @@
         <button id="theme-toggle-btn" aria-label="Toggle theme">☀️</button>
         <h1>7-Day Healthy Meal Plan</h1>
         <p class="subtitle">A balanced view of breakfast, lunch, and dinner</p>
-        <div class="lang-toggle" role="navigation" aria-label="Language">
+        <nav class="lang-toggle" aria-label="Language">
             <a class="lang-option" href="weekly-en.html" aria-current="page">EN</a>
             <a class="lang-option" href="weekly.html">KO</a>
-        </div>
+        </nav>
         <div class="weekly-controls" role="tablist" aria-label="Day filter">
             <button class="filter-btn" data-filter="all" aria-pressed="true">All</button>
             <button class="filter-btn" data-filter="mon">Mon</button>
@@ -70,9 +71,10 @@
                 <div class="meal-row"><span class="meal-tag">EVE</span> <span class="meal-text" data-meal="dinner"></span></div>
             </section>
         </div>
-        <a class="weekly-link" href="index-en.html">Back to today's picks</a>
+        <a class="weekly-link" href="index.html">Back to today's picks</a>
         <a class="weekly-link" href="grocery-en.html">Open grocery list</a>
     </div>
+    <script src="theme.js"></script>
     <script src="menu-data.js"></script>
     <script src="weekly.js"></script>
     <script src="lang.js"></script>

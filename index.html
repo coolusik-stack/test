@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Healthy Daily Menu</title>
+    <meta name="description" content="Get daily healthy meal recommendations for breakfast, lunch, and dinner with calorie information.">
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -11,10 +12,10 @@
         <button id="theme-toggle-btn" aria-label="Toggle theme">☀️</button>
         <h1>Healthy Daily Menu</h1>
         <p class="subtitle">Balanced picks for breakfast, lunch, and dinner</p>
-        <div class="lang-toggle" role="navigation" aria-label="Language">
+        <nav class="lang-toggle" aria-label="Language">
             <a class="lang-option" href="index.html" aria-current="page">EN</a>
             <a class="lang-option" href="index-ko.html">KO</a>
-        </div>
+        </nav>
         <daily-menus></daily-menus>
         <button id="generate-btn">Get Today's Healthy Picks</button>
         <a class="weekly-link" href="weekly-en.html">View 7-Day Healthy Plan</a>
@@ -39,7 +40,8 @@
         <div id="disqus_thread"></div>
         <noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
     </div>
-    <script src="main-en.js"></script>
+    <script src="theme.js"></script>
+    <script src="main.js"></script>
     <script src="lang.js"></script>
     <script>
         var disqus_config = function () {
