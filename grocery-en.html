@@ -16,11 +16,21 @@
             <a class="lang-option" href="grocery-en.html" aria-current="page">EN</a>
             <a class="lang-option" href="grocery.html">KO</a>
         </nav>
+        <nav class="page-nav" aria-label="Page navigation">
+            <a href="index.html"><span class="nav-icon">🍽</span> Daily</a>
+            <a href="weekly-en.html"><span class="nav-icon">📅</span> Weekly</a>
+            <a href="grocery-en.html" aria-current="page"><span class="nav-icon">🛒</span> Grocery</a>
+        </nav>
         <div class="weekly-controls">
             <button class="filter-btn" id="regenerate-list">Regenerate list</button>
         </div>
         <div id="grocery-list" class="grocery-grid"></div>
-        <a class="weekly-link" href="weekly-en.html">Back to weekly plan</a>
+        <div class="links-row">
+            <a class="weekly-link" href="weekly-en.html">Back to weekly plan</a>
+        </div>
+        <footer class="site-footer">
+            <p>Healthy Daily Menu &mdash; Eat well, live well.</p>
+        </footer>
     </div>
     <script src="menu-data.js"></script>
     <script src="grocery.js"></script>

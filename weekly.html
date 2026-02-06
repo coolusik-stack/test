@@ -16,6 +16,11 @@
             <a class="lang-option" href="weekly-en.html">EN</a>
             <a class="lang-option" href="weekly.html" aria-current="page">KO</a>
         </nav>
+        <nav class="page-nav" aria-label="페이지 내비게이션">
+            <a href="index-ko.html"><span class="nav-icon">🍽</span> 오늘의 추천</a>
+            <a href="weekly.html" aria-current="page"><span class="nav-icon">📅</span> 주간 플랜</a>
+            <a href="grocery.html"><span class="nav-icon">🛒</span> 장보기</a>
+        </nav>
         <div class="weekly-controls" role="tablist" aria-label="요일 필터">
             <button class="filter-btn" data-filter="all" aria-pressed="true">전체</button>
             <button class="filter-btn" data-filter="mon">월</button>
@@ -30,49 +35,54 @@
         <div class="weekly-grid">
             <section class="day-card" data-day="mon">
                 <div class="day-label">월요일</div>
-                <div class="meal-row"><span class="meal-tag">아침</span> <span class="meal-text" data-meal="breakfast"></span></div>
-                <div class="meal-row"><span class="meal-tag">점심</span> <span class="meal-text" data-meal="lunch"></span></div>
-                <div class="meal-row"><span class="meal-tag">저녁</span> <span class="meal-text" data-meal="dinner"></span></div>
+                <div class="meal-row"><span class="meal-tag tag-breakfast">아침</span> <span class="meal-text" data-meal="breakfast"></span></div>
+                <div class="meal-row"><span class="meal-tag tag-lunch">점심</span> <span class="meal-text" data-meal="lunch"></span></div>
+                <div class="meal-row"><span class="meal-tag tag-dinner">저녁</span> <span class="meal-text" data-meal="dinner"></span></div>
             </section>
             <section class="day-card" data-day="tue">
                 <div class="day-label">화요일</div>
-                <div class="meal-row"><span class="meal-tag">아침</span> <span class="meal-text" data-meal="breakfast"></span></div>
-                <div class="meal-row"><span class="meal-tag">점심</span> <span class="meal-text" data-meal="lunch"></span></div>
-                <div class="meal-row"><span class="meal-tag">저녁</span> <span class="meal-text" data-meal="dinner"></span></div>
+                <div class="meal-row"><span class="meal-tag tag-breakfast">아침</span> <span class="meal-text" data-meal="breakfast"></span></div>
+                <div class="meal-row"><span class="meal-tag tag-lunch">점심</span> <span class="meal-text" data-meal="lunch"></span></div>
+                <div class="meal-row"><span class="meal-tag tag-dinner">저녁</span> <span class="meal-text" data-meal="dinner"></span></div>
             </section>
             <section class="day-card" data-day="wed">
                 <div class="day-label">수요일</div>
-                <div class="meal-row"><span class="meal-tag">아침</span> <span class="meal-text" data-meal="breakfast"></span></div>
-                <div class="meal-row"><span class="meal-tag">점심</span> <span class="meal-text" data-meal="lunch"></span></div>
-                <div class="meal-row"><span class="meal-tag">저녁</span> <span class="meal-text" data-meal="dinner"></span></div>
+                <div class="meal-row"><span class="meal-tag tag-breakfast">아침</span> <span class="meal-text" data-meal="breakfast"></span></div>
+                <div class="meal-row"><span class="meal-tag tag-lunch">점심</span> <span class="meal-text" data-meal="lunch"></span></div>
+                <div class="meal-row"><span class="meal-tag tag-dinner">저녁</span> <span class="meal-text" data-meal="dinner"></span></div>
             </section>
             <section class="day-card" data-day="thu">
                 <div class="day-label">목요일</div>
-                <div class="meal-row"><span class="meal-tag">아침</span> <span class="meal-text" data-meal="breakfast"></span></div>
-                <div class="meal-row"><span class="meal-tag">점심</span> <span class="meal-text" data-meal="lunch"></span></div>
-                <div class="meal-row"><span class="meal-tag">저녁</span> <span class="meal-text" data-meal="dinner"></span></div>
+                <div class="meal-row"><span class="meal-tag tag-breakfast">아침</span> <span class="meal-text" data-meal="breakfast"></span></div>
+                <div class="meal-row"><span class="meal-tag tag-lunch">점심</span> <span class="meal-text" data-meal="lunch"></span></div>
+                <div class="meal-row"><span class="meal-tag tag-dinner">저녁</span> <span class="meal-text" data-meal="dinner"></span></div>
             </section>
             <section class="day-card" data-day="fri">
                 <div class="day-label">금요일</div>
-                <div class="meal-row"><span class="meal-tag">아침</span> <span class="meal-text" data-meal="breakfast"></span></div>
-                <div class="meal-row"><span class="meal-tag">점심</span> <span class="meal-text" data-meal="lunch"></span></div>
-                <div class="meal-row"><span class="meal-tag">저녁</span> <span class="meal-text" data-meal="dinner"></span></div>
+                <div class="meal-row"><span class="meal-tag tag-breakfast">아침</span> <span class="meal-text" data-meal="breakfast"></span></div>
+                <div class="meal-row"><span class="meal-tag tag-lunch">점심</span> <span class="meal-text" data-meal="lunch"></span></div>
+                <div class="meal-row"><span class="meal-tag tag-dinner">저녁</span> <span class="meal-text" data-meal="dinner"></span></div>
             </section>
             <section class="day-card" data-day="sat">
                 <div class="day-label">토요일</div>
-                <div class="meal-row"><span class="meal-tag">아침</span> <span class="meal-text" data-meal="breakfast"></span></div>
-                <div class="meal-row"><span class="meal-tag">점심</span> <span class="meal-text" data-meal="lunch"></span></div>
-                <div class="meal-row"><span class="meal-tag">저녁</span> <span class="meal-text" data-meal="dinner"></span></div>
+                <div class="meal-row"><span class="meal-tag tag-breakfast">아침</span> <span class="meal-text" data-meal="breakfast"></span></div>
+                <div class="meal-row"><span class="meal-tag tag-lunch">점심</span> <span class="meal-text" data-meal="lunch"></span></div>
+                <div class="meal-row"><span class="meal-tag tag-dinner">저녁</span> <span class="meal-text" data-meal="dinner"></span></div>
             </section>
             <section class="day-card" data-day="sun">
                 <div class="day-label">일요일</div>
-                <div class="meal-row"><span class="meal-tag">아침</span> <span class="meal-text" data-meal="breakfast"></span></div>
-                <div class="meal-row"><span class="meal-tag">점심</span> <span class="meal-text" data-meal="lunch"></span></div>
-                <div class="meal-row"><span class="meal-tag">저녁</span> <span class="meal-text" data-meal="dinner"></span></div>
+                <div class="meal-row"><span class="meal-tag tag-breakfast">아침</span> <span class="meal-text" data-meal="breakfast"></span></div>
+                <div class="meal-row"><span class="meal-tag tag-lunch">점심</span> <span class="meal-text" data-meal="lunch"></span></div>
+                <div class="meal-row"><span class="meal-tag tag-dinner">저녁</span> <span class="meal-text" data-meal="dinner"></span></div>
             </section>
         </div>
-        <a class="weekly-link" href="index-ko.html">오늘의 추천으로 돌아가기</a>
-        <a class="weekly-link" href="grocery.html">장보기 리스트 보기</a>
+        <div class="links-row">
+            <a class="weekly-link" href="index-ko.html">오늘의 추천으로 돌아가기</a>
+            <a class="weekly-link" href="grocery.html">장보기 리스트 보기</a>
+        </div>
+        <footer class="site-footer">
+            <p>건강식 하루 메뉴 &mdash; 잘 먹고, 잘 살자.</p>
+        </footer>
     </div>
     <script src="theme.js"></script>
     <script src="menu-data.js"></script>

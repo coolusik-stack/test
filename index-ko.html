@@ -16,29 +16,45 @@
             <a class="lang-option" href="index.html">EN</a>
             <a class="lang-option" href="index-ko.html" aria-current="page">KO</a>
         </nav>
+        <nav class="page-nav" aria-label="페이지 내비게이션">
+            <a href="index-ko.html" aria-current="page"><span class="nav-icon">🍽</span> 오늘의 추천</a>
+            <a href="weekly.html"><span class="nav-icon">📅</span> 주간 플랜</a>
+            <a href="grocery.html"><span class="nav-icon">🛒</span> 장보기</a>
+        </nav>
         <daily-menus></daily-menus>
         <button id="generate-btn">오늘의 건강식 추천</button>
-        <a class="weekly-link" href="weekly.html">1주일치 건강식 플랜 보기</a>
+        <div class="links-row">
+            <a class="weekly-link" href="weekly.html">1주일치 건강식 플랜 보기</a>
+        </div>
+
+        <hr class="section-divider">
 
         <div class="contact-form-section">
             <h2>제휴 문의</h2>
             <p>협업에 관심 있으시면 언제든지 연락 주세요!</p>
             <form action="https://formspree.io/f/mjgebdbw" method="POST" class="contact-form">
-                <label for="name">이름:</label>
-                <input type="text" id="name" name="name" required>
-
-                <label for="email">이메일:</label>
-                <input type="email" id="email" name="email" required>
-
-                <label for="message">메시지:</label>
-                <textarea id="message" name="message" rows="5" required></textarea>
-
+                <div class="form-group">
+                    <label for="name">이름</label>
+                    <input type="text" id="name" name="name" placeholder="이름을 입력하세요" required>
+                </div>
+                <div class="form-group">
+                    <label for="email">이메일</label>
+                    <input type="email" id="email" name="email" placeholder="example@email.com" required>
+                </div>
+                <div class="form-group">
+                    <label for="message">메시지</label>
+                    <textarea id="message" name="message" rows="5" placeholder="아이디어를 알려주세요..." required></textarea>
+                </div>
                 <button type="submit">문의 보내기</button>
             </form>
         </div>
 
         <div id="disqus_thread"></div>
         <noscript>댓글을 보려면 JavaScript를 활성화해 주세요. <a href="https://disqus.com/?ref_noscript">Disqus 제공 댓글.</a></noscript>
+
+        <footer class="site-footer">
+            <p>건강식 하루 메뉴 &mdash; 잘 먹고, 잘 살자.</p>
+        </footer>
     </div>
     <script src="theme.js"></script>
     <script src="main.js"></script>
@@ -58,5 +74,3 @@
     </script>
 </body>
 </html>
-
-

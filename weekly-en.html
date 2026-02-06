@@ -16,6 +16,11 @@
             <a class="lang-option" href="weekly-en.html" aria-current="page">EN</a>
             <a class="lang-option" href="weekly.html">KO</a>
         </nav>
+        <nav class="page-nav" aria-label="Page navigation">
+            <a href="index.html"><span class="nav-icon">🍽</span> Daily</a>
+            <a href="weekly-en.html" aria-current="page"><span class="nav-icon">📅</span> Weekly</a>
+            <a href="grocery-en.html"><span class="nav-icon">🛒</span> Grocery</a>
+        </nav>
         <div class="weekly-controls" role="tablist" aria-label="Day filter">
             <button class="filter-btn" data-filter="all" aria-pressed="true">All</button>
             <button class="filter-btn" data-filter="mon">Mon</button>
@@ -30,49 +35,54 @@
         <div class="weekly-grid">
             <section class="day-card" data-day="mon">
                 <div class="day-label">Monday</div>
-                <div class="meal-row"><span class="meal-tag">AM</span> <span class="meal-text" data-meal="breakfast"></span></div>
-                <div class="meal-row"><span class="meal-tag">PM</span> <span class="meal-text" data-meal="lunch"></span></div>
-                <div class="meal-row"><span class="meal-tag">EVE</span> <span class="meal-text" data-meal="dinner"></span></div>
+                <div class="meal-row"><span class="meal-tag tag-breakfast">AM</span> <span class="meal-text" data-meal="breakfast"></span></div>
+                <div class="meal-row"><span class="meal-tag tag-lunch">PM</span> <span class="meal-text" data-meal="lunch"></span></div>
+                <div class="meal-row"><span class="meal-tag tag-dinner">EVE</span> <span class="meal-text" data-meal="dinner"></span></div>
             </section>
             <section class="day-card" data-day="tue">
                 <div class="day-label">Tuesday</div>
-                <div class="meal-row"><span class="meal-tag">AM</span> <span class="meal-text" data-meal="breakfast"></span></div>
-                <div class="meal-row"><span class="meal-tag">PM</span> <span class="meal-text" data-meal="lunch"></span></div>
-                <div class="meal-row"><span class="meal-tag">EVE</span> <span class="meal-text" data-meal="dinner"></span></div>
+                <div class="meal-row"><span class="meal-tag tag-breakfast">AM</span> <span class="meal-text" data-meal="breakfast"></span></div>
+                <div class="meal-row"><span class="meal-tag tag-lunch">PM</span> <span class="meal-text" data-meal="lunch"></span></div>
+                <div class="meal-row"><span class="meal-tag tag-dinner">EVE</span> <span class="meal-text" data-meal="dinner"></span></div>
             </section>
             <section class="day-card" data-day="wed">
                 <div class="day-label">Wednesday</div>
-                <div class="meal-row"><span class="meal-tag">AM</span> <span class="meal-text" data-meal="breakfast"></span></div>
-                <div class="meal-row"><span class="meal-tag">PM</span> <span class="meal-text" data-meal="lunch"></span></div>
-                <div class="meal-row"><span class="meal-tag">EVE</span> <span class="meal-text" data-meal="dinner"></span></div>
+                <div class="meal-row"><span class="meal-tag tag-breakfast">AM</span> <span class="meal-text" data-meal="breakfast"></span></div>
+                <div class="meal-row"><span class="meal-tag tag-lunch">PM</span> <span class="meal-text" data-meal="lunch"></span></div>
+                <div class="meal-row"><span class="meal-tag tag-dinner">EVE</span> <span class="meal-text" data-meal="dinner"></span></div>
             </section>
             <section class="day-card" data-day="thu">
                 <div class="day-label">Thursday</div>
-                <div class="meal-row"><span class="meal-tag">AM</span> <span class="meal-text" data-meal="breakfast"></span></div>
-                <div class="meal-row"><span class="meal-tag">PM</span> <span class="meal-text" data-meal="lunch"></span></div>
-                <div class="meal-row"><span class="meal-tag">EVE</span> <span class="meal-text" data-meal="dinner"></span></div>
+                <div class="meal-row"><span class="meal-tag tag-breakfast">AM</span> <span class="meal-text" data-meal="breakfast"></span></div>
+                <div class="meal-row"><span class="meal-tag tag-lunch">PM</span> <span class="meal-text" data-meal="lunch"></span></div>
+                <div class="meal-row"><span class="meal-tag tag-dinner">EVE</span> <span class="meal-text" data-meal="dinner"></span></div>
             </section>
             <section class="day-card" data-day="fri">
                 <div class="day-label">Friday</div>
-                <div class="meal-row"><span class="meal-tag">AM</span> <span class="meal-text" data-meal="breakfast"></span></div>
-                <div class="meal-row"><span class="meal-tag">PM</span> <span class="meal-text" data-meal="lunch"></span></div>
-                <div class="meal-row"><span class="meal-tag">EVE</span> <span class="meal-text" data-meal="dinner"></span></div>
+                <div class="meal-row"><span class="meal-tag tag-breakfast">AM</span> <span class="meal-text" data-meal="breakfast"></span></div>
+                <div class="meal-row"><span class="meal-tag tag-lunch">PM</span> <span class="meal-text" data-meal="lunch"></span></div>
+                <div class="meal-row"><span class="meal-tag tag-dinner">EVE</span> <span class="meal-text" data-meal="dinner"></span></div>
             </section>
             <section class="day-card" data-day="sat">
                 <div class="day-label">Saturday</div>
-                <div class="meal-row"><span class="meal-tag">AM</span> <span class="meal-text" data-meal="breakfast"></span></div>
-                <div class="meal-row"><span class="meal-tag">PM</span> <span class="meal-text" data-meal="lunch"></span></div>
-                <div class="meal-row"><span class="meal-tag">EVE</span> <span class="meal-text" data-meal="dinner"></span></div>
+                <div class="meal-row"><span class="meal-tag tag-breakfast">AM</span> <span class="meal-text" data-meal="breakfast"></span></div>
+                <div class="meal-row"><span class="meal-tag tag-lunch">PM</span> <span class="meal-text" data-meal="lunch"></span></div>
+                <div class="meal-row"><span class="meal-tag tag-dinner">EVE</span> <span class="meal-text" data-meal="dinner"></span></div>
             </section>
             <section class="day-card" data-day="sun">
                 <div class="day-label">Sunday</div>
-                <div class="meal-row"><span class="meal-tag">AM</span> <span class="meal-text" data-meal="breakfast"></span></div>
-                <div class="meal-row"><span class="meal-tag">PM</span> <span class="meal-text" data-meal="lunch"></span></div>
-                <div class="meal-row"><span class="meal-tag">EVE</span> <span class="meal-text" data-meal="dinner"></span></div>
+                <div class="meal-row"><span class="meal-tag tag-breakfast">AM</span> <span class="meal-text" data-meal="breakfast"></span></div>
+                <div class="meal-row"><span class="meal-tag tag-lunch">PM</span> <span class="meal-text" data-meal="lunch"></span></div>
+                <div class="meal-row"><span class="meal-tag tag-dinner">EVE</span> <span class="meal-text" data-meal="dinner"></span></div>
             </section>
         </div>
-        <a class="weekly-link" href="index.html">Back to today's picks</a>
-        <a class="weekly-link" href="grocery-en.html">Open grocery list</a>
+        <div class="links-row">
+            <a class="weekly-link" href="index.html">Back to today's picks</a>
+            <a class="weekly-link" href="grocery-en.html">Open grocery list</a>
+        </div>
+        <footer class="site-footer">
+            <p>Healthy Daily Menu &mdash; Eat well, live well.</p>
+        </footer>
     </div>
     <script src="theme.js"></script>
     <script src="menu-data.js"></script>

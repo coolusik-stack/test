@@ -177,11 +177,27 @@ class DailyMenus extends HTMLElement {
                     border: 1px solid rgba(15, 23, 42, 0.08);
                     text-align: center;
                     animation: rise 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+                    opacity: 0;
+                    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.3s ease;
+                    cursor: default;
+                }
+
+                .menu-card:nth-child(1) { animation-delay: 0s; }
+                .menu-card:nth-child(2) { animation-delay: 0.1s; }
+                .menu-card:nth-child(3) { animation-delay: 0.2s; }
+
+                .menu-card:hover {
+                    transform: translateY(-6px);
+                    box-shadow: 0 18px 40px rgba(15, 23, 42, 0.18);
                 }
 
                 :host-context(body.dark-mode) .menu-card {
                     background: linear-gradient(135deg, rgba(15, 23, 42, 0.85) 0%, rgba(15, 23, 42, 0.65) 100%);
                     border: 1px solid rgba(148, 163, 184, 0.15);
+                }
+
+                :host-context(body.dark-mode) .menu-card:hover {
+                    box-shadow: 0 18px 40px rgba(0, 0, 0, 0.35);
                 }
 
                 .menu-label {
@@ -199,6 +215,11 @@ class DailyMenus extends HTMLElement {
                 .menu-emoji {
                     font-size: 2.5rem;
                     margin-bottom: 0.5rem;
+                    transition: transform 0.3s ease;
+                }
+
+                .menu-card:hover .menu-emoji {
+                    transform: scale(1.15);
                 }
 
                 .menu-name {
@@ -213,12 +234,18 @@ class DailyMenus extends HTMLElement {
                 }
 
                 .menu-calories {
-                    font-size: 0.9rem;
-                    color: #4a5568;
+                    font-size: 0.85rem;
+                    color: #78716c;
+                    font-weight: 500;
+                    padding: 0.2rem 0.6rem;
+                    background: rgba(249, 115, 22, 0.08);
+                    border-radius: 999px;
+                    display: inline-block;
                 }
 
                 :host-context(body.dark-mode) .menu-calories {
                     color: #a0aec0;
+                    background: rgba(251, 146, 60, 0.1);
                 }
 
                 .total-calories {
@@ -228,19 +255,22 @@ class DailyMenus extends HTMLElement {
                     color: #0f172a;
                     text-align: center;
                     padding: 1rem;
-                    border-radius: 12px;
-                    background: rgba(255, 255, 255, 0.7);
+                    border-radius: 16px;
+                    background: linear-gradient(135deg, rgba(255,255,255,0.8), rgba(255,237,213,0.6));
                     box-shadow: 0 5px 15px rgba(15, 23, 42, 0.1);
                     display: flex;
                     justify-content: center;
                     align-items: center;
                     gap: 0.5rem;
+                    border: 1px solid rgba(249, 115, 22, 0.1);
                 }
 
                 :host-context(body.dark-mode) .total-calories {
-                    background: rgba(15, 23, 42, 0.7);
+                    background: linear-gradient(135deg, rgba(15, 23, 42, 0.7), rgba(41, 37, 36, 0.7));
                     color: #e2e8f0;
+                    border-color: rgba(251, 146, 60, 0.15);
                 }
+
                 .total-calories-icon {
                     font-size: 1.5rem;
                     color: #f97316;

@@ -16,11 +16,21 @@
             <a class="lang-option" href="grocery-en.html">EN</a>
             <a class="lang-option" href="grocery.html" aria-current="page">KO</a>
         </nav>
+        <nav class="page-nav" aria-label="페이지 내비게이션">
+            <a href="index-ko.html"><span class="nav-icon">🍽</span> 오늘의 추천</a>
+            <a href="weekly.html"><span class="nav-icon">📅</span> 주간 플랜</a>
+            <a href="grocery.html" aria-current="page"><span class="nav-icon">🛒</span> 장보기</a>
+        </nav>
         <div class="weekly-controls">
             <button class="filter-btn" id="regenerate-list">리스트 다시 생성</button>
         </div>
         <div id="grocery-list" class="grocery-grid"></div>
-        <a class="weekly-link" href="weekly.html">주간 플랜으로 돌아가기</a>
+        <div class="links-row">
+            <a class="weekly-link" href="weekly.html">주간 플랜으로 돌아가기</a>
+        </div>
+        <footer class="site-footer">
+            <p>건강식 하루 메뉴 &mdash; 잘 먹고, 잘 살자.</p>
+        </footer>
     </div>
     <script src="menu-data.js"></script>
     <script src="grocery.js"></script>
