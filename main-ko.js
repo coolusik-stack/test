@@ -1,24 +1,45 @@
 const menuData = {
     breakfast: [
         { name: '오트밀 + 그릭요거트 + 베리', emoji: '🥣' },
-        { name: '통밀 토스트 + 아보카도 + 삶은 달걀', emoji: '🥑' },
+        { name: '통밀 토스트 + 아보카도 + 달걀', emoji: '🥑' },
         { name: '두부 스크램블 + 채소', emoji: '🍳' },
         { name: '과일 + 견과류 + 플레인 요거트', emoji: '🍓' },
-        { name: '현미죽 + 김치 + 나물', emoji: '🍚' }
+        { name: '현미죽 + 나물', emoji: '🍚' },
+        { name: '치아푸딩 + 바나나 + 견과류', emoji: '🥛' },
+        { name: '코티지 치즈 + 사과 + 시나몬', emoji: '🍎' },
+        { name: '달걀 오믈렛 + 시금치 + 토마토', emoji: '🥚' },
+        { name: '통곡물 시리얼 + 우유 + 베리', emoji: '🥛' },
+        { name: '오버나이트 오트 + 아몬드버터', emoji: '🥜' },
+        { name: '스무디 볼 + 그래놀라', emoji: '🍌' },
+        { name: '미소국 + 두부 + 밥', emoji: '🍲' }
     ],
     lunch: [
         { name: '현미/잡곡밥 + 닭가슴살 + 샐러드', emoji: '🥗' },
         { name: '두부 스테이크 + 구운 채소', emoji: '🥦' },
         { name: '연어 샐러드 + 통곡물빵', emoji: '🐟' },
         { name: '닭가슴살 포케 + 현미', emoji: '🍚' },
-        { name: '콩/렌틸 스튜 + 샐러드', emoji: '🥣' }
+        { name: '콩/렌틸 스튜 + 샐러드', emoji: '🥣' },
+        { name: '칠면조 랩 + 믹스그린', emoji: '🌯' },
+        { name: '퀴노아 볼 + 병아리콩 + 채소', emoji: '🥗' },
+        { name: '소바 + 채소 + 두부', emoji: '🍜' },
+        { name: '참치 샐러드 + 통곡물 크래커', emoji: '🐟' },
+        { name: '저지방 비빔밥', emoji: '🍚' },
+        { name: '채소 부리또 볼', emoji: '🌯' },
+        { name: '치킨 수프 + 샐러드', emoji: '🍲' }
     ],
     dinner: [
         { name: '연어 구이 + 구운 채소', emoji: '🐟' },
         { name: '닭가슴살 + 퀴노아 + 샐러드', emoji: '🍗' },
         { name: '두부 구이 + 버섯볶음', emoji: '🍄' },
         { name: '콩/렌틸 스튜 + 통곡물빵', emoji: '🥖' },
-        { name: '채소 듬뿍 샐러드 + 삶은 달걀', emoji: '🥚' }
+        { name: '채소 샐러드 + 삶은 달걀', emoji: '🥚' },
+        { name: '칠면조 미트볼 + 주키니 누들', emoji: '🍝' },
+        { name: '새우 볶음 + 현미밥', emoji: '🍤' },
+        { name: '대구 구이 + 그린 샐러드', emoji: '🐟' },
+        { name: '닭가슴살 카레 + 콜리플라워 라이스', emoji: '🍛' },
+        { name: '속 채운 파프리카', emoji: '🫑' },
+        { name: '두부 채소 볶음', emoji: '🥬' },
+        { name: '닭가슴살 + 고구마 구이', emoji: '🍠' }
     ]
 };
 

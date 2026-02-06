@@ -11,44 +11,58 @@
         <button id="theme-toggle-btn" aria-label="테마 변경">☀️</button>
         <h1>1주일치 건강식 플랜</h1>
         <p class="subtitle">균형 잡힌 아침·점심·저녁을 한눈에 확인하세요</p>
+        <div class="lang-toggle" role="navigation" aria-label="언어 선택">
+            <a class="lang-option" href="weekly-en.html">EN</a>
+            <a class="lang-option" href="weekly.html" aria-current="page">KO</a>
+        </div>
+        <div class="weekly-controls" role="tablist" aria-label="요일 필터">
+            <button class="filter-btn" data-filter="all" aria-pressed="true">전체</button>
+            <button class="filter-btn" data-filter="mon">월</button>
+            <button class="filter-btn" data-filter="tue">화</button>
+            <button class="filter-btn" data-filter="wed">수</button>
+            <button class="filter-btn" data-filter="thu">목</button>
+            <button class="filter-btn" data-filter="fri">금</button>
+            <button class="filter-btn" data-filter="sat">토</button>
+            <button class="filter-btn" data-filter="sun">일</button>
+        </div>
         <div class="weekly-grid">
-            <section class="day-card">
+            <section class="day-card" data-day="mon">
                 <div class="day-label">월요일</div>
                 <div class="meal-row"><span class="meal-tag">아침</span> 오트밀 + 그릭요거트 + 베리</div>
                 <div class="meal-row"><span class="meal-tag">점심</span> 현미/잡곡밥 + 닭가슴살 + 샐러드</div>
                 <div class="meal-row"><span class="meal-tag">저녁</span> 연어 구이 + 구운 채소</div>
             </section>
-            <section class="day-card">
+            <section class="day-card" data-day="tue">
                 <div class="day-label">화요일</div>
                 <div class="meal-row"><span class="meal-tag">아침</span> 통밀 토스트 + 아보카도 + 달걀</div>
                 <div class="meal-row"><span class="meal-tag">점심</span> 두부 스테이크 + 구운 채소</div>
                 <div class="meal-row"><span class="meal-tag">저녁</span> 콩/렌틸 스튜 + 통곡물빵</div>
             </section>
-            <section class="day-card">
+            <section class="day-card" data-day="wed">
                 <div class="day-label">수요일</div>
                 <div class="meal-row"><span class="meal-tag">아침</span> 과일 + 견과류 + 플레인 요거트</div>
                 <div class="meal-row"><span class="meal-tag">점심</span> 연어 샐러드 + 통곡물빵</div>
                 <div class="meal-row"><span class="meal-tag">저녁</span> 두부 구이 + 버섯볶음</div>
             </section>
-            <section class="day-card">
+            <section class="day-card" data-day="thu">
                 <div class="day-label">목요일</div>
                 <div class="meal-row"><span class="meal-tag">아침</span> 현미죽 + 김치 + 나물</div>
                 <div class="meal-row"><span class="meal-tag">점심</span> 닭가슴살 포케 + 현미</div>
                 <div class="meal-row"><span class="meal-tag">저녁</span> 닭가슴살 + 퀴노아 + 샐러드</div>
             </section>
-            <section class="day-card">
+            <section class="day-card" data-day="fri">
                 <div class="day-label">금요일</div>
                 <div class="meal-row"><span class="meal-tag">아침</span> 두부 스크램블 + 채소</div>
                 <div class="meal-row"><span class="meal-tag">점심</span> 콩/렌틸 스튜 + 샐러드</div>
                 <div class="meal-row"><span class="meal-tag">저녁</span> 채소 샐러드 + 삶은 달걀</div>
             </section>
-            <section class="day-card">
+            <section class="day-card" data-day="sat">
                 <div class="day-label">토요일</div>
                 <div class="meal-row"><span class="meal-tag">아침</span> 오트밀 + 바나나 + 견과류</div>
                 <div class="meal-row"><span class="meal-tag">점심</span> 닭가슴살 + 구운 채소</div>
                 <div class="meal-row"><span class="meal-tag">저녁</span> 연어 샐러드 + 통곡물빵</div>
             </section>
-            <section class="day-card">
+            <section class="day-card" data-day="sun">
                 <div class="day-label">일요일</div>
                 <div class="meal-row"><span class="meal-tag">아침</span> 그릭요거트 + 베리 + 씨앗</div>
                 <div class="meal-row"><span class="meal-tag">점심</span> 두부 구이 + 현미 + 나물</div>
@@ -56,7 +70,6 @@
             </section>
         </div>
         <a class="weekly-link" href="index-ko.html">오늘의 추천으로 돌아가기</a>
-        <a class="weekly-link language-link" href="weekly-en.html">English Version</a>
     </div>
     <script src="weekly.js"></script>
 </body>

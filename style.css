@@ -147,14 +147,43 @@ body.dark-mode .subtitle {
     transform: translateY(-1px);
 }
 
-.language-link {
-    margin-left: 0.75rem;
-    font-weight: 500;
-    color: #92400e;
+.lang-toggle {
+    display: inline-flex;
+    gap: 0.35rem;
+    padding: 0.3rem;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.8);
+    border: 1px solid rgba(15, 23, 42, 0.1);
+    margin-bottom: 1.25rem;
 }
 
-body.dark-mode .language-link {
-    color: #fbbf24;
+body.dark-mode .lang-toggle {
+    background: rgba(15, 23, 42, 0.75);
+    border: 1px solid rgba(148, 163, 184, 0.2);
+}
+
+.lang-option {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 48px;
+    padding: 0.35rem 0.8rem;
+    border-radius: 999px;
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: #92400e;
+    text-decoration: none;
+    transition: all 0.2s ease;
+}
+
+.lang-option[aria-current="page"] {
+    background: linear-gradient(135deg, #f97316 0%, #fb7185 100%);
+    color: #fff;
+    box-shadow: 0 6px 16px rgba(249, 115, 22, 0.35);
+}
+
+.lang-option:hover {
+    transform: translateY(-1px);
 }
 
 .weekly .weekly-grid {
@@ -162,6 +191,40 @@ body.dark-mode .language-link {
     grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
     gap: 1rem;
     margin: 1.5rem 0 0.5rem;
+}
+
+.weekly .weekly-controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    justify-content: center;
+    margin: 0.5rem 0 1.25rem;
+}
+
+.weekly .filter-btn {
+    border: none;
+    background: rgba(255, 255, 255, 0.9);
+    color: #9a3412;
+    font-weight: 700;
+    font-size: 0.82rem;
+    padding: 0.4rem 0.8rem;
+    border-radius: 999px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    box-shadow: 0 6px 14px rgba(15, 23, 42, 0.08);
+    border: 1px solid rgba(15, 23, 42, 0.08);
+}
+
+body.dark-mode .weekly .filter-btn {
+    background: rgba(15, 23, 42, 0.8);
+    color: #fbbf24;
+    border: 1px solid rgba(148, 163, 184, 0.2);
+}
+
+.weekly .filter-btn.active {
+    background: linear-gradient(135deg, #f97316 0%, #fb7185 100%);
+    color: #fff;
+    transform: translateY(-1px);
 }
 
 .weekly .day-card {
@@ -193,6 +256,7 @@ body.dark-mode .weekly .day-label {
     font-size: 0.92rem;
     color: #44403c;
     margin-bottom: 0.5rem;
+    line-height: 1.5;
 }
 
 body.dark-mode .weekly .meal-row {
@@ -229,5 +293,9 @@ body.dark-mode .weekly .meal-row {
 
     .weekly .weekly-grid {
         grid-template-columns: 1fr;
+    }
+
+    .lang-toggle {
+        margin-bottom: 1rem;
     }
 }

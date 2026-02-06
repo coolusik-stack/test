@@ -4,21 +4,42 @@ const menuData = {
         { name: 'Whole-grain toast + avocado + egg', emoji: '🥑' },
         { name: 'Tofu scramble + veggies', emoji: '🍳' },
         { name: 'Fruit + nuts + plain yogurt', emoji: '🍓' },
-        { name: 'Brown rice porridge + veggies', emoji: '🍚' }
+        { name: 'Brown rice porridge + veggies', emoji: '🍚' },
+        { name: 'Chia pudding + banana + nuts', emoji: '🥛' },
+        { name: 'Cottage cheese + apple + cinnamon', emoji: '🍎' },
+        { name: 'Egg omelet + spinach + tomato', emoji: '🥚' },
+        { name: 'Whole-grain cereal + milk + berries', emoji: '🥛' },
+        { name: 'Overnight oats + almond butter', emoji: '🥜' },
+        { name: 'Smoothie bowl + granola', emoji: '🍌' },
+        { name: 'Miso soup + tofu + rice', emoji: '🍲' }
     ],
     lunch: [
         { name: 'Brown rice + grilled chicken + salad', emoji: '🥗' },
         { name: 'Tofu steak + roasted veggies', emoji: '🥦' },
         { name: 'Salmon salad + whole-grain bread', emoji: '🐟' },
         { name: 'Chicken poke bowl + brown rice', emoji: '🍚' },
-        { name: 'Bean/lentil stew + salad', emoji: '🥣' }
+        { name: 'Bean/lentil stew + salad', emoji: '🥣' },
+        { name: 'Turkey wrap + mixed greens', emoji: '🌯' },
+        { name: 'Quinoa bowl + chickpeas + veggies', emoji: '🥗' },
+        { name: 'Soba noodles + veggies + tofu', emoji: '🍜' },
+        { name: 'Tuna salad + whole-grain crackers', emoji: '🐟' },
+        { name: 'Bibimbap with lean protein', emoji: '🍚' },
+        { name: 'Veggie burrito bowl', emoji: '🌯' },
+        { name: 'Chicken soup + side salad', emoji: '🍲' }
     ],
     dinner: [
         { name: 'Baked salmon + roasted veggies', emoji: '🐟' },
         { name: 'Chicken + quinoa + salad', emoji: '🍗' },
         { name: 'Grilled tofu + sautéed mushrooms', emoji: '🍄' },
         { name: 'Bean/lentil stew + whole-grain bread', emoji: '🥖' },
-        { name: 'Veggie salad + boiled eggs', emoji: '🥚' }
+        { name: 'Veggie salad + boiled eggs', emoji: '🥚' },
+        { name: 'Turkey meatballs + zucchini noodles', emoji: '🍝' },
+        { name: 'Shrimp stir-fry + brown rice', emoji: '🍤' },
+        { name: 'Baked cod + greens', emoji: '🐟' },
+        { name: 'Chicken curry + cauliflower rice', emoji: '🍛' },
+        { name: 'Stuffed bell peppers', emoji: '🫑' },
+        { name: 'Tofu vegetable stir-fry', emoji: '🥬' },
+        { name: 'Grilled chicken + roasted sweet potato', emoji: '🍠' }
     ]
 };
 

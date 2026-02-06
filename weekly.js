@@ -2,7 +2,9 @@ const themeToggleBtn = document.getElementById('theme-toggle-btn');
 const body = document.body;
 
 const updateThemeIcon = (theme) => {
-    themeToggleBtn.textContent = theme === 'dark' ? '🌙' : '☀️';
+    if (themeToggleBtn) {
+        themeToggleBtn.textContent = theme === 'dark' ? '🌙' : '☀️';
+    }
 };
 
 const setTheme = (theme) => {
@@ -27,10 +29,38 @@ if (savedTheme) {
     }
 }
 
-themeToggleBtn.addEventListener('click', () => {
-    if (body.classList.contains('dark-mode')) {
-        setTheme('light');
-    } else {
-        setTheme('dark');
-    }
-});
+if (themeToggleBtn) {
+    themeToggleBtn.addEventListener('click', () => {
+        if (body.classList.contains('dark-mode')) {
+            setTheme('light');
+        } else {
+            setTheme('dark');
+        }
+    });
+}
+
+const filterButtons = document.querySelectorAll('[data-filter]');
+const dayCards = document.querySelectorAll('[data-day]');
+
+const setActiveFilter = (value) => {
+    filterButtons.forEach((btn) => {
+        const isActive = btn.dataset.filter === value;
+        btn.classList.toggle('active', isActive);
+        btn.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+    });
+
+    dayCards.forEach((card) => {
+        const showAll = value === 'all';
+        const matches = card.dataset.day === value;
+        card.style.display = showAll || matches ? 'block' : 'none';
+    });
+};
+
+if (filterButtons.length > 0) {
+    filterButtons.forEach((btn) => {
+        btn.addEventListener('click', () => {
+            setActiveFilter(btn.dataset.filter);
+        });
+    });
+    setActiveFilter('all');
+}
