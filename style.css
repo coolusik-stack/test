@@ -147,6 +147,16 @@ body.dark-mode .subtitle {
     transform: translateY(-1px);
 }
 
+.language-link {
+    margin-left: 0.75rem;
+    font-weight: 500;
+    color: #92400e;
+}
+
+body.dark-mode .language-link {
+    color: #fbbf24;
+}
+
 .weekly .weekly-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
