@@ -24,53 +24,57 @@
             <button class="filter-btn" data-filter="fri">금</button>
             <button class="filter-btn" data-filter="sat">토</button>
             <button class="filter-btn" data-filter="sun">일</button>
+            <button class="filter-btn" id="regenerate-week">플랜 새로 생성</button>
         </div>
         <div class="weekly-grid">
             <section class="day-card" data-day="mon">
                 <div class="day-label">월요일</div>
-                <div class="meal-row"><span class="meal-tag">아침</span> 오트밀 + 그릭요거트 + 베리</div>
-                <div class="meal-row"><span class="meal-tag">점심</span> 현미/잡곡밥 + 닭가슴살 + 샐러드</div>
-                <div class="meal-row"><span class="meal-tag">저녁</span> 연어 구이 + 구운 채소</div>
+                <div class="meal-row"><span class="meal-tag">아침</span> <span class="meal-text" data-meal="breakfast"></span></div>
+                <div class="meal-row"><span class="meal-tag">점심</span> <span class="meal-text" data-meal="lunch"></span></div>
+                <div class="meal-row"><span class="meal-tag">저녁</span> <span class="meal-text" data-meal="dinner"></span></div>
             </section>
             <section class="day-card" data-day="tue">
                 <div class="day-label">화요일</div>
-                <div class="meal-row"><span class="meal-tag">아침</span> 통밀 토스트 + 아보카도 + 달걀</div>
-                <div class="meal-row"><span class="meal-tag">점심</span> 두부 스테이크 + 구운 채소</div>
-                <div class="meal-row"><span class="meal-tag">저녁</span> 콩/렌틸 스튜 + 통곡물빵</div>
+                <div class="meal-row"><span class="meal-tag">아침</span> <span class="meal-text" data-meal="breakfast"></span></div>
+                <div class="meal-row"><span class="meal-tag">점심</span> <span class="meal-text" data-meal="lunch"></span></div>
+                <div class="meal-row"><span class="meal-tag">저녁</span> <span class="meal-text" data-meal="dinner"></span></div>
             </section>
             <section class="day-card" data-day="wed">
                 <div class="day-label">수요일</div>
-                <div class="meal-row"><span class="meal-tag">아침</span> 과일 + 견과류 + 플레인 요거트</div>
-                <div class="meal-row"><span class="meal-tag">점심</span> 연어 샐러드 + 통곡물빵</div>
-                <div class="meal-row"><span class="meal-tag">저녁</span> 두부 구이 + 버섯볶음</div>
+                <div class="meal-row"><span class="meal-tag">아침</span> <span class="meal-text" data-meal="breakfast"></span></div>
+                <div class="meal-row"><span class="meal-tag">점심</span> <span class="meal-text" data-meal="lunch"></span></div>
+                <div class="meal-row"><span class="meal-tag">저녁</span> <span class="meal-text" data-meal="dinner"></span></div>
             </section>
             <section class="day-card" data-day="thu">
                 <div class="day-label">목요일</div>
-                <div class="meal-row"><span class="meal-tag">아침</span> 현미죽 + 김치 + 나물</div>
-                <div class="meal-row"><span class="meal-tag">점심</span> 닭가슴살 포케 + 현미</div>
-                <div class="meal-row"><span class="meal-tag">저녁</span> 닭가슴살 + 퀴노아 + 샐러드</div>
+                <div class="meal-row"><span class="meal-tag">아침</span> <span class="meal-text" data-meal="breakfast"></span></div>
+                <div class="meal-row"><span class="meal-tag">점심</span> <span class="meal-text" data-meal="lunch"></span></div>
+                <div class="meal-row"><span class="meal-tag">저녁</span> <span class="meal-text" data-meal="dinner"></span></div>
             </section>
             <section class="day-card" data-day="fri">
                 <div class="day-label">금요일</div>
-                <div class="meal-row"><span class="meal-tag">아침</span> 두부 스크램블 + 채소</div>
-                <div class="meal-row"><span class="meal-tag">점심</span> 콩/렌틸 스튜 + 샐러드</div>
-                <div class="meal-row"><span class="meal-tag">저녁</span> 채소 샐러드 + 삶은 달걀</div>
+                <div class="meal-row"><span class="meal-tag">아침</span> <span class="meal-text" data-meal="breakfast"></span></div>
+                <div class="meal-row"><span class="meal-tag">점심</span> <span class="meal-text" data-meal="lunch"></span></div>
+                <div class="meal-row"><span class="meal-tag">저녁</span> <span class="meal-text" data-meal="dinner"></span></div>
             </section>
             <section class="day-card" data-day="sat">
                 <div class="day-label">토요일</div>
-                <div class="meal-row"><span class="meal-tag">아침</span> 오트밀 + 바나나 + 견과류</div>
-                <div class="meal-row"><span class="meal-tag">점심</span> 닭가슴살 + 구운 채소</div>
-                <div class="meal-row"><span class="meal-tag">저녁</span> 연어 샐러드 + 통곡물빵</div>
+                <div class="meal-row"><span class="meal-tag">아침</span> <span class="meal-text" data-meal="breakfast"></span></div>
+                <div class="meal-row"><span class="meal-tag">점심</span> <span class="meal-text" data-meal="lunch"></span></div>
+                <div class="meal-row"><span class="meal-tag">저녁</span> <span class="meal-text" data-meal="dinner"></span></div>
             </section>
             <section class="day-card" data-day="sun">
                 <div class="day-label">일요일</div>
-                <div class="meal-row"><span class="meal-tag">아침</span> 그릭요거트 + 베리 + 씨앗</div>
-                <div class="meal-row"><span class="meal-tag">점심</span> 두부 구이 + 현미 + 나물</div>
-                <div class="meal-row"><span class="meal-tag">저녁</span> 콩/렌틸 스튜 + 구운 채소</div>
+                <div class="meal-row"><span class="meal-tag">아침</span> <span class="meal-text" data-meal="breakfast"></span></div>
+                <div class="meal-row"><span class="meal-tag">점심</span> <span class="meal-text" data-meal="lunch"></span></div>
+                <div class="meal-row"><span class="meal-tag">저녁</span> <span class="meal-text" data-meal="dinner"></span></div>
             </section>
         </div>
         <a class="weekly-link" href="index-ko.html">오늘의 추천으로 돌아가기</a>
+        <a class="weekly-link" href="grocery.html">장보기 리스트 보기</a>
     </div>
+    <script src="menu-data.js"></script>
     <script src="weekly.js"></script>
+    <script src="lang.js"></script>
 </body>
 </html>

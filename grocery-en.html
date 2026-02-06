@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Grocery List</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container weekly">
+        <button id="theme-toggle-btn" aria-label="Toggle theme">☀️</button>
+        <h1>Grocery List</h1>
+        <p class="subtitle">Auto-generated from your weekly plan</p>
+        <div class="lang-toggle" role="navigation" aria-label="Language">
+            <a class="lang-option" href="grocery-en.html" aria-current="page">EN</a>
+            <a class="lang-option" href="grocery.html">KO</a>
+        </div>
+        <div class="weekly-controls">
+            <button class="filter-btn" id="regenerate-list">Regenerate list</button>
+        </div>
+        <div id="grocery-list" class="grocery-grid"></div>
+        <a class="weekly-link" href="weekly-en.html">Back to weekly plan</a>
+    </div>
+    <script src="menu-data.js"></script>
+    <script src="grocery.js"></script>
+    <script src="lang.js"></script>
+</body>
+</html>

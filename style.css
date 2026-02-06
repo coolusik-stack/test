@@ -227,6 +227,65 @@ body.dark-mode .weekly .filter-btn {
     transform: translateY(-1px);
 }
 
+.grocery-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 1rem;
+    margin: 1.5rem 0 0.5rem;
+}
+
+.grocery-card {
+    background: rgba(255, 255, 255, 0.92);
+    border-radius: 18px;
+    padding: 1.1rem 1.2rem;
+    box-shadow: 0 10px 30px rgba(15, 23, 42, 0.08);
+    border: 1px solid rgba(15, 23, 42, 0.08);
+}
+
+body.dark-mode .grocery-card {
+    background: rgba(15, 23, 42, 0.85);
+    border: 1px solid rgba(148, 163, 184, 0.15);
+}
+
+.grocery-title {
+    font-size: 0.95rem;
+    font-weight: 700;
+    margin-bottom: 0.6rem;
+    color: #0f172a;
+}
+
+body.dark-mode .grocery-title {
+    color: #e2e8f0;
+}
+
+.grocery-items {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.grocery-item {
+    margin-bottom: 0.45rem;
+    font-size: 0.9rem;
+    color: #44403c;
+}
+
+body.dark-mode .grocery-item {
+    color: #cbd5f5;
+}
+
+.grocery-check {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.grocery-check input {
+    width: 16px;
+    height: 16px;
+    accent-color: #f97316;
+}
+
 .weekly .day-card {
     background: rgba(255, 255, 255, 0.9);
     border-radius: 18px;
@@ -297,5 +356,9 @@ body.dark-mode .weekly .meal-row {
 
     .lang-toggle {
         margin-bottom: 1rem;
+    }
+
+    .grocery-grid {
+        grid-template-columns: 1fr;
     }
 }

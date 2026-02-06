@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>장보기 리스트</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container weekly">
+        <button id="theme-toggle-btn" aria-label="테마 변경">☀️</button>
+        <h1>장보기 리스트</h1>
+        <p class="subtitle">1주일치 플랜을 기준으로 자동 생성됩니다</p>
+        <div class="lang-toggle" role="navigation" aria-label="언어 선택">
+            <a class="lang-option" href="grocery-en.html">EN</a>
+            <a class="lang-option" href="grocery.html" aria-current="page">KO</a>
+        </div>
+        <div class="weekly-controls">
+            <button class="filter-btn" id="regenerate-list">리스트 다시 생성</button>
+        </div>
+        <div id="grocery-list" class="grocery-grid"></div>
+        <a class="weekly-link" href="weekly.html">주간 플랜으로 돌아가기</a>
+    </div>
+    <script src="menu-data.js"></script>
+    <script src="grocery.js"></script>
+    <script src="lang.js"></script>
+</body>
+</html>
