@@ -18,8 +18,26 @@
         <daily-menus></daily-menus>
         <button id="generate-btn">Get Today's Healthy Picks</button>
         <a class="weekly-link" href="weekly-en.html">View 7-Day Healthy Plan</a>
+
+        <div class="contact-form-section">
+            <h2>Partnership Inquiry</h2>
+            <p>Interested in collaborating? Please reach out to us!</p>
+            <form action="https://formspree.io/f/mjgebdbw" method="POST" class="contact-form">
+                <label for="name">Name:</label>
+                <input type="text" id="name" name="name" required>
+
+                <label for="email">Email:</label>
+                <input type="email" id="email" name="email" required>
+
+                <label for="message">Message:</label>
+                <textarea id="message" name="message" rows="5" required></textarea>
+
+                <button type="submit">Send Inquiry</button>
+            </form>
+        </div>
     </div>
     <script src="main-en.js"></script>
     <script src="lang.js"></script>
 </body>
 </html>
+
