@@ -1,209 +1,126 @@
-const menuData = [
-    // 한식
-    { name: '김치찌개', emoji: '🍲', category: '한식' },
-    { name: '된장찌개', emoji: '🍲', category: '한식' },
-    { name: '비빔밥', emoji: '🍚', category: '한식' },
-    { name: '불고기', emoji: '🥩', category: '한식' },
-    { name: '삼겹살', emoji: '🥓', category: '한식' },
-    { name: '갈비찜', emoji: '🍖', category: '한식' },
-    { name: '제육볶음', emoji: '🍳', category: '한식' },
-    { name: '순두부찌개', emoji: '🍲', category: '한식' },
-    { name: '냉면', emoji: '🍜', category: '한식' },
-    { name: '칼국수', emoji: '🍜', category: '한식' },
-    { name: '떡볶이', emoji: '🍢', category: '한식' },
-    { name: '김밥', emoji: '🍙', category: '한식' },
-    { name: '삼계탕', emoji: '🍗', category: '한식' },
-    { name: '감자탕', emoji: '🍖', category: '한식' },
-    { name: '부대찌개', emoji: '🍲', category: '한식' },
-    { name: '족발', emoji: '🦶', category: '한식' },
-    { name: '보쌈', emoji: '🥬', category: '한식' },
-    { name: '곱창', emoji: '🔥', category: '한식' },
+const menuData = {
+    breakfast: [
+        { name: '오트밀 + 그릭요거트 + 베리', emoji: '🥣' },
+        { name: '통밀 토스트 + 아보카도 + 삶은 달걀', emoji: '🥑' },
+        { name: '두부 스크램블 + 채소', emoji: '🍳' },
+        { name: '과일 + 견과류 + 플레인 요거트', emoji: '🍓' },
+        { name: '현미죽 + 김치 + 나물', emoji: '🍚' }
+    ],
+    lunch: [
+        { name: '현미/잡곡밥 + 닭가슴살 + 샐러드', emoji: '🥗' },
+        { name: '두부 스테이크 + 구운 채소', emoji: '🥦' },
+        { name: '연어 샐러드 + 통곡물빵', emoji: '🐟' },
+        { name: '닭가슴살 포케 + 현미', emoji: '🍚' },
+        { name: '콩/렌틸 스튜 + 샐러드', emoji: '🥣' }
+    ],
+    dinner: [
+        { name: '연어 구이 + 구운 채소', emoji: '🐟' },
+        { name: '닭가슴살 + 퀴노아 + 샐러드', emoji: '🍗' },
+        { name: '두부 구이 + 버섯볶음', emoji: '🍄' },
+        { name: '콩/렌틸 스튜 + 통곡물빵', emoji: '🥖' },
+        { name: '채소 듬뿍 샐러드 + 삶은 달걀', emoji: '🥚' }
+    ]
+};
 
-    // 중식
-    { name: '짜장면', emoji: '🍝', category: '중식' },
-    { name: '짬뽕', emoji: '🍜', category: '중식' },
-    { name: '탕수육', emoji: '🍖', category: '중식' },
-    { name: '마파두부', emoji: '🫕', category: '중식' },
-    { name: '깐풍기', emoji: '🍗', category: '중식' },
-    { name: '양장피', emoji: '🥗', category: '중식' },
-    { name: '볶음밥', emoji: '🍛', category: '중식' },
-    { name: '마라탕', emoji: '🌶️', category: '중식' },
-    { name: '훠궈', emoji: '🫕', category: '중식' },
-    { name: '유린기', emoji: '🍗', category: '중식' },
-    { name: '꿔바로우', emoji: '🍖', category: '중식' },
-
-    // 일식
-    { name: '초밥', emoji: '🍣', category: '일식' },
-    { name: '라멘', emoji: '🍜', category: '일식' },
-    { name: '돈카츠', emoji: '🍱', category: '일식' },
-    { name: '우동', emoji: '🍜', category: '일식' },
-    { name: '카레', emoji: '🍛', category: '일식' },
-    { name: '사시미', emoji: '🐟', category: '일식' },
-    { name: '규동', emoji: '🍚', category: '일식' },
-    { name: '오코노미야키', emoji: '🥞', category: '일식' },
-    { name: '타코야키', emoji: '🐙', category: '일식' },
-    { name: '덴푸라', emoji: '🍤', category: '일식' },
-    { name: '가츠동', emoji: '🍱', category: '일식' },
-    { name: '소바', emoji: '🍝', category: '일식' },
-
-    // 양식
-    { name: '파스타', emoji: '🍝', category: '양식' },
-    { name: '피자', emoji: '🍕', category: '양식' },
-    { name: '스테이크', emoji: '🥩', category: '양식' },
-    { name: '햄버거', emoji: '🍔', category: '양식' },
-    { name: '리조또', emoji: '🍚', category: '양식' },
-    { name: '샐러드', emoji: '🥗', category: '양식' },
-    { name: '오믈렛', emoji: '🍳', category: '양식' },
-    { name: '그라탕', emoji: '🧀', category: '양식' },
-    { name: '치킨', emoji: '🍗', category: '양식' },
-    { name: '샌드위치', emoji: '🥪', category: '양식' },
-    { name: '감바스', emoji: '🦐', category: '양식' },
-    { name: '뇨끼', emoji: '🥔', category: '양식' },
-
-    // 아시안
-    { name: '쌀국수', emoji: '🍜', category: '아시안' },
-    { name: '팟타이', emoji: '🍝', category: '아시안' },
-    { name: '똠얌꿍', emoji: '🍲', category: '아시안' },
-    { name: '월남쌈', emoji: '🥬', category: '아시안' },
-    { name: '반미', emoji: '🥖', category: '아시안' },
-    { name: '나시고렝', emoji: '🍛', category: '아시안' },
-    { name: '분짜', emoji: '🍜', category: '아시안' },
-    { name: '커리', emoji: '🍛', category: '아시안' },
-    { name: '양꼬치', emoji: '🍢', category: '아시안' },
-
-    // 분식/간식
-    { name: '라면', emoji: '🍜', category: '분식' },
-    { name: '순대', emoji: '🌭', category: '분식' },
-    { name: '튀김', emoji: '🍤', category: '분식' },
-    { name: '오뎅', emoji: '🍢', category: '분식' },
-    { name: '붕어빵', emoji: '🐟', category: '분식' },
-
-    // 야식
-    { name: '치맥', emoji: '🍺', category: '야식' },
-    { name: '피맥', emoji: '🍕', category: '야식' },
-    { name: '라볶이', emoji: '🍜', category: '야식' }
-];
-
-class MenuRecommendation extends HTMLElement {
+class DailyMenus extends HTMLElement {
     constructor() {
         super();
         this.attachShadow({ mode: 'open' });
-        this.recommendation = null;
+        this.menus = {
+            breakfast: null,
+            lunch: null,
+            dinner: null
+        };
     }
 
     connectedCallback() {
-        this.generateRecommendation();
+        this.generateMenus();
     }
 
-    generateRecommendation() {
-        const randomIndex = Math.floor(Math.random() * menuData.length);
-        this.recommendation = menuData[randomIndex];
+    getRandomMenu(type) {
+        const list = menuData[type] || [];
+        if (list.length === 0) return null;
+        const randomIndex = Math.floor(Math.random() * list.length);
+        return list[randomIndex];
+    }
+
+    generateMenus() {
+        this.menus = {
+            breakfast: this.getRandomMenu('breakfast'),
+            lunch: this.getRandomMenu('lunch'),
+            dinner: this.getRandomMenu('dinner')
+        };
         this.render();
     }
 
-    render() {
-        if (!this.recommendation) return;
+    renderCard(type, label, accent) {
+        const item = this.menus[type];
+        if (!item) return '';
+        return `
+            <div class="menu-card">
+                <div class="menu-label" style="background: ${accent}">${label}</div>
+                <div class="menu-emoji">${item.emoji}</div>
+                <div class="menu-name">${item.name}</div>
+            </div>
+        `;
+    }
 
+    render() {
         this.shadowRoot.innerHTML = `
             <style>
-                .recommendation-card {
-                    margin-top: 2rem;
-                    padding: 2rem;
-                    background: linear-gradient(135deg, rgba(255,255,255,0.8) 0%, rgba(255,255,255,0.6) 100%);
-                    border-radius: 20px;
-                    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
-                    border: 1px solid rgba(255, 255, 255, 0.5);
-                    animation: fadeInUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+                .menu-grid {
+                    margin-top: 1.75rem;
+                    display: grid;
+                    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+                    gap: 1rem;
                 }
 
-                :host-context(body.dark-mode) .recommendation-card {
-                    background: linear-gradient(135deg, rgba(30, 41, 59, 0.8) 0%, rgba(30, 41, 59, 0.6) 100%);
-                    border: 1px solid rgba(148, 163, 184, 0.2);
+                .menu-card {
+                    padding: 1.5rem 1.25rem;
+                    border-radius: 18px;
+                    background: linear-gradient(135deg, rgba(255,255,255,0.95) 0%, rgba(255,255,255,0.75) 100%);
+                    box-shadow: 0 10px 30px rgba(15, 23, 42, 0.12);
+                    border: 1px solid rgba(15, 23, 42, 0.08);
+                    text-align: center;
+                    animation: rise 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
                 }
 
-                .emoji {
-                    font-size: 5rem;
-                    margin-bottom: 1rem;
-                    animation: bounce 0.6s cubic-bezier(0.68, -0.55, 0.265, 1.55) 0.3s forwards;
-                    opacity: 0;
-                    transform: scale(0);
+                :host-context(body.dark-mode) .menu-card {
+                    background: linear-gradient(135deg, rgba(15, 23, 42, 0.85) 0%, rgba(15, 23, 42, 0.65) 100%);
+                    border: 1px solid rgba(148, 163, 184, 0.15);
                 }
 
-                .category {
+                .menu-label {
                     display: inline-block;
-                    font-size: 0.85rem;
-                    font-weight: 600;
                     color: #fff;
-                    background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
-                    padding: 0.35rem 1rem;
-                    border-radius: 20px;
-                    margin-bottom: 1rem;
-                    letter-spacing: 0.05em;
+                    font-weight: 700;
+                    font-size: 0.75rem;
+                    letter-spacing: 0.06em;
+                    text-transform: uppercase;
+                    padding: 0.35rem 0.9rem;
+                    border-radius: 999px;
+                    margin-bottom: 0.75rem;
                 }
 
-                :host-context(body.dark-mode) .category {
-                    background: linear-gradient(135deg, #fb923c 0%, #f97316 100%);
+                .menu-emoji {
+                    font-size: 2.5rem;
+                    margin-bottom: 0.5rem;
                 }
 
                 .menu-name {
-                    font-size: 2.5rem;
-                    font-weight: 700;
-                    background: linear-gradient(135deg, #1c1917 0%, #44403c 100%);
-                    -webkit-background-clip: text;
-                    -webkit-text-fill-color: transparent;
-                    background-clip: text;
-                    margin: 0;
-                    animation: slideIn 0.5s cubic-bezier(0.16, 1, 0.3, 1) 0.2s forwards;
-                    opacity: 0;
-                    transform: translateY(20px);
+                    font-size: 1.05rem;
+                    font-weight: 600;
+                    color: #0f172a;
                 }
 
                 :host-context(body.dark-mode) .menu-name {
-                    background: linear-gradient(135deg, #fafaf9 0%, #d6d3d1 100%);
-                    -webkit-background-clip: text;
-                    -webkit-text-fill-color: transparent;
-                    background-clip: text;
+                    color: #e2e8f0;
                 }
 
-                .suggestion {
-                    margin-top: 1.5rem;
-                    font-size: 0.95rem;
-                    color: #78716c;
-                }
-
-                :host-context(body.dark-mode) .suggestion {
-                    color: #a8a29e;
-                }
-
-                @keyframes fadeInUp {
+                @keyframes rise {
                     from {
                         opacity: 0;
-                        transform: translateY(30px);
-                    }
-                    to {
-                        opacity: 1;
-                        transform: translateY(0);
-                    }
-                }
-
-                @keyframes bounce {
-                    from {
-                        opacity: 0;
-                        transform: scale(0);
-                    }
-                    50% {
-                        transform: scale(1.2);
-                    }
-                    to {
-                        opacity: 1;
-                        transform: scale(1);
-                    }
-                }
-
-                @keyframes slideIn {
-                    from {
-                        opacity: 0;
-                        transform: translateY(20px);
+                        transform: translateY(18px);
                     }
                     to {
                         opacity: 1;
@@ -212,34 +129,32 @@ class MenuRecommendation extends HTMLElement {
                 }
 
                 @media (max-width: 480px) {
-                    .recommendation-card {
-                        padding: 1.5rem;
+                    .menu-card {
+                        padding: 1.2rem 1rem;
                     }
-                    .emoji {
-                        font-size: 4rem;
+                    .menu-emoji {
+                        font-size: 2.1rem;
                     }
                     .menu-name {
-                        font-size: 1.8rem;
+                        font-size: 0.98rem;
                     }
                 }
             </style>
-            <div class="recommendation-card">
-                <div class="emoji">${this.recommendation.emoji}</div>
-                <div class="category">${this.recommendation.category}</div>
-                <h2 class="menu-name">${this.recommendation.name}</h2>
-                <p class="suggestion">오늘 저녁은 이거 어때요?</p>
+            <div class="menu-grid">
+                ${this.renderCard('breakfast', '아침', 'linear-gradient(135deg, #0ea5e9 0%, #38bdf8 100%)')}
+                ${this.renderCard('lunch', '점심', 'linear-gradient(135deg, #22c55e 0%, #84cc16 100%)')}
+                ${this.renderCard('dinner', '저녁', 'linear-gradient(135deg, #f97316 0%, #fb7185 100%)')}
             </div>
         `;
     }
 }
 
-customElements.define('menu-recommendation', MenuRecommendation);
+customElements.define('daily-menus', DailyMenus);
 
 document.getElementById('generate-btn').addEventListener('click', () => {
-    document.querySelector('menu-recommendation').generateRecommendation();
+    document.querySelector('daily-menus').generateMenus();
 });
 
-// Theme toggle functionality
 const themeToggleBtn = document.getElementById('theme-toggle-btn');
 const body = document.body;
 
