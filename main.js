@@ -2,11 +2,12 @@ class LottoNumbers extends HTMLElement {
     constructor() {
         super();
         this.attachShadow({ mode: 'open' });
-        this.numbers = [];
+        this.sets = [];
+        this.setCount = 5;
     }
 
     connectedCallback() {
-        this.render();
+        this.generateNumbers();
     }
 
     getBallClass(num) {
@@ -17,23 +18,55 @@ class LottoNumbers extends HTMLElement {
         return 'ball-41-45';
     }
 
-    generateNumbers() {
+    generateNumberSet() {
         const newNumbers = new Set();
         while (newNumbers.size < 6) {
             newNumbers.add(Math.floor(Math.random() * 45) + 1);
         }
-        this.numbers = Array.from(newNumbers).sort((a, b) => a - b);
+        return Array.from(newNumbers).sort((a, b) => a - b);
+    }
+
+    generateNumbers() {
+        this.sets = Array.from({ length: this.setCount }, () => this.generateNumberSet());
         this.render();
     }
 
     render() {
         this.shadowRoot.innerHTML = `
             <style>
+                .sets {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 1.25rem;
+                    margin-top: 1.5rem;
+                }
+                .set-card {
+                    background: rgba(255, 255, 255, 0.6);
+                    border-radius: 18px;
+                    padding: 1rem 1.25rem;
+                    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+                    border: 1px solid rgba(148, 163, 184, 0.2);
+                }
+                :host-context(.dark-mode) .set-card {
+                    background: rgba(15, 23, 42, 0.6);
+                    border: 1px solid rgba(148, 163, 184, 0.1);
+                }
+                .set-label {
+                    font-weight: 700;
+                    letter-spacing: 0.04em;
+                    text-transform: uppercase;
+                    font-size: 0.75rem;
+                    color: #64748b;
+                    margin-bottom: 0.75rem;
+                    text-align: left;
+                }
+                :host-context(.dark-mode) .set-label {
+                    color: #94a3b8;
+                }
                 .lotto-container {
                     display: flex;
                     gap: 0.75rem;
                     justify-content: center;
-                    margin-top: 1.5rem;
                     flex-wrap: wrap;
                 }
                 .lotto-ball {
@@ -88,6 +121,9 @@ class LottoNumbers extends HTMLElement {
                 }
 
                 @media (max-width: 480px) {
+                    .set-card {
+                        padding: 0.85rem 0.9rem;
+                    }
                     .lotto-ball {
                         width: 46px;
                         height: 46px;
@@ -95,9 +131,16 @@ class LottoNumbers extends HTMLElement {
                     }
                 }
             </style>
-            <div class="lotto-container">
-                ${this.numbers.map((num, index) => `
-                    <div class="lotto-ball ${this.getBallClass(num)}" style="animation-delay: ${index * 0.1}s">${num}</div>
+            <div class="sets">
+                ${this.sets.map((setNumbers, setIndex) => `
+                    <div class="set-card">
+                        <div class="set-label">Set ${setIndex + 1}</div>
+                        <div class="lotto-container">
+                            ${setNumbers.map((num, index) => `
+                                <div class="lotto-ball ${this.getBallClass(num)}" style="animation-delay: ${index * 0.08}s">${num}</div>
+                            `).join('')}
+                        </div>
+                    </div>
                 `).join('')}
             </div>
         `;
