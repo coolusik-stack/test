@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Page Not Found - Healthy Daily Menu</title>
+    <meta name="robots" content="noindex,follow">
+    <link rel="icon" href="/favicon.ico">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1 id="error-title">Page Not Found</h1>
+            <p class="subtitle" id="error-subtitle">The page you're looking for doesn't exist or has been moved.</p>
+        </header>
+        <main>
+            <div class="article-content" style="text-align:center; padding: 2rem 0;">
+                <p style="font-size: 5rem; margin: 0;">404</p>
+                <p id="error-message">Here are some helpful links to get you back on track:</p>
+                <div class="seo-links" style="justify-content: center; margin-top: 1.5rem;">
+                    <a href="index.html" id="link-daily">Daily Menu</a>
+                    <a href="weekly-en.html" id="link-weekly">Weekly Plan</a>
+                    <a href="grocery-en.html" id="link-grocery">Grocery List</a>
+                    <a href="nutrition-en.html" id="link-guide">Nutrition Guide</a>
+                    <a href="about-en.html" id="link-about">About</a>
+                </div>
+            </div>
+        </main>
+        <footer class="site-footer">
+            <p>&copy; 2025 Healthy Daily Menu.</p>
+        </footer>
+    </div>
+    <script>
+        if (navigator.language && navigator.language.startsWith('ko')) {
+            document.documentElement.lang = 'ko';
+            document.getElementById('error-title').textContent = '페이지를 찾을 수 없습니다';
+            document.getElementById('error-subtitle').textContent = '요청하신 페이지가 존재하지 않거나 이동되었습니다.';
+            document.getElementById('error-message').textContent = '아래 링크에서 원하는 페이지를 찾아보세요:';
+            document.getElementById('link-daily').textContent = '오늘의 추천';
+            document.getElementById('link-daily').href = 'index-ko.html';
+            document.getElementById('link-weekly').textContent = '주간 플랜';
+            document.getElementById('link-weekly').href = 'weekly.html';
+            document.getElementById('link-grocery').textContent = '장보기';
+            document.getElementById('link-grocery').href = 'grocery.html';
+            document.getElementById('link-guide').textContent = '영양 가이드';
+            document.getElementById('link-guide').href = 'nutrition-ko.html';
+            document.getElementById('link-about').textContent = '소개';
+            document.getElementById('link-about').href = 'about.html';
+        }
+    </script>
+</body>
+</html>
