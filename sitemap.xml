@@ -2,115 +2,115 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
         xmlns:xhtml="http://www.w3.org/1999/xhtml">
   <url>
-    <loc>https://luckybybirthday.com/index.html</loc>
+    <loc>https://www.luckybybirthday.com/index.html</loc>
     <lastmod>2026-02-08</lastmod>
     <changefreq>daily</changefreq>
     <priority>1.0</priority>
-    <xhtml:link rel="alternate" hreflang="en" href="https://luckybybirthday.com/index.html"/>
-    <xhtml:link rel="alternate" hreflang="ko" href="https://luckybybirthday.com/index-ko.html"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.luckybybirthday.com/index.html"/>
+    <xhtml:link rel="alternate" hreflang="ko" href="https://www.luckybybirthday.com/index-ko.html"/>
   </url>
   <url>
-    <loc>https://luckybybirthday.com/index-ko.html</loc>
+    <loc>https://www.luckybybirthday.com/index-ko.html</loc>
     <lastmod>2026-02-08</lastmod>
     <changefreq>daily</changefreq>
     <priority>1.0</priority>
-    <xhtml:link rel="alternate" hreflang="en" href="https://luckybybirthday.com/index.html"/>
-    <xhtml:link rel="alternate" hreflang="ko" href="https://luckybybirthday.com/index-ko.html"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.luckybybirthday.com/index.html"/>
+    <xhtml:link rel="alternate" hreflang="ko" href="https://www.luckybybirthday.com/index-ko.html"/>
   </url>
   <url>
-    <loc>https://luckybybirthday.com/weekly-en.html</loc>
+    <loc>https://www.luckybybirthday.com/weekly-en.html</loc>
     <lastmod>2026-02-08</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
-    <xhtml:link rel="alternate" hreflang="en" href="https://luckybybirthday.com/weekly-en.html"/>
-    <xhtml:link rel="alternate" hreflang="ko" href="https://luckybybirthday.com/weekly.html"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.luckybybirthday.com/weekly-en.html"/>
+    <xhtml:link rel="alternate" hreflang="ko" href="https://www.luckybybirthday.com/weekly.html"/>
   </url>
   <url>
-    <loc>https://luckybybirthday.com/weekly.html</loc>
+    <loc>https://www.luckybybirthday.com/weekly.html</loc>
     <lastmod>2026-02-08</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
-    <xhtml:link rel="alternate" hreflang="en" href="https://luckybybirthday.com/weekly-en.html"/>
-    <xhtml:link rel="alternate" hreflang="ko" href="https://luckybybirthday.com/weekly.html"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.luckybybirthday.com/weekly-en.html"/>
+    <xhtml:link rel="alternate" hreflang="ko" href="https://www.luckybybirthday.com/weekly.html"/>
   </url>
   <url>
-    <loc>https://luckybybirthday.com/grocery-en.html</loc>
+    <loc>https://www.luckybybirthday.com/grocery-en.html</loc>
     <lastmod>2026-02-08</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
-    <xhtml:link rel="alternate" hreflang="en" href="https://luckybybirthday.com/grocery-en.html"/>
-    <xhtml:link rel="alternate" hreflang="ko" href="https://luckybybirthday.com/grocery.html"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.luckybybirthday.com/grocery-en.html"/>
+    <xhtml:link rel="alternate" hreflang="ko" href="https://www.luckybybirthday.com/grocery.html"/>
   </url>
   <url>
-    <loc>https://luckybybirthday.com/grocery.html</loc>
+    <loc>https://www.luckybybirthday.com/grocery.html</loc>
     <lastmod>2026-02-08</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
-    <xhtml:link rel="alternate" hreflang="en" href="https://luckybybirthday.com/grocery-en.html"/>
-    <xhtml:link rel="alternate" hreflang="ko" href="https://luckybybirthday.com/grocery.html"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.luckybybirthday.com/grocery-en.html"/>
+    <xhtml:link rel="alternate" hreflang="ko" href="https://www.luckybybirthday.com/grocery.html"/>
   </url>
   <url>
-    <loc>https://luckybybirthday.com/nutrition-en.html</loc>
+    <loc>https://www.luckybybirthday.com/nutrition-en.html</loc>
     <lastmod>2026-02-08</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.7</priority>
-    <xhtml:link rel="alternate" hreflang="en" href="https://luckybybirthday.com/nutrition-en.html"/>
-    <xhtml:link rel="alternate" hreflang="ko" href="https://luckybybirthday.com/nutrition-ko.html"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.luckybybirthday.com/nutrition-en.html"/>
+    <xhtml:link rel="alternate" hreflang="ko" href="https://www.luckybybirthday.com/nutrition-ko.html"/>
   </url>
   <url>
-    <loc>https://luckybybirthday.com/nutrition-ko.html</loc>
+    <loc>https://www.luckybybirthday.com/nutrition-ko.html</loc>
     <lastmod>2026-02-08</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.7</priority>
-    <xhtml:link rel="alternate" hreflang="en" href="https://luckybybirthday.com/nutrition-en.html"/>
-    <xhtml:link rel="alternate" hreflang="ko" href="https://luckybybirthday.com/nutrition-ko.html"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.luckybybirthday.com/nutrition-en.html"/>
+    <xhtml:link rel="alternate" hreflang="ko" href="https://www.luckybybirthday.com/nutrition-ko.html"/>
   </url>
   <url>
-    <loc>https://luckybybirthday.com/about-en.html</loc>
+    <loc>https://www.luckybybirthday.com/about-en.html</loc>
     <lastmod>2026-02-08</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.5</priority>
-    <xhtml:link rel="alternate" hreflang="en" href="https://luckybybirthday.com/about-en.html"/>
-    <xhtml:link rel="alternate" hreflang="ko" href="https://luckybybirthday.com/about.html"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.luckybybirthday.com/about-en.html"/>
+    <xhtml:link rel="alternate" hreflang="ko" href="https://www.luckybybirthday.com/about.html"/>
   </url>
   <url>
-    <loc>https://luckybybirthday.com/about.html</loc>
+    <loc>https://www.luckybybirthday.com/about.html</loc>
     <lastmod>2026-02-08</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.5</priority>
-    <xhtml:link rel="alternate" hreflang="en" href="https://luckybybirthday.com/about-en.html"/>
-    <xhtml:link rel="alternate" hreflang="ko" href="https://luckybybirthday.com/about.html"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.luckybybirthday.com/about-en.html"/>
+    <xhtml:link rel="alternate" hreflang="ko" href="https://www.luckybybirthday.com/about.html"/>
   </url>
   <url>
-    <loc>https://luckybybirthday.com/privacy-en.html</loc>
+    <loc>https://www.luckybybirthday.com/privacy-en.html</loc>
     <lastmod>2026-02-08</lastmod>
     <changefreq>yearly</changefreq>
     <priority>0.3</priority>
-    <xhtml:link rel="alternate" hreflang="en" href="https://luckybybirthday.com/privacy-en.html"/>
-    <xhtml:link rel="alternate" hreflang="ko" href="https://luckybybirthday.com/privacy.html"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.luckybybirthday.com/privacy-en.html"/>
+    <xhtml:link rel="alternate" hreflang="ko" href="https://www.luckybybirthday.com/privacy.html"/>
   </url>
   <url>
-    <loc>https://luckybybirthday.com/privacy.html</loc>
+    <loc>https://www.luckybybirthday.com/privacy.html</loc>
     <lastmod>2026-02-08</lastmod>
     <changefreq>yearly</changefreq>
     <priority>0.3</priority>
-    <xhtml:link rel="alternate" hreflang="en" href="https://luckybybirthday.com/privacy-en.html"/>
-    <xhtml:link rel="alternate" hreflang="ko" href="https://luckybybirthday.com/privacy.html"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.luckybybirthday.com/privacy-en.html"/>
+    <xhtml:link rel="alternate" hreflang="ko" href="https://www.luckybybirthday.com/privacy.html"/>
   </url>
   <url>
-    <loc>https://luckybybirthday.com/terms-en.html</loc>
+    <loc>https://www.luckybybirthday.com/terms-en.html</loc>
     <lastmod>2026-02-08</lastmod>
     <changefreq>yearly</changefreq>
     <priority>0.3</priority>
-    <xhtml:link rel="alternate" hreflang="en" href="https://luckybybirthday.com/terms-en.html"/>
-    <xhtml:link rel="alternate" hreflang="ko" href="https://luckybybirthday.com/terms.html"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.luckybybirthday.com/terms-en.html"/>
+    <xhtml:link rel="alternate" hreflang="ko" href="https://www.luckybybirthday.com/terms.html"/>
   </url>
   <url>
-    <loc>https://luckybybirthday.com/terms.html</loc>
+    <loc>https://www.luckybybirthday.com/terms.html</loc>
     <lastmod>2026-02-08</lastmod>
     <changefreq>yearly</changefreq>
     <priority>0.3</priority>
-    <xhtml:link rel="alternate" hreflang="en" href="https://luckybybirthday.com/terms-en.html"/>
-    <xhtml:link rel="alternate" hreflang="ko" href="https://luckybybirthday.com/terms.html"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.luckybybirthday.com/terms-en.html"/>
+    <xhtml:link rel="alternate" hreflang="ko" href="https://www.luckybybirthday.com/terms.html"/>
   </url>
 </urlset>
