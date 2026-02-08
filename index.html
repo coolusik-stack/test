@@ -10,6 +10,10 @@
     <meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1">
     <meta name="theme-color" content="#f97316">
     <meta name="application-name" content="Healthy Daily Menu">
+    <link rel="icon" href="/favicon.ico">
+    <link rel="preconnect" href="https://www.googletagmanager.com">
+    <link rel="preconnect" href="https://pagead2.googlesyndication.com">
+    <link rel="dns-prefetch" href="https://www.clarity.ms">
     <meta property="og:title" content="Healthy Daily Menu - Balanced Meal Recommendations with Calories">
     <meta property="og:description" content="Get personalized daily healthy meal recommendations for breakfast, lunch, and dinner with calorie tracking. Plan balanced meals and improve your nutrition.">
     <meta property="og:image" content="https://test-9bx.pages.dev/og.svg">
@@ -19,7 +23,7 @@
     <meta property="og:site_name" content="Healthy Daily Menu">
     <meta property="og:locale" content="en_US">
     <meta property="og:locale:alternate" content="ko_KR">
-    <meta name="twitter:card" content="summary">
+    <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:title" content="Healthy Daily Menu - Balanced Meal Recommendations with Calories">
     <meta name="twitter:description" content="Get personalized daily healthy meal recommendations for breakfast, lunch, and dinner with calorie tracking. Plan balanced meals and improve your nutrition.">
     <link rel="alternate" href="index.html" hreflang="en">
@@ -77,23 +81,50 @@
         ]
       }
     </script>
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "WebSite",
+        "name": "Healthy Daily Menu",
+        "url": "https://test-9bx.pages.dev/",
+        "inLanguage": ["en", "ko"],
+        "description": "Get personalized daily healthy meal recommendations for breakfast, lunch, and dinner with calorie tracking."
+      }
+    </script>
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "Organization",
+        "name": "Healthy Daily Menu",
+        "url": "https://test-9bx.pages.dev/",
+        "logo": "https://test-9bx.pages.dev/og.svg",
+        "contactPoint": {
+          "@type": "ContactPoint",
+          "email": "coolusik@gmail.com",
+          "contactType": "customer service"
+        }
+      }
+    </script>
 </head>
 <body>
     <div class="container">
-        <button id="theme-toggle-btn" aria-label="Toggle theme">☀️</button>
-        <h1>Healthy Daily Menu</h1>
-        <p class="subtitle">Balanced picks for breakfast, lunch, and dinner</p>
-        <nav class="lang-toggle" aria-label="Language">
-            <a class="lang-option" href="index.html" aria-current="page">EN</a>
-            <a class="lang-option" href="index-ko.html">KO</a>
-        </nav>
-        <nav class="page-nav" aria-label="Page navigation">
-            <a href="index.html" aria-current="page"><span class="nav-icon">🍽</span> Daily</a>
-            <a href="weekly-en.html"><span class="nav-icon">📅</span> Weekly</a>
-            <a href="grocery-en.html"><span class="nav-icon">🛒</span> Grocery</a>
-            <a href="nutrition-en.html"><span class="nav-icon">📖</span> Guide</a>
-            <a href="about-en.html"><span class="nav-icon">ℹ️</span> About</a>
-        </nav>
+        <header>
+            <button id="theme-toggle-btn" aria-label="Toggle theme">☀️</button>
+            <h1>Healthy Daily Menu</h1>
+            <p class="subtitle">Balanced picks for breakfast, lunch, and dinner</p>
+            <nav class="lang-toggle" aria-label="Language">
+                <a class="lang-option" href="index.html" aria-current="page">EN</a>
+                <a class="lang-option" href="index-ko.html">KO</a>
+            </nav>
+            <nav class="page-nav" aria-label="Page navigation">
+                <a href="index.html" aria-current="page"><span class="nav-icon">🍽</span> Daily</a>
+                <a href="weekly-en.html"><span class="nav-icon">📅</span> Weekly</a>
+                <a href="grocery-en.html"><span class="nav-icon">🛒</span> Grocery</a>
+                <a href="nutrition-en.html"><span class="nav-icon">📖</span> Guide</a>
+                <a href="about-en.html"><span class="nav-icon">ℹ️</span> About</a>
+            </nav>
+        </header>
+        <main>
         <daily-menus></daily-menus>
         <button id="generate-btn">Get Today's Healthy Picks</button>
         <div class="links-row">
@@ -260,6 +291,7 @@
         <div id="disqus_thread"></div>
         <noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
 
+        </main>
         <footer class="site-footer">
             <nav class="footer-links">
                 <a href="about-en.html">About</a>
