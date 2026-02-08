@@ -1017,3 +1017,195 @@ body.dark-mode .article-content a {
 .footer-links a:hover {
     color: var(--nav-link-active);
 }
+
+/* ===== Share FAB ===== */
+.share-wrapper {
+    position: fixed;
+    bottom: 1.5rem;
+    left: 1.5rem;
+    z-index: 1000;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.6rem;
+}
+
+.share-fab {
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    border: none;
+    background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
+    color: #fff;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 4px 15px rgba(249, 115, 22, 0.4);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
+    z-index: 2;
+}
+
+.share-fab:hover {
+    transform: scale(1.08);
+    box-shadow: 0 6px 20px rgba(249, 115, 22, 0.5);
+}
+
+.share-fab:active {
+    transform: scale(0.95);
+}
+
+.share-fab__icon {
+    position: absolute;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.share-fab__icon--share {
+    opacity: 1;
+    transform: rotate(0deg);
+}
+
+.share-fab__icon--close {
+    opacity: 0;
+    transform: rotate(-90deg);
+}
+
+.share-wrapper--open .share-fab__icon--share {
+    opacity: 0;
+    transform: rotate(90deg);
+}
+
+.share-wrapper--open .share-fab__icon--close {
+    opacity: 1;
+    transform: rotate(0deg);
+}
+
+.share-panel {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+    pointer-events: none;
+}
+
+.share-panel .share-btn {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    opacity: 0;
+    transform: scale(0.3) translateY(20px);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.15);
+    pointer-events: none;
+}
+
+.share-wrapper--open .share-panel {
+    pointer-events: auto;
+}
+
+.share-wrapper--open .share-panel .share-btn {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+    pointer-events: auto;
+}
+
+.share-wrapper--open .share-panel .share-btn:nth-child(4) { transition-delay: 0.03s; }
+.share-wrapper--open .share-panel .share-btn:nth-child(3) { transition-delay: 0.06s; }
+.share-wrapper--open .share-panel .share-btn:nth-child(2) { transition-delay: 0.09s; }
+.share-wrapper--open .share-panel .share-btn:nth-child(1) { transition-delay: 0.12s; }
+
+.share-btn:hover {
+    transform: scale(1.12) !important;
+}
+
+.share-btn:active {
+    transform: scale(0.95) !important;
+}
+
+.share-btn--twitter {
+    background: #000;
+}
+
+.share-btn--facebook {
+    background: #1877f2;
+}
+
+.share-btn--more {
+    background: linear-gradient(135deg, #22c55e, #16a34a);
+}
+
+.share-btn--copy {
+    background: linear-gradient(135deg, #6366f1, #8b5cf6);
+}
+
+.share-btn--copied {
+    background: linear-gradient(135deg, #22c55e, #16a34a) !important;
+}
+
+body.dark-mode .share-fab {
+    background: linear-gradient(135deg, #fb923c 0%, #f97316 100%);
+    box-shadow: 0 4px 15px rgba(251, 146, 60, 0.4);
+}
+
+body.dark-mode .share-fab:hover {
+    box-shadow: 0 6px 20px rgba(251, 146, 60, 0.5);
+}
+
+.share-toast {
+    position: fixed;
+    bottom: 5.5rem;
+    left: 1.5rem;
+    background: rgba(0, 0, 0, 0.85);
+    color: #fff;
+    padding: 0.5rem 1rem;
+    border-radius: 999px;
+    font-size: 0.82rem;
+    font-weight: 600;
+    opacity: 0;
+    transform: translateY(8px);
+    transition: all 0.3s ease;
+    pointer-events: none;
+    white-space: nowrap;
+}
+
+body.dark-mode .share-toast {
+    background: rgba(255, 255, 255, 0.9);
+    color: #1c1917;
+}
+
+.share-toast--visible {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+@media (max-width: 480px) {
+    .share-wrapper {
+        bottom: 1rem;
+        left: 1rem;
+    }
+
+    .share-fab {
+        width: 50px;
+        height: 50px;
+    }
+
+    .share-panel .share-btn {
+        width: 44px;
+        height: 44px;
+    }
+
+    .share-toast {
+        bottom: 4.5rem;
+        left: 1rem;
+    }
+}
