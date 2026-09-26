@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>asset maker</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=Jua&display=swap">
+<style>
+  body { margin: 0; background: #222; }
+  canvas { display: block; margin: 8px; }
+</style>
+</head>
+<body>
+<!-- Renders the PWA icons and the share image from the in-game art. Used by a Playwright script. -->
+<canvas id="icon" width="512" height="512"></canvas>
+<canvas id="og" width="1200" height="630"></canvas>
+<script type="module">
+import * as Art from '../js/art.js';
+
+function burst(g, w, h, c1, c2, cx = w / 2, cy = h / 2) {
+  const bg = g.createRadialGradient(cx, cy, 10, cx, cy, Math.max(w, h) * 0.75);
+  bg.addColorStop(0, c1);
+  bg.addColorStop(1, c2);
+  g.fillStyle = bg;
+  g.fillRect(0, 0, w, h);
+  g.save();
+  g.translate(cx, cy);
+  g.fillStyle = 'rgba(255,255,255,0.13)';
+  for (let i = 0; i < 16; i++) {
+    g.rotate((Math.PI * 2) / 16);
+    g.beginPath();
+    g.moveTo(0, 0);
+    g.lineTo(Math.max(w, h), -Math.max(w, h) * 0.1);
+    g.lineTo(Math.max(w, h), Math.max(w, h) * 0.1);
+    g.closePath();
+    if (i % 2 === 0) g.fill();
+  }
+  g.restore();
+}
+
+function drawIcon(maskable) {
+  const c = document.getElementById('icon');
+  const g = c.getContext('2d');
+  const S = c.width;
+  g.clearRect(0, 0, S, S);
+  burst(g, S, S, '#9fe3ff', '#2a86d6');
+  // captain on cart with slingshot, centred
+  g.save();
+  const k = maskable ? S / 5.2 : S / 4.3;
+  g.translate(S / 2, S * 0.56);
+  g.scale(k, k);
+  Art.drawCommander(g, -0.25, 0.45, { team: 0, facing: 1, time: 0.4, blink: 0, hurt: 0, hp: 1, moving: false, wheelAngle: 0.3, dead: false, pouch: null, aimPower: 0, mood: 'aim' }, (ctx) => {
+    const a = Art.slingAnchors(-0.25, 0.45, 1);
+    Art.drawBird(ctx, 'red', a.rest.x, a.rest.y - 0.13, 0.38, 0, { time: 0.2, state: 'fly', lookX: 1, lookY: 0 });
+  });
+  g.restore();
+  return c;
+}
+
+function drawOG() {
+  const c = document.getElementById('og');
+  const g = c.getContext('2d');
+  const W = c.width, H = c.height;
+  const sky = g.createLinearGradient(0, 0, 0, H);
+  sky.addColorStop(0, '#4fb0f2');
+  sky.addColorStop(0.6, '#a7e0ff');
+  sky.addColorStop(1, '#e8f8ff');
+  g.fillStyle = sky;
+  g.fillRect(0, 0, W, H);
+  // sun + clouds
+  g.fillStyle = 'rgba(255,245,200,0.5)';
+  g.beginPath(); g.arc(W * 0.86, H * 0.2, 90, 0, 7); g.fill();
+  g.fillStyle = '#fff6c9';
+  g.beginPath(); g.arc(W * 0.86, H * 0.2, 52, 0, 7); g.fill();
+  const cloud = (x, y, s) => {
+    g.fillStyle = 'rgba(255,255,255,0.95)';
+    for (const [dx, dy, r] of [[-1.1, 0, 0.9], [0, -0.5, 1.25], [1.1, 0, 0.95], [0.4, 0.2, 0.9], [-0.5, 0.25, 0.8]]) {
+      g.beginPath(); g.arc(x + dx * s, y + dy * s, r * s, 0, 7); g.fill();
+    }
+  };
+  cloud(170, 110, 34); cloud(640, 70, 26); cloud(1010, 330, 30);
+  // far hills
+  g.fillStyle = '#9fd0a8';
+  g.beginPath(); g.moveTo(0, H);
+  for (let x = 0; x <= W; x += 10) g.lineTo(x, 400 - Math.sin(x / 140) * 40 - Math.sin(x / 57) * 12);
+  g.lineTo(W, H); g.fill();
+  // ground islands
+  const ground = (x0, x1, top) => {
+    g.fillStyle = '#9a6334';
+    g.beginPath();
+    g.moveTo(x0 - 40, H);
+    g.quadraticCurveTo(x0 - 30, top + 20, x0 + 30, top);
+    g.lineTo(x1 - 30, top);
+    g.quadraticCurveTo(x1 + 30, top + 20, x1 + 40, H);
+    g.fill();
+    g.strokeStyle = '#3d9a24'; g.lineWidth = 16; g.lineCap = 'round';
+    g.beginPath(); g.moveTo(x0 + 10, top + 4); g.lineTo(x1 - 10, top + 4); g.stroke();
+    g.strokeStyle = '#6fcb3c'; g.lineWidth = 10;
+    g.beginPath(); g.moveTo(x0 + 10, top); g.lineTo(x1 - 10, top); g.stroke();
+  };
+  ground(-60, 360, 520);
+  ground(860, 1260, 505);
+  // sea
+  g.fillStyle = 'rgba(40,140,220,0.9)';
+  g.fillRect(0, 590, W, 40);
+  g.fillStyle = '#e8f8ff';
+  g.fillRect(0, 588, W, 4);
+  const Z = 62;
+  const world = (x, y, fn) => { g.save(); g.translate(x, y); g.scale(Z, Z); fn(); g.restore(); };
+  // captains
+  world(150, 520 - 0.75 * Z, () => {
+    Art.drawCommander(g, 0, 0, { team: 0, facing: 1, time: 0.3, hp: 1, mood: 'aim', pouch: null }, (ctx) => {
+      const a = Art.slingAnchors(0, 0, 1);
+      Art.drawBird(ctx, 'red', a.rest.x, a.rest.y - 0.13, 0.38, 0, { state: 'fly', lookX: 1 });
+    });
+  });
+  world(1060, 505 - 0.75 * Z, () => {
+    Art.drawCommander(g, 0, 0, { team: 1, facing: -1, time: 1.1, hp: 1, mood: 'scared' });
+  });
+  // forts
+  const block = (x, y, m, w, h, a = 0, shape = 'box', r = 0) => world(x, y, () => Art.drawBlock(g, { material: m, shape, x: 0, y: 0, angle: a, w, h, r, hp01: 1, seed: (x * 7 + y) | 0 }));
+  block(900, 505 - 62, 'wood', 0.26, 2.0);
+  block(1000, 505 - 62, 'wood', 0.26, 2.0);
+  block(950, 505 - 132, 'wood', 2.1, 0.26, 0.08);
+  block(950, 505 - 22, 'stone', 0.7, 0.7);
+  block(915, 505 - 160, 'ice', 0.7, 0.7, 0.3);
+  block(1150, 505 - 22, 'tnt', 0.7, 0.7);
+  block(280, 520 - 25, 'stone', 0.8, 0.8);
+  block(330, 520 - 75, 'ice', 0.26, 1.6, -0.1);
+  // flying birds with puff trails
+  const trail = (pts) => {
+    g.fillStyle = 'rgba(255,255,255,0.85)';
+    pts.forEach(([x, y], i) => { g.beginPath(); g.arc(x, y, i % 3 === 0 ? 7 : 4, 0, 7); g.fill(); });
+  };
+  const arc = [];
+  for (let t = 0; t <= 1; t += 0.03) arc.push([230 + t * 620, 420 - Math.sin(t * Math.PI) * 110 - t * 20]);
+  trail(arc);
+  world(860, 395, () => Art.drawBird(g, 'black', 0, 0, 0.42, 0.45, { state: 'fly', fuse: 0.8, time: 0.3 }));
+  world(600, 330, () => Art.drawBird(g, 'yellow', 0, 0, 0.36, -0.05, { state: 'fly', time: 0.5 }));
+  world(420, 345, () => Art.drawBird(g, 'blue', 0, 0, 0.3, -0.2, { state: 'fly', time: 0.9 }));
+  world(385, 385, () => Art.drawBird(g, 'mini', 0, 0, 0.22, -0.1, { state: 'fly', time: 0.9 }));
+  world(455, 392, () => Art.drawBird(g, 'mini', 0, 0, 0.22, 0.1, { state: 'fly', time: 0.9 }));
+  world(1090, 205, () => Art.drawBird(g, 'white', 0, 0, 0.4, 0.1, { state: 'fly', time: 0.2, flip: true }));
+  world(1085, 262, () => Art.drawBird(g, 'egg', 0, 0, 0.27, 0.2, { time: 0.2 }));
+  // logo
+  g.save();
+  g.translate(W / 2, 150);
+  g.rotate(-0.05);
+  g.textAlign = 'center';
+  g.textBaseline = 'middle';
+  g.lineJoin = 'round';
+  g.font = '64px "Black Han Sans"';
+  g.lineWidth = 16; g.strokeStyle = '#2b1a12';
+  g.strokeText('엥그리', -150, -70);
+  g.fillStyle = '#ffd21f';
+  g.fillText('엥그리', -150, -70);
+  g.font = '150px "Black Han Sans"';
+  g.lineWidth = 30;
+  g.strokeText('포트리스', 0, 40);
+  g.fillStyle = '#2b1a12';
+  g.fillText('포트리스', 0, 50);
+  const tg = g.createLinearGradient(0, -20, 0, 100);
+  tg.addColorStop(0, '#fff2a8');
+  tg.addColorStop(0.4, '#ffc53a');
+  tg.addColorStop(0.65, '#ff8a26');
+  tg.addColorStop(1, '#e2461d');
+  g.fillStyle = tg;
+  g.fillText('포트리스', 0, 40);
+  g.restore();
+  g.save();
+  g.font = '30px Jua';
+  const tag = '새총으로 쏘고, 요새를 무너뜨려라!';
+  const tw = g.measureText(tag).width + 48;
+  g.translate(W / 2, 285);
+  g.rotate(0.02);
+  g.fillStyle = '#2b1a12';
+  g.beginPath(); g.roundRect(-tw / 2, -26, tw, 52, 26); g.fill();
+  g.fillStyle = '#fff4dc';
+  g.textAlign = 'center'; g.textBaseline = 'middle';
+  g.fillText(tag, 0, 2);
+  g.restore();
+  return c;
+}
+
+window.makeAssets = async () => {
+  await document.fonts.load('150px "Black Han Sans"');
+  await document.fonts.load('30px Jua');
+  const out = {};
+  const ic = document.getElementById('icon');
+  drawIcon(false);
+  out.icon512 = ic.toDataURL('image/png');
+  const small = document.createElement('canvas');
+  small.width = small.height = 192;
+  small.getContext('2d').drawImage(ic, 0, 0, 192, 192);
+  out.icon192 = small.toDataURL('image/png');
+  drawIcon(true);
+  out.maskable = ic.toDataURL('image/png');
+  drawIcon(false);
+  drawOG();
+  out.og = document.getElementById('og').toDataURL('image/jpeg', 0.88);
+  return out;
+};
+window.assetsReady = true;
+</script>
+</body>
+</html>

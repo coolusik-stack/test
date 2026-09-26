@@ -1,0 +1,324 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Art Preview — 엥그리 포트리스</title>
+<style>
+  html, body { margin: 0; background: #7cc4f2; font-family: system-ui, -apple-system, "Segoe UI", sans-serif; }
+  #wrap { position: relative; }
+  canvas#c { display: block; }
+  #icons { display: flex; gap: 14px; align-items: center; padding: 14px 24px 28px; background: linear-gradient(#e9f6ff, #cfeaff); }
+  #icons .ic { display: flex; flex-direction: column; align-items: center; font-size: 12px; color: #234; }
+  #icons canvas { width: 96px; height: 96px; border-radius: 22px; background: radial-gradient(circle at 40% 35%, #ffffff, #bfe3ff); box-shadow: 0 2px 6px rgba(0,40,80,.25); }
+  #icons canvas.dark { background: radial-gradient(circle at 40% 35%, #3a4b66, #1a2233); }
+  #bar { position: fixed; top: 8px; right: 12px; z-index: 5; background: rgba(255,255,255,.85); padding: 6px 10px; border-radius: 8px; font-size: 13px; }
+</style>
+</head>
+<body>
+<div id="bar"><label><input type="checkbox" id="anim"> animate</label></div>
+<div id="wrap"><canvas id="c"></canvas></div>
+<div id="icons"></div>
+<script type="module">
+import * as A from '../js/art.js';
+
+window.__errors = [];
+window.addEventListener('error', e => window.__errors.push(String(e.message)));
+
+const params = new URLSearchParams(location.search);
+const W = 1900, H = 3900;
+const dpr = window.devicePixelRatio || 1;
+const cv = document.getElementById('c');
+cv.width = W * dpr; cv.height = H * dpr;
+cv.style.width = W + 'px'; cv.style.height = H + 'px';
+const ctx = cv.getContext('2d');
+
+// place a meter-space drawing at CSS px (px,py) with pixels-per-meter k
+function at(px, py, k, fn) {
+  ctx.setTransform(dpr * k, 0, 0, dpr * k, dpr * px, dpr * py);
+  fn();
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
+function label(t, x, y, size = 13, color = '#10324f', align = 'center') {
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.font = `600 ${size}px system-ui, sans-serif`;
+  ctx.fillStyle = color; ctx.textAlign = align; ctx.textBaseline = 'middle';
+  ctx.fillText(t, x, y);
+}
+function title(t, y) {
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.fillStyle = 'rgba(255,255,255,0.55)';
+  ctx.fillRect(0, y - 20, W, 40);
+  label(t, 24, y, 22, '#0c2a44', 'left');
+}
+
+function background() {
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const g = ctx.createLinearGradient(0, 0, 0, H);
+  g.addColorStop(0, '#5fb6f0'); g.addColorStop(0.35, '#a9dcfb'); g.addColorStop(0.6, '#d7f0ff'); g.addColorStop(1, '#f3fbff');
+  ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+  // soft clouds
+  ctx.fillStyle = 'rgba(255,255,255,0.55)';
+  for (const [x, y, s] of [[260, 120, 1], [1300, 90, 1.3], [900, 1500, 1.1], [1600, 2300, 0.9], [300, 2900, 1.2]]) {
+    for (const [dx, dy, r] of [[0, 0, 40], [45, -18, 50], [95, 0, 38], [40, 16, 36]]) {
+      ctx.beginPath(); ctx.arc(x + dx * s, y + dy * s, r * s, 0, Math.PI * 2); ctx.fill();
+    }
+  }
+}
+
+const TYPES = ['red', 'yellow', 'blue', 'black', 'white', 'mini', 'egg'];
+const STATES = [
+  ['idle', {}],
+  ['fly', { state: 'fly', lookX: 1, lookY: -0.2 }],
+  ['hurt', { state: 'hurt' }],
+  ['dizzy', { state: 'dizzy' }],
+  ['blink .5', { blink: 0.5 }],
+  ['blink 1', { blink: 1 }],
+  ['flip', { flip: true, lookX: -1 }],
+  ['fly flip', { flip: true, state: 'fly', lookX: -1 }],
+  ['squash +.3', { squash: 0.3 }],
+  ['squash -.3', { squash: -0.3 }],
+  ['look ↖', { lookX: -0.8, lookY: -0.7 }],
+  ['rot 40°', { angle: 0.7 }],
+  ['fuse .3', { fuse: 0.3 }],
+  ['fuse .95', { fuse: 0.95, state: 'fly' }],
+];
+
+function drawAll(time) {
+  background();
+  let y0 = 40;
+  title('Ammo birds — states (r = 0.4 m @ 110 px/m)', y0);
+  const cellW = 128, cellH = 128, gx0 = 150;
+  STATES.forEach(([name], i) => label(name, gx0 + i * cellW, y0 + 40));
+  TYPES.forEach((t, row) => {
+    const cy = y0 + 110 + row * cellH;
+    label(t, 60, cy, 15);
+    STATES.forEach(([name, st], i) => {
+      const s = Object.assign({ time: time + i * 0.37 + row * 0.11, blink: 0, state: 'idle' }, st);
+      const r = t === 'mini' ? 0.26 : t === 'egg' ? 0.22 : 0.4;
+      at(gx0 + i * cellW, cy, 110, () => A.drawBird(ctx, t, 0, 0, r, st.angle || 0, s));
+    });
+  });
+  y0 += 110 + TYPES.length * cellH + 20;
+
+  title('Small (r≈12px) and large (r≈80px) sizes', y0);
+  TYPES.forEach((t, i) => {
+    at(90 + i * 60, y0 + 70, 30, () => A.drawBird(ctx, t, 0, 0, 0.4, 0, { time }));
+    at(90 + i * 60, y0 + 120, 30, () => A.drawBird(ctx, t, 0, 0, 0.4, 0, { time, state: 'fly', lookX: 1 }));
+  });
+  TYPES.forEach((t, i) => {
+    const big = [['red', {}], ['yellow', {}], ['blue', {}], ['black', { fuse: 0.6 }], ['white', {}], ['white', { state: 'fly', lookX: 1 }], ['red', { state: 'fly', lookX: 1, lookY: -0.3 }]][i];
+    at(560 + i * 195, y0 + 125, 200, () => A.drawBird(ctx, big[0], 0, 0, 0.4, 0, Object.assign({ time }, big[1])));
+  });
+  y0 += 250;
+
+  title('Commanders (80 px/m) — CART.radius circle shown dashed', y0);
+  const cmds = [
+    ['T0 rest →', { team: 0, facing: 1 }],
+    ['T0 rest ←', { team: 0, facing: -1 }],
+    ['T1 rest →', { team: 1, facing: 1 }],
+    ['T1 rest ←', { team: 1, facing: -1 }],
+    ['T0 aim + ammo', { team: 0, facing: 1, mood: 'aim', aimPower: 0.85, pouch: 'pull' }],
+    ['T1 aim + ammo ←', { team: 1, facing: -1, mood: 'aim', aimPower: 0.6, pouch: 'pull2' }],
+    ['T0 loaded at rest', { team: 0, facing: 1, ammo: 'yellow' }],
+    ['T1 loaded at rest', { team: 1, facing: 1, ammo: 'black' }],
+    ['T0 hurt', { team: 0, facing: 1, hurt: 0.9 }],
+    ['T1 hurt', { team: 1, facing: 1, hurt: 0.9 }],
+    ['T0 hp .3', { team: 0, facing: 1, hp: 0.3 }],
+    ['T1 hp .1', { team: 1, facing: -1, hp: 0.1 }],
+    ['T0 dead', { team: 0, facing: 1, dead: true, hp: 0 }],
+    ['T1 dead', { team: 1, facing: -1, dead: true, hp: 0 }],
+    ['T0 happy', { team: 0, facing: 1, mood: 'happy' }],
+    ['T1 scared', { team: 1, facing: 1, mood: 'scared' }],
+    ['T0 moving', { team: 0, facing: 1, moving: true }],
+    ['T1 blink', { team: 1, facing: 1, blink: 1 }],
+  ];
+  const cw = 230, ch = 280, perRow = 8;
+  cmds.forEach(([name, st], i) => {
+    const col = i % perRow, row = Math.floor(i / perRow);
+    const cx = 130 + col * cw, cy = y0 + 200 + row * ch;
+    label(name, cx, cy + 90);
+    at(cx, cy, 80, () => {
+      // ground
+      ctx.fillStyle = 'rgba(110,170,60,0.55)';
+      ctx.fillRect(-1.4, 0.75, 2.8, 0.1);
+      ctx.save(); ctx.setLineDash([0.06, 0.06]); ctx.strokeStyle = 'rgba(0,60,120,0.35)'; ctx.lineWidth = 0.02;
+      ctx.beginPath(); ctx.arc(0, 0, A.CART.radius, 0, Math.PI * 2); ctx.stroke(); ctx.restore();
+      const s = Object.assign({ time: time + i * 0.21, blink: 0, hp: 1, hurt: 0, wheelAngle: time * 3 }, st);
+      const an = A.slingAnchors(0, 0, s.facing);
+      let ammo = null;
+      if (st.pouch === 'pull') { s.pouch = { x: an.rest.x - 1.25, y: an.rest.y + 0.45 }; ammo = 'red'; }
+      else if (st.pouch === 'pull2') { s.pouch = { x: an.rest.x + 0.9, y: an.rest.y + 0.25 }; ammo = 'blue'; }
+      else s.pouch = null;
+      if (st.ammo) ammo = st.ammo;
+      const p = s.pouch || an.rest;
+      A.drawCommander(ctx, 0, 0, s, ammo ? (c) => A.drawBird(c, ammo, p.x, p.y, 0.4, 0, { time, flip: s.facing < 0, lookX: s.facing, fuse: 0 }) : null);
+      // anchor markers
+      if (i < 2) {
+        for (const k of ['back', 'front', 'rest']) {
+          ctx.fillStyle = k === 'rest' ? '#00c853' : '#ff00aa';
+          ctx.beginPath(); ctx.arc(an[k].x, an[k].y, 0.03, 0, Math.PI * 2); ctx.fill();
+        }
+      }
+    });
+  });
+  y0 += 200 + Math.ceil(cmds.length / perRow) * ch + 10;
+
+  title('Blocks — wood / stone / ice / tnt × box / circle × hp 1 / .5 / .2 (90 px/m)', y0);
+  const mats = ['wood', 'stone', 'ice', 'tnt'];
+  const hps = [1, 0.5, 0.2];
+  let bx = 80;
+  mats.forEach((m, mi) => {
+    hps.forEach((hp, hi) => {
+      const cx = 110 + (mi * 3 + hi) * 150, cy = y0 + 110;
+      label(`${m} ${hp}`, cx, y0 + 40);
+      at(cx, cy, 90, () => {
+        A.drawBlock(ctx, { material: m, shape: 'box', x: 0, y: -0.1, angle: 0, w: 1.4, h: 0.6, hp01: hp, seed: 3 + mi });
+        A.drawBlock(ctx, { material: m, shape: 'circle', x: 0, y: 1.25, angle: time * 0.2, r: 0.45, hp01: hp, seed: 5 + mi });
+        A.drawBlock(ctx, { material: m, shape: 'box', x: -0.45, y: 2.3, angle: 0, w: 0.3, h: 0.3, hp01: hp, seed: 9 + mi });
+        A.drawBlock(ctx, { material: m, shape: 'box', x: 0.35, y: 2.45, angle: 0.4, w: 0.8, h: 0.8, hp01: hp, seed: 11 + mi });
+      });
+    });
+  });
+  y0 += 380;
+  // size range & rotations
+  const rowY = y0 + 40;
+  label('long 3m plank, tall pillars, rotated, flash', 24, rowY - 10, 14, '#10324f', 'left');
+  at(40, rowY + 60, 90, () => {
+    const L = [
+      { material: 'wood', shape: 'box', x: 1.8, y: 0.2, w: 3, h: 0.3, hp01: 1, seed: 1 },
+      { material: 'wood', shape: 'box', x: 1.8, y: 0.8, w: 3, h: 0.3, hp01: 0.3, seed: 2 },
+      { material: 'stone', shape: 'box', x: 1.8, y: 1.4, w: 3, h: 0.35, hp01: 0.5, seed: 3 },
+      { material: 'ice', shape: 'box', x: 1.8, y: 2.0, w: 3, h: 0.3, hp01: 0.2, seed: 4 },
+      { material: 'wood', shape: 'box', x: 4.0, y: 1.1, w: 0.35, h: 2.2, hp01: 1, seed: 5 },
+      { material: 'stone', shape: 'box', x: 4.7, y: 1.1, w: 0.4, h: 2.2, hp01: 0.6, seed: 6 },
+      { material: 'ice', shape: 'box', x: 5.4, y: 1.1, w: 0.35, h: 2.2, hp01: 1, seed: 7 },
+      { material: 'tnt', shape: 'box', x: 6.3, y: 0.4, w: 0.7, h: 0.7, hp01: 1, seed: 8 },
+      { material: 'tnt', shape: 'box', x: 6.3, y: 1.6, w: 0.6, h: 1.2, hp01: 0.3, seed: 8, angle: 0.3 },
+      { material: 'wood', shape: 'box', x: 7.9, y: 0.6, w: 1.6, h: 0.4, hp01: 1, seed: 9, angle: -0.6 },
+      { material: 'stone', shape: 'box', x: 7.9, y: 1.8, w: 1.2, h: 1.2, hp01: 0.25, seed: 10, angle: 0.25 },
+      { material: 'ice', shape: 'box', x: 9.6, y: 0.7, w: 1.2, h: 1.2, hp01: 0.6, seed: 11, angle: 0.7 },
+      { material: 'wood', shape: 'box', x: 9.6, y: 2.1, w: 1.2, h: 0.5, hp01: 1, seed: 12, flash: 0.8 },
+      { material: 'wood', shape: 'circle', x: 11.2, y: 0.6, r: 0.8, hp01: 1, seed: 13 },
+      { material: 'stone', shape: 'circle', x: 11.2, y: 2.2, r: 0.7, hp01: 0.3, seed: 14 },
+      { material: 'ice', shape: 'circle', x: 12.9, y: 0.6, r: 0.6, hp01: 0.5, seed: 15 },
+      { material: 'tnt', shape: 'circle', x: 12.9, y: 2.1, r: 0.55, hp01: 1, seed: 16 },
+      { material: 'stone', shape: 'box', x: 15.0, y: 1.2, w: 2.6, h: 2.6, hp01: 0.2, seed: 17 },
+      { material: 'wood', shape: 'box', x: 17.9, y: 1.2, w: 2.6, h: 2.6, hp01: 0.5, seed: 18 },
+    ];
+    for (const b of L) A.drawBlock(ctx, b);
+  });
+  y0 += 390;
+
+  title('In-game mock scene (48 px/m)', y0);
+  const sceneTop = y0 + 30;
+  at(0, sceneTop, 48, () => {
+    // ground
+    const gy = 8.6;
+    const g = ctx.createLinearGradient(0, gy, 0, gy + 3);
+    g.addColorStop(0, '#79c24a'); g.addColorStop(0.15, '#4f9a33'); g.addColorStop(0.2, '#8b5e34'); g.addColorStop(1, '#5e3c1f');
+    ctx.fillStyle = g; ctx.fillRect(0, gy, 40, 3);
+    // commander left
+    const s0 = { team: 0, facing: 1, time, mood: 'aim', aimPower: 0.7, hp: 1 };
+    const an0 = A.slingAnchors(4, gy - 0.75, 1);
+    s0.pouch = { x: an0.rest.x - 1.0, y: an0.rest.y + 0.35 };
+    A.drawCommander(ctx, 4, gy - 0.75, s0, (c) => A.drawBird(c, 'red', s0.pouch.x, s0.pouch.y, 0.38, 0, { time, lookX: 1 }));
+    // commander right
+    const s1 = { team: 1, facing: -1, time, hp: 0.3 };
+    A.drawCommander(ctx, 35, gy - 0.75, s1, (c) => { const a = A.slingAnchors(35, gy - 0.75, -1).rest; A.drawBird(c, 'blue', a.x, a.y, 0.34, 0, { time, flip: true, lookX: -1 }); });
+    // fort
+    const fort = [
+      { material: 'stone', shape: 'box', x: 27, y: gy - 0.2, w: 4.2, h: 0.4, seed: 1 },
+      { material: 'wood', shape: 'box', x: 25.4, y: gy - 1.4, w: 0.35, h: 2.0, seed: 2 },
+      { material: 'wood', shape: 'box', x: 28.6, y: gy - 1.4, w: 0.35, h: 2.0, seed: 3, hp01: 0.5 },
+      { material: 'ice', shape: 'box', x: 27, y: gy - 1.0, w: 1.2, h: 1.2, seed: 4 },
+      { material: 'tnt', shape: 'box', x: 27, y: gy - 2.0, w: 0.8, h: 0.8, seed: 5 },
+      { material: 'wood', shape: 'box', x: 27, y: gy - 2.6, w: 3.8, h: 0.35, seed: 6 },
+      { material: 'stone', shape: 'circle', x: 26.0, y: gy - 3.25, r: 0.45, seed: 7 },
+      { material: 'ice', shape: 'box', x: 27.4, y: gy - 3.2, w: 0.6, h: 0.9, seed: 8, hp01: 0.3 },
+      { material: 'wood', shape: 'circle', x: 28.4, y: gy - 3.2, r: 0.4, seed: 9 },
+      { material: 'stone', shape: 'box', x: 31, y: gy - 0.9, w: 0.9, h: 1.8, seed: 10, hp01: 0.6 },
+      { material: 'wood', shape: 'box', x: 31, y: gy - 2.0, w: 1.6, h: 0.3, seed: 11, angle: 0.08 },
+    ];
+    for (const b of fort) A.drawBlock(ctx, b);
+    // birds in flight
+    A.drawBird(ctx, 'yellow', 12, 2.6, 0.36, 0.25, { time, state: 'fly', lookX: 1, lookY: 0.2 });
+    A.drawBird(ctx, 'black', 17, 1.6, 0.44, 0.1, { time, state: 'fly', fuse: 0.7, lookX: 1 });
+    A.drawBird(ctx, 'white', 21, 1.3, 0.42, 0, { time, state: 'fly', lookX: 1 });
+    A.drawBird(ctx, 'egg', 21.1, 2.7, 0.22, 0.4, { time });
+    for (let k = 0; k < 3; k++) A.drawBird(ctx, 'mini', 14 + k * 0.7, 4.2 + (k - 1) * 0.6, 0.26, 0, { time: time + k, state: 'fly', lookX: 1 });
+    A.drawBird(ctx, 'red', 23.5, gy - 0.4, 0.4, 0.9, { time, state: 'dizzy' });
+    A.drawBird(ctx, 'blue', 32.8, gy - 0.34, 0.34, 0, { time, state: 'hurt', squash: 0.2 });
+  });
+}
+
+// icons
+const icons = document.getElementById('icons');
+function addIcon(name, fn, dark) {
+  const d = document.createElement('div'); d.className = 'ic';
+  const c = document.createElement('canvas'); c.width = 96 * dpr; c.height = 96 * dpr; if (dark) c.className = 'dark';
+  d.appendChild(c);
+  const t = document.createElement('span'); t.textContent = name; d.appendChild(t);
+  icons.appendChild(d);
+  fn(c);
+}
+for (const t of [...A.BIRD_TYPES, 'mini', 'egg']) addIcon((A.BIRD_INFO[t] ? A.BIRD_INFO[t].name + ' ' : '') + t, c => A.drawBirdIcon(c, t));
+addIcon('captain 0', c => A.drawCaptainIcon(c, 0));
+addIcon('captain 1', c => A.drawCaptainIcon(c, 1));
+addIcon('captain 0', c => A.drawCaptainIcon(c, 0), true);
+addIcon('captain 1', c => A.drawCaptainIcon(c, 1), true);
+
+// state-leak check: transform/alpha/styles must be unchanged after each call
+function leakCheck() {
+  const c2 = document.createElement('canvas').getContext('2d');
+  c2.setTransform(2, 0, 0, 2, 10, 10); c2.globalAlpha = 0.7; c2.fillStyle = '#123456'; c2.strokeStyle = '#654321'; c2.lineWidth = 3;
+  const snap = () => JSON.stringify([c2.getTransform().toString(), c2.globalAlpha, c2.fillStyle, c2.strokeStyle, c2.lineWidth, c2.lineCap, c2.lineJoin, c2.globalCompositeOperation, c2.font, c2.textAlign, c2.getLineDash()]);
+  const before = snap();
+  let inner = null;
+  A.drawBird(c2, 'black', 1, 1, 0.4, 0.3, { fuse: 0.5, state: 'dizzy', time: 1 });
+  A.drawBird(c2, 'egg', 1, 1, 0.2, 0.3, {});
+  A.drawBird(c2, 'white', 1, 1, 0.4, 0, undefined);
+  A.drawCommander(c2, 0, 0, { team: 1, facing: -1, dead: true, pouch: { x: 1, y: -1 } }, (cc) => { inner = snap(); });
+  A.drawCommander(c2, 0, 0, {}, null);
+  for (const m of ['wood', 'stone', 'ice', 'tnt']) for (const sh of ['box', 'circle']) A.drawBlock(c2, { material: m, shape: sh, x: 0, y: 0, w: 1, h: 0.5, r: 0.4, hp01: 0.1, seed: 2, flash: 0.5, angle: 0.3 });
+  const after = snap();
+  if (before !== after) window.__errors.push('STATE LEAK: ' + before + ' vs ' + after);
+  if (inner !== before) window.__errors.push('drawAmmo state mismatch: ' + inner);
+}
+leakCheck();
+
+let t0 = parseFloat(params.get('t') || '1.3');
+drawAll(t0);
+const animBox = document.getElementById('anim');
+let raf = 0;
+animBox.addEventListener('change', () => {
+  if (animBox.checked) {
+    const start = performance.now();
+    const loop = (now) => { drawAll(t0 + (now - start) / 1000); raf = requestAnimationFrame(loop); };
+    raf = requestAnimationFrame(loop);
+  } else cancelAnimationFrame(raf);
+});
+
+// perf probe: time N frames of a typical load (40 blocks + 6 birds + 2 commanders)
+window.__perf = () => {
+  const c3 = document.createElement('canvas'); c3.width = 1280; c3.height = 720;
+  const x = c3.getContext('2d');
+  const blocks = [];
+  for (let i = 0; i < 40; i++) blocks.push({ material: ['wood', 'stone', 'ice', 'tnt'][i % 4], shape: i % 5 ? 'box' : 'circle', x: 10 + (i % 10), y: 5 + Math.floor(i / 10), w: 0.4 + (i % 3) * 0.6, h: 0.3 + (i % 2) * 0.5, r: 0.4, hp01: [1, 0.5, 0.2][i % 3], seed: i, angle: i * 0.1 });
+  const t = performance.now();
+  const N = 60;
+  for (let f = 0; f < N; f++) {
+    x.setTransform(40, 0, 0, 40, 0, 0);
+    x.clearRect(0, 0, 40, 20);
+    for (const b of blocks) A.drawBlock(x, b);
+    for (let k = 0; k < 6; k++) A.drawBird(x, A.BIRD_TYPES[k % 5], 3 + k * 2, 3, 0.4, f * 0.05, { time: f / 60, state: 'fly', fuse: 0.5 });
+    A.drawCommander(x, 3, 9, { team: 0, facing: 1, time: f / 60 }, null);
+    A.drawCommander(x, 28, 9, { team: 1, facing: -1, time: f / 60 }, null);
+  }
+  x.getImageData(0, 0, 1, 1);
+  return (performance.now() - t) / N;
+};
+window.__ready = true;
+</script>
+</body>
+</html>

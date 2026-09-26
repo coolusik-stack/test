@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Audio Test — Angry Fortress</title>
+<style>
+  :root { color-scheme: light dark; --bg:#fdf6e9; --fg:#2b2118; --card:#fff; --line:#e6d7bd; --accent:#e8573c; --accent2:#3c8de8; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#1d1a17; --fg:#f3ead9; --card:#2a2622; --line:#4a4238; } }
+  * { box-sizing: border-box; }
+  body { margin:0; padding:16px; font:15px/1.4 system-ui, -apple-system, "Apple SD Gothic Neo", sans-serif; background:var(--bg); color:var(--fg); }
+  h1 { font-size:20px; margin:0 0 4px; }
+  p.note { margin:0 0 12px; opacity:.75; font-size:13px; }
+  section { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:12px; margin:0 0 12px; }
+  h2 { font-size:14px; margin:0 0 8px; text-transform:uppercase; letter-spacing:.06em; opacity:.7; }
+  .grid { display:flex; flex-wrap:wrap; gap:6px; }
+  button { font:inherit; padding:9px 12px; border-radius:10px; border:1px solid var(--line); background:var(--bg); color:inherit; cursor:pointer; touch-action:manipulation; }
+  button:active { transform:scale(.96); }
+  button.primary { background:var(--accent); color:#fff; border-color:transparent; font-weight:600; }
+  button.music { border-color:var(--accent2); }
+  label { display:flex; align-items:center; gap:8px; margin:4px 0; font-size:13px; }
+  input[type=range] { flex:1; min-width:0; }
+  #pad { height:90px; border-radius:12px; border:2px dashed var(--line); display:flex; align-items:center; justify-content:center; user-select:none; touch-action:none; font-size:13px; opacity:.85; }
+  #meter { height:10px; border-radius:5px; background:var(--line); overflow:hidden; }
+  #meter > div { height:100%; width:0; background:linear-gradient(90deg, #4caf50, #ffc107 70%, #f44336); }
+  #status { font:12px ui-monospace, monospace; white-space:pre-wrap; opacity:.8; }
+</style>
+</head>
+<body>
+<h1>엥그리 포트리스 — Audio Test</h1>
+<p class="note">All sounds are synthesized live (js/audio.js). Tap “Unlock” first on iOS.</p>
+
+<section>
+  <div class="grid">
+    <button class="primary" id="unlock">Unlock / Init</button>
+    <button id="sfxToggle">SFX: on</button>
+    <button id="musicToggle">Music: on</button>
+    <button id="pause">Pause</button>
+    <button id="resume">Resume</button>
+    <button id="duck">Duck</button>
+    <button id="stress">Stress ×80</button>
+    <button id="stars">Stars ×3</button>
+  </div>
+  <label>vol <input id="vol" type="range" min="0" max="2" step="0.05" value="1"><span id="volV">1</span></label>
+  <label>pitch <input id="pitch" type="range" min="0.5" max="2" step="0.01" value="1"><span id="pitchV">1</span></label>
+  <label>pan <input id="pan" type="range" min="-1" max="1" step="0.05" value="0"><span id="panV">0</span></label>
+  <div id="meter"><div></div></div>
+  <div id="status"></div>
+</section>
+
+<section>
+  <h2>Music</h2>
+  <div class="grid">
+    <button class="music" data-track="menu">menu</button>
+    <button class="music" data-track="battle">battle</button>
+    <button class="music" data-track="victory">victory</button>
+    <button class="music" data-track="">stop</button>
+  </div>
+</section>
+
+<section>
+  <h2>Slingshot stretch (drag in the box)</h2>
+  <div id="pad">drag → stretch(t) · release → launch</div>
+</section>
+
+<div id="groups"></div>
+
+<script type="module">
+import Sound from '../js/audio.js';
+window.Sound = Sound;
+
+const GROUPS = {
+  UI: ['tap', 'back', 'select', 'start', 'turn', 'tick', 'deny'],
+  Birds: ['launch', 'squawk_red', 'squawk_yellow', 'squawk_blue', 'squawk_black', 'squawk_white', 'ability', 'dash', 'split', 'egg_drop', 'fuse'],
+  Impacts: ['hit_wood', 'hit_stone', 'hit_ice', 'break_wood', 'break_stone', 'break_ice', 'thud', 'bounce'],
+  Explosions: ['explode_small', 'explode_big', 'tnt'],
+  Captain: ['hurt', 'ko', 'splash', 'move', 'land'],
+  Results: ['win', 'lose', 'star', 'wind'],
+};
+window.SOUND_GROUPS = GROUPS;
+
+const $ = (id) => document.getElementById(id);
+const opts = () => ({ vol: +$('vol').value, pitch: +$('pitch').value, pan: +$('pan').value });
+['vol', 'pitch', 'pan'].forEach((k) => $(k).addEventListener('input', () => { $(k + 'V').textContent = $(k).value; }));
+
+const groupsEl = $('groups');
+for (const [g, names] of Object.entries(GROUPS)) {
+  const sec = document.createElement('section');
+  sec.innerHTML = `<h2>${g}</h2><div class="grid"></div>`;
+  const grid = sec.querySelector('.grid');
+  names.forEach((n) => {
+    const b = document.createElement('button');
+    b.textContent = n;
+    b.dataset.sfx = n;
+    grid.appendChild(b);
+  });
+  groupsEl.appendChild(sec);
+}
+
+document.addEventListener('pointerdown', () => Sound.unlock(), { once: true });
+$('unlock').onclick = () => { Sound.init(); Sound.play('tap'); };
+document.body.addEventListener('click', (e) => {
+  const b = e.target.closest('button');
+  if (!b) return;
+  if (b.dataset.sfx) { Sound.init(); Sound.play(b.dataset.sfx, opts()); }
+  if (b.dataset.track !== undefined) { Sound.init(); Sound.music(b.dataset.track || null); }
+});
+$('sfxToggle').onclick = () => { Sound.setSfx(!Sound.sfxOn); $('sfxToggle').textContent = 'SFX: ' + (Sound.sfxOn ? 'on' : 'off'); };
+$('musicToggle').onclick = () => { Sound.setMusic(!Sound.musicOn); $('musicToggle').textContent = 'Music: ' + (Sound.musicOn ? 'on' : 'off'); };
+$('pause').onclick = () => Sound.pause();
+$('resume').onclick = () => Sound.resume();
+$('duck').onclick = () => Sound.duck(0.6, 1.2);
+$('stars').onclick = () => { [1, 1.12, 1.26].forEach((p, i) => setTimeout(() => Sound.play('star', { pitch: p }), i * 350)); };
+$('stress').onclick = () => {
+  const names = GROUPS.Impacts;
+  for (let i = 0; i < 80; i++) Sound.play(names[i % names.length], { vol: Math.random(), pan: Math.random() * 2 - 1 });
+};
+
+// slingshot pad
+const pad = $('pad');
+let dragging = false, x0 = 0, t = 0;
+pad.addEventListener('pointerdown', (e) => { Sound.init(); dragging = true; x0 = e.clientX; pad.setPointerCapture(e.pointerId); });
+pad.addEventListener('pointermove', (e) => { if (!dragging) return; t = Math.min(1, Math.abs(e.clientX - x0) / (pad.clientWidth * 0.6)); });
+const end = () => { if (!dragging) return; dragging = false; Sound.stretch(null); if (t > 0.1) Sound.play('launch', { vol: 0.6 + t * 0.6 }); t = 0; };
+pad.addEventListener('pointerup', end);
+pad.addEventListener('pointercancel', end);
+(function frame() { if (dragging) Sound.stretch(t); requestAnimationFrame(frame); })();
+
+document.addEventListener('visibilitychange', () => (document.hidden ? Sound.pause() : Sound.resume()));
+
+// meter + status
+const buf = new Float32Array(2048);
+const bar = $('meter').firstElementChild;
+let peakHold = 0;
+setInterval(() => {
+  const an = Sound._analyser();
+  if (an) {
+    an.getFloatTimeDomainData(buf);
+    let pk = 0;
+    for (let i = 0; i < buf.length; i++) pk = Math.max(pk, Math.abs(buf[i]));
+    peakHold = Math.max(pk, peakHold * 0.92);
+    bar.style.width = Math.min(100, peakHold * 100) + '%';
+  }
+  const d = Sound._debug();
+  $('status').textContent = `ctx: ${d.state}  voices: ${d.voices}  music: ${d.players.map((p) => p.name + (p.fading ? '(fading)' : '')).join(', ') || '-'}  peak: ${peakHold.toFixed(2)}`;
+}, 100);
+</script>
+</body>
+</html>

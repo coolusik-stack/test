@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>엥그리 포트리스</title>
+<meta name="description" content="새총으로 쏘고 요새를 무너뜨려라! 귀여운 새들의 턴제 포격 대결 — 혼자서 CPU와, 또는 친구와 한 폰으로.">
+<meta name="theme-color" content="#2a78c9">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="엥그리 포트리스">
+<meta property="og:title" content="엥그리 포트리스">
+<meta property="og:description" content="새총으로 쏘고 요새를 무너뜨려라! 귀여운 새들의 턴제 포격 대결">
+<meta property="og:type" content="website">
+<meta property="og:image" content="assets/og.jpg">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" href="assets/icon-192.png">
+<link rel="apple-touch-icon" href="assets/icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=Jua&display=swap">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<svg class="sprite" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
+  <symbol id="i-pause" viewBox="0 0 24 24"><rect x="6" y="5" width="4.2" height="14" rx="1.6"/><rect x="13.8" y="5" width="4.2" height="14" rx="1.6"/></symbol>
+  <symbol id="i-play" viewBox="0 0 24 24"><path d="M8 5.5v13a1 1 0 0 0 1.5.86l10.4-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z"/></symbol>
+  <symbol id="i-left" viewBox="0 0 24 24"><path d="M15.5 4.5 7 12l8.5 7.5a1.2 1.2 0 0 0 2-.9V5.4a1.2 1.2 0 0 0-2-.9z"/></symbol>
+  <symbol id="i-right" viewBox="0 0 24 24"><path d="M8.5 4.5 17 12l-8.5 7.5a1.2 1.2 0 0 1-2-.9V5.4a1.2 1.2 0 0 1 2-.9z"/></symbol>
+  <symbol id="i-map" viewBox="0 0 24 24"><path d="M3 7.2 8.5 5l7 2.5L21 5.3v11.5L15.5 19l-7-2.5L3 18.7z" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"/><path d="M8.5 5v11.5M15.5 7.5V19" stroke="currentColor" stroke-width="2.2"/></symbol>
+  <symbol id="i-sound" viewBox="0 0 24 24"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7M18 6a8.5 8.5 0 0 1 0 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+  <symbol id="i-music" viewBox="0 0 24 24"><path d="M9 17.5V6.2l10-2.2v11.3" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"/><ellipse cx="6.5" cy="17.8" rx="3" ry="2.4"/><ellipse cx="16.5" cy="15.5" rx="3" ry="2.4"/></symbol>
+  <symbol id="i-vibe" viewBox="0 0 24 24"><rect x="7.5" y="3.5" width="9" height="17" rx="2" fill="none" stroke="currentColor" stroke-width="2.2"/><path d="M4 8v8M20 8v8" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></symbol>
+  <symbol id="i-home" viewBox="0 0 24 24"><path d="M3.5 11.2 12 4l8.5 7.2V20a1 1 0 0 1-1 1H15v-6h-6v6H4.5a1 1 0 0 1-1-1z"/></symbol>
+  <symbol id="i-redo" viewBox="0 0 24 24"><path d="M19 12a7 7 0 1 1-2.05-4.95" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/><path d="M20.5 4v5.5H15z"/></symbol>
+  <symbol id="i-help" viewBox="0 0 24 24"><path d="M9 9.3a3.1 3.1 0 1 1 4.4 2.8c-.9.4-1.4 1.2-1.4 2.1v.6" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/><circle cx="12" cy="18.6" r="1.6"/></symbol>
+  <symbol id="i-gear" viewBox="0 0 24 24"><path d="M12 8.2a3.8 3.8 0 1 0 0 7.6 3.8 3.8 0 0 0 0-7.6zm8.3 5.4-1.9.5a6.8 6.8 0 0 1-.7 1.6l1 1.7-1.9 1.9-1.7-1a6.8 6.8 0 0 1-1.6.7l-.5 1.9h-2.7l-.5-1.9a6.8 6.8 0 0 1-1.6-.7l-1.7 1-1.9-1.9 1-1.7a6.8 6.8 0 0 1-.7-1.6l-1.9-.5v-2.7l1.9-.5a6.8 6.8 0 0 1 .7-1.6l-1-1.7 1.9-1.9 1.7 1a6.8 6.8 0 0 1 1.6-.7l.5-1.9h2.7l.5 1.9a6.8 6.8 0 0 1 1.6.7l1.7-1 1.9 1.9-1 1.7a6.8 6.8 0 0 1 .7 1.6l1.9.5z"/></symbol>
+  <symbol id="i-rotate" viewBox="0 0 24 24"><rect x="3" y="8" width="18" height="10" rx="2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M6.5 5.5A8 8 0 0 1 17 4.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M17.8 2v4h-4z"/></symbol>
+  <symbol id="i-wind" viewBox="0 0 24 24"><path d="M3 9h11a3 3 0 1 0-3-3M3 14h15a3 3 0 1 1-3 3M3 11.5h8" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></symbol>
+</svg>
+
+<canvas id="game" aria-label="게임 화면"></canvas>
+
+<!-- ============ TITLE ============ -->
+<section id="title" class="screen">
+  <div class="title-wrap">
+    <div class="logo" aria-label="엥그리 포트리스">
+      <span class="logo-top">엥그리</span>
+      <span class="logo-main"><span class="lm-back" aria-hidden="true">포트리스</span><span class="lm-front">포트리스</span></span>
+      <span class="logo-tag">새총으로 쏘고, 요새를 무너뜨려라!</span>
+    </div>
+    <div class="menu">
+      <button class="btn btn-red btn-big" id="btn-solo"><span class="btn-kicker">혼자 하기</span>CPU와 대결</button>
+      <button class="btn btn-blue btn-big" id="btn-duo"><span class="btn-kicker">둘이 하기</span>한 폰으로 대결</button>
+      <div class="menu-row">
+        <button class="btn btn-cream btn-icon" id="btn-help" aria-label="게임 방법"><svg><use href="#i-help"/></svg></button>
+        <button class="btn btn-cream btn-icon" id="btn-settings" aria-label="설정"><svg><use href="#i-gear"/></svg></button>
+      </div>
+    </div>
+  </div>
+  <p class="record" id="record"></p>
+</section>
+
+<!-- ============ SETUP ============ -->
+<section id="setup" class="screen" hidden>
+  <div class="panel setup-panel">
+    <header class="panel-head">
+      <button class="btn btn-cream btn-icon btn-sm" id="setup-back" aria-label="뒤로"><svg><use href="#i-left"/></svg></button>
+      <h2 id="setup-title">전투 준비</h2>
+      <span class="spacer"></span>
+    </header>
+    <div class="setup-grid">
+      <div class="setup-fields">
+        <div class="field" id="field-diff">
+          <span class="field-label">CPU 실력</span>
+          <div class="seg" data-key="difficulty">
+            <button data-v="easy">쉬움</button><button data-v="normal">보통</button><button data-v="hard">어려움</button>
+          </div>
+        </div>
+        <div class="field">
+          <span class="field-label">바람</span>
+          <div class="seg" data-key="wind">
+            <button data-v="off">없음</button><button data-v="normal">보통</button><button data-v="strong">강풍</button>
+          </div>
+        </div>
+        <div class="field">
+          <span class="field-label">턴 제한</span>
+          <div class="seg" data-key="timer">
+            <button data-v="0">없음</button><button data-v="30">30초</button><button data-v="20">20초</button>
+          </div>
+        </div>
+        <div class="field">
+          <span class="field-label">조준선</span>
+          <div class="seg" data-key="guide">
+            <button data-v="on">보이기</button><button data-v="off">숨기기</button>
+          </div>
+        </div>
+      </div>
+      <div class="setup-maps">
+        <span class="field-label">전장</span>
+        <div class="maps" id="maps"></div>
+      </div>
+      <button class="btn btn-yellow btn-go" id="btn-go">전투 시작!</button>
+    </div>
+  </div>
+</section>
+
+<!-- ============ HUD ============ -->
+<div id="hud" hidden>
+  <div class="hud-top">
+    <button class="hud-btn" id="btn-pause" aria-label="일시정지"><svg><use href="#i-pause"/></svg></button>
+    <div class="pcard" id="pcard-0">
+      <canvas class="pface" width="96" height="96"></canvas>
+      <div class="pinfo">
+        <span class="pname"></span>
+        <div class="hpbar"><i class="hpfill"></i><i class="hpghost"></i><b class="hpnum">100</b></div>
+      </div>
+    </div>
+    <div class="hud-center">
+      <div class="turnpill" id="turnpill"><span id="turntext">준비</span><b id="timer" hidden>30</b></div>
+      <div class="wind" id="wind">
+        <svg class="wind-ico"><use href="#i-wind"/></svg>
+        <div class="wind-track"><i class="wind-fill" id="windfill"></i><i class="wind-mid"></i></div>
+        <b id="windnum">0</b>
+      </div>
+    </div>
+    <div class="pcard right" id="pcard-1">
+      <canvas class="pface" width="96" height="96"></canvas>
+      <div class="pinfo">
+        <span class="pname"></span>
+        <div class="hpbar"><i class="hpfill"></i><i class="hpghost"></i><b class="hpnum">100</b></div>
+      </div>
+    </div>
+    <button class="hud-btn" id="btn-overview" aria-label="전체 지도 보기"><svg><use href="#i-map"/></svg></button>
+  </div>
+
+  <div class="hud-bottom" id="controls">
+    <div class="movepad">
+      <button class="mbtn" id="mv-left" aria-label="왼쪽으로 이동"><svg><use href="#i-left"/></svg></button>
+      <div class="stamina"><span>이동</span><div class="st-track"><i id="stfill"></i></div></div>
+      <button class="mbtn" id="mv-right" aria-label="오른쪽으로 이동"><svg><use href="#i-right"/></svg></button>
+    </div>
+    <div class="hint" id="hint"></div>
+    <div class="birds" id="birds"></div>
+  </div>
+  <div class="banner" id="banner" hidden><strong id="banner-text"></strong><span id="banner-sub"></span></div>
+  <div class="tip" id="tip" hidden></div>
+</div>
+
+<!-- ============ PAUSE ============ -->
+<section id="pause" class="screen modal" hidden>
+  <div class="panel small-panel">
+    <h2>일시정지</h2>
+    <div class="toggles">
+      <button class="tgl" data-toggle="sfx"><svg><use href="#i-sound"/></svg><span>효과음</span></button>
+      <button class="tgl" data-toggle="music"><svg><use href="#i-music"/></svg><span>음악</span></button>
+      <button class="tgl" data-toggle="vibe"><svg><use href="#i-vibe"/></svg><span>진동</span></button>
+    </div>
+    <button class="btn btn-yellow" id="btn-resume"><svg><use href="#i-play"/></svg>계속하기</button>
+    <div class="menu-row">
+      <button class="btn btn-cream" id="btn-restart"><svg><use href="#i-redo"/></svg>다시 시작</button>
+      <button class="btn btn-cream" id="btn-home"><svg><use href="#i-home"/></svg>메뉴로</button>
+    </div>
+  </div>
+</section>
+
+<!-- ============ SETTINGS ============ -->
+<section id="settings" class="screen modal" hidden>
+  <div class="panel small-panel">
+    <h2>설정</h2>
+    <div class="toggles">
+      <button class="tgl" data-toggle="sfx"><svg><use href="#i-sound"/></svg><span>효과음</span></button>
+      <button class="tgl" data-toggle="music"><svg><use href="#i-music"/></svg><span>음악</span></button>
+      <button class="tgl" data-toggle="vibe"><svg><use href="#i-vibe"/></svg><span>진동</span></button>
+    </div>
+    <button class="btn btn-yellow" id="settings-close">확인</button>
+  </div>
+</section>
+
+<!-- ============ HELP ============ -->
+<section id="help" class="screen modal" hidden>
+  <div class="panel help-panel">
+    <button class="btn btn-cream btn-icon btn-sm panel-x" id="help-x" aria-label="닫기"><svg><use href="#i-play"/></svg></button>
+    <h2>게임 방법</h2>
+    <ol class="steps">
+      <li><b>당기고 놓기</b><span>내 새총 근처를 터치한 채 뒤로 당겼다 놓으면 발사! 더 멀리 당길수록 세게 날아가요.</span></li>
+      <li><b>바람을 읽기</b><span>위쪽 바람 표시를 보세요. 높이 쏠수록 바람에 많이 밀려요. 흰 점선은 지난 발사 궤적이에요.</span></li>
+      <li><b>특수 새 쓰기</b><span>날아가는 중 화면을 터치하면 능력 발동! 돌진, 분열, 대폭발, 알 폭탄.</span></li>
+      <li><b>이동과 지형</b><span>◀ ▶ 버튼으로 수레를 옮겨요. 폭발은 땅을 파고, 바다에 빠지면 즉시 패배!</span></li>
+    </ol>
+    <div class="help-birds" id="help-birds"></div>
+    <button class="btn btn-yellow" id="help-close">알겠어요!</button>
+  </div>
+</section>
+
+<!-- ============ RESULT ============ -->
+<section id="result" class="screen modal" hidden>
+  <div class="panel result-panel">
+    <div class="result-main">
+      <div class="result-head">
+        <canvas id="result-face" width="160" height="160"></canvas>
+        <div>
+          <h2 id="result-title">승리!</h2>
+          <p id="result-sub"></p>
+          <div class="stars" id="stars"><i></i><i></i><i></i></div>
+        </div>
+      </div>
+      <div class="menu-row">
+        <button class="btn btn-yellow" id="btn-again"><svg><use href="#i-redo"/></svg>한 판 더</button>
+        <button class="btn btn-cream" id="btn-menu"><svg><use href="#i-home"/></svg>메뉴로</button>
+      </div>
+    </div>
+    <table class="stats" id="stats"></table>
+  </div>
+</section>
+
+<!-- ============ ROTATE HINT ============ -->
+<div id="rotate" hidden>
+  <svg><use href="#i-rotate"/></svg>
+  <p>휴대폰을 가로로 돌리면<br>전장이 더 넓게 보여요</p>
+  <button class="btn btn-cream btn-sm" id="rotate-ok">이대로 할래요</button>
+</div>
+
+<div id="boot"><div class="boot-dot"></div></div>
+
+<script src="vendor/planck.min.js"></script>
+<script type="module" src="js/main.js"></script>
+</body>
+</html>

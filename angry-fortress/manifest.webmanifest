@@ -1,0 +1,17 @@
+{
+  "name": "엥그리 포트리스",
+  "short_name": "엥그리포트",
+  "description": "새총으로 쏘고 요새를 무너뜨려라! 귀여운 새들의 턴제 포격 대결",
+  "lang": "ko",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "fullscreen",
+  "orientation": "landscape",
+  "background_color": "#58b7f5",
+  "theme_color": "#2a78c9",
+  "icons": [
+    { "src": "assets/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "assets/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "assets/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
