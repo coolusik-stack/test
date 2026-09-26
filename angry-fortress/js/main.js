@@ -26,6 +26,8 @@ let size = { w: 0, h: 0, dpr: 1 };
 let hudTimer = 0;
 let rotateDismissed = false;
 let demoRestartT = null;
+let releaseKeys = () => {};
+let rotatePaused = false;
 
 // ---------------------------------------------------------------- sizing
 function resize() {
@@ -42,7 +44,17 @@ window.addEventListener('orientationchange', () => setTimeout(resize, 200));
 
 function updateRotateHint() {
   const portrait = size.h > size.w * 1.05;
-  $('#rotate').hidden = !(screen === 'battle' && portrait && !rotateDismissed);
+  const show = screen === 'battle' && portrait && !rotateDismissed;
+  $('#rotate').hidden = !show;
+  // freeze the match (turn timer, CPU) while the overlay covers it
+  if (show && game && !game.paused) {
+    game.paused = true;
+    game.cancelInput();
+    rotatePaused = true;
+  } else if (!show && rotatePaused) {
+    rotatePaused = false;
+    if (game && screen === 'battle') game.paused = false;
+  }
 }
 
 // ---------------------------------------------------------------- screens
@@ -52,6 +64,7 @@ function show(id) {
 
 function goTitle() {
   screen = 'title';
+  rotatePaused = false;
   show('title');
   $('#hud').hidden = true;
   startDemo();
@@ -96,6 +109,8 @@ function startBattle(opts) {
   $('#hud').hidden = false;
   $('#banner').hidden = true;
   $('#tip').hidden = true;
+  hint('', 0);
+  rotatePaused = false;
   const g = new Game(canvas, { ...opts, seed: (Math.random() * 1e9) | 0 }, (evt, data) => {
     if (g === game) onGameEvent(evt, data); // ignore late events from a replaced match
   }, size);
@@ -322,6 +337,7 @@ function syncHud(force) {
 function showResult(r) {
   screen = 'result';
   $('#hud').hidden = true;
+  updateRotateHint();
   show('result');
   const cpu = lastOpts.mode === 'cpu';
   let title, sub;
@@ -582,7 +598,8 @@ function bind() {
     game.pointerMove(e.pointerId, e.clientX, e.clientY);
   });
   const up = (e) => {
-    if (screen !== 'battle' || !game) return;
+    if (!game) return;
+    if (screen !== 'battle') { game.pointers.delete(e.pointerId); return; }
     game.pointerUp(e.pointerId);
   };
   canvas.addEventListener('pointerup', up);
@@ -596,6 +613,11 @@ function bind() {
 
   // keyboard (desktop)
   const keysDown = new Set();
+  releaseKeys = () => {
+    keysDown.clear();
+    if (game) game.setMove(0);
+  };
+  window.addEventListener('blur', () => releaseKeys());
   window.addEventListener('keydown', (e) => {
     if (screen !== 'battle' || !game) {
       if (e.key === 'Escape' && screen === 'paused') pause(false);
@@ -615,11 +637,9 @@ function bind() {
   window.addEventListener('keyup', (e) => {
     keysDown.delete(e.key);
     if (!game) return;
-    if (['ArrowLeft', 'ArrowRight', 'a', 'd'].includes(e.key)) {
-      const l = keysDown.has('ArrowLeft') || keysDown.has('a');
-      const r = keysDown.has('ArrowRight') || keysDown.has('d');
-      game.setMove(l && !r ? -1 : r && !l ? 1 : 0);
-    }
+    // releasing a direction key always stops: a key whose keyup got lost (focus change)
+    // must never keep the cart driving on its own
+    if (['ArrowLeft', 'ArrowRight', 'a', 'd'].includes(e.key)) game.setMove(0);
   });
 
   document.addEventListener('visibilitychange', () => {
@@ -637,7 +657,8 @@ function pause(on) {
   if (on) {
     if (screen !== 'battle') return;
     game.paused = true;
-    game.setMove(0);
+    game.cancelInput();
+    releaseKeys();
     screen = 'paused';
     syncToggles();
     show('pause');

@@ -42,6 +42,7 @@ export class Game {
     this.projectiles = [];
     this.blocks = [];
     this.killQueue = [];
+    this.pendingFalls = [];
     this.blastQueue = [];
     this.dentQueue = [];
     this.pointers = new Map();
@@ -73,8 +74,9 @@ export class Game {
     this.players = [0, 1].map((i) => {
       const x = land.bases[i];
       const y = this.terrain.surfaceY(x) + CART_R + 0.05;
-      const body = this.world.createBody({ type: 'dynamic', position: V(x, y), fixedRotation: true, linearDamping: 0.15 });
-      body.createFixture(planck.Circle(CART_R), { density: 2.0, friction: 1.2, restitution: 0.02 });
+      // heavy cart: direct hits hurt but shouldn't shove the captain off the island
+      const body = this.world.createBody({ type: 'dynamic', position: V(x, y), fixedRotation: true, linearDamping: 0.35 });
+      body.createFixture(planck.Circle(CART_R), { density: 5.0, friction: 1.2, restitution: 0.02 });
       body.createFixture(planck.Circle(V(0, HEAD.y), HEAD.r), { density: 0.6, friction: 0.6, restitution: 0.05 });
       const p = {
         id: i,
@@ -183,6 +185,18 @@ export class Game {
     });
     w.on('begin-contact', (contact) => {
       const a = ud(contact.getFixtureA()), b = ud(contact.getFixtureB());
+      // fall damage: judged from the captain's speed when it lands, not from solver impulses
+      for (const [s, o] of [[a, b], [b, a]]) {
+        if (s.kind !== 'captain' || (o.kind !== 'terrain' && o.kind !== 'block') || !this.damageOn) continue;
+        const p = s.ref;
+        const vy = -p.body.getLinearVelocity().y;
+        if (vy > 6) this._sfx('land', { vol: clamp(vy / 14, 0.3, 1) });
+        if (vy > 7.5 && !p.dead && this.time - (p.projHitT ?? -9) > 0.3) {
+          const dmg = (vy - 7.5) * 2.5;
+          const attacker = this.state === 'flight' || this.state === 'settle' ? this.players[this.turn] : null;
+          this.pendingFalls.push({ p, dmg, attacker: attacker === p ? null : attacker });
+        }
+      }
       for (const [s, o] of [[a, b], [b, a]]) {
         if (s.kind !== 'proj') continue;
         const P = s.ref;
@@ -243,6 +257,7 @@ export class Game {
         const room = HIT_CAP - (P.dealt || 0);
         dmg = Math.min(room, Math.max(0, imp - 1.5) * HIT_K * (P.spec.hit ?? 1));
         P.dealt = (P.dealt || 0) + dmg;
+        p.projHitT = this.time;
         if (dmg > 4) {
           p.hurtT = 1;
           const pos = p.body.getPosition();
@@ -250,10 +265,9 @@ export class Game {
           this.fx.burst(pos.x, pos.y + 1.2, 'star', 5, { speed: 4 });
         }
       } else if (o.kind === 'block') {
+        // a bird slamming a block into the captain is already counted as the bird's hit
+        if (this.time - (p.projHitT ?? -9) < 0.3) return;
         dmg = Math.min(25, Math.max(0, imp - 2.5) * 1.2);
-      } else if (o.kind === 'terrain') {
-        dmg = Math.max(0, imp - 14) * 0.8;
-        if (imp > 10) this._sfx('land', { vol: clamp(imp / 30, 0.3, 1) });
       }
       if (dmg > 0.3) this._hurt(p, dmg, o.kind === 'proj' ? o.ref.owner : null);
     }
@@ -293,7 +307,7 @@ export class Game {
     if (dmg >= 12) {
       this.fx.shake(0.12 + dmg * 0.006);
       if (dmg >= 25) this.slowmo(0.35);
-      vibrate(dmg >= 25 ? [30, 40, 60] : 25);
+      this._vibe(dmg >= 25 ? [30, 40, 60] : 25);
     }
     p.mood = 'scared';
     p.moodT = 1.5;
@@ -327,7 +341,7 @@ export class Game {
     this.fx.burst(x, y, 'dirt', Math.round(8 + crater * 6), { speed: 7 + r * 2, color: this.theme.ground.dirtDark });
     this.fx.shake(0.12 + r * 0.1);
     this._sfx(isTnt ? 'tnt' : r > 1.6 ? 'explode_big' : 'explode_small');
-    vibrate(r > 1.6 ? [40, 30, 60] : 25);
+    this._vibe(r > 1.6 ? [40, 30, 60] : 25);
     if (r > 1.6) this.slowmo(0.18);
     // captains
     for (const p of this.players) {
@@ -340,7 +354,7 @@ export class Game {
         const dx = pos.x - x, dy = pos.y - y + 0.6;
         const l = Math.hypot(dx, dy) || 1;
         const m = p.body.getMass();
-        p.body.applyLinearImpulse(V((dx / l) * push * 0.22 * k * m, (dy / l) * push * 0.22 * k * m + 1.5 * k * m), p.body.getPosition(), true);
+        p.body.applyLinearImpulse(V((dx / l) * push * 0.14 * k * m, (dy / l) * push * 0.14 * k * m + 1.5 * k * m), p.body.getPosition(), true);
       }
     }
     // blocks
@@ -410,13 +424,13 @@ export class Game {
     this._stretch(null);
     this._sfx('launch', { vol: 0.6 + power * 0.5 });
     this._sfx('squawk_' + type, { vol: 0.8 });
-    vibrate(15);
+    this._vibe(15);
     this.fx.burst(rest.x, rest.y, 'feather', 3, { color: Art.BIRD_INFO[type].color, speed: 2 });
     this.aim = null;
     this.setState('flight');
-    this.emit('fired', { player: p.id, type });
     // select next available bird automatically if this one ran out
     if (p.ammo[type] <= 0) p.sel = 'red';
+    this.emit('fired', { player: p.id, type });
   }
 
   restPos(p) {
@@ -425,9 +439,10 @@ export class Game {
     return { x: a.rest.x, y: -a.rest.y };
   }
 
-  activateAbility() {
+  activateAbility(fromAI = false) {
     const P = this.lead;
     if (!P || P.dead || P.used || P.kind !== 'bird') return false;
+    if (P.owner.isAI !== fromAI) return false; // humans can't fire the CPU's ability (and vice versa)
     const spec = P.spec;
     if (!spec.ability) return false;
     if (P.firstHit && spec.ability !== 'boom') return false;
@@ -531,7 +546,7 @@ export class Game {
       winner.mood = 'happy';
       winner.moodT = 99;
     }
-    setTimeout(() => this.emit('over', this.result()), 1600);
+    this.overSent = false;
   }
 
   result() {
@@ -543,7 +558,7 @@ export class Game {
       isAIWin: w ? w.isAI : false,
       stars,
       turns: this.turnNo,
-      players: this.players.map((p) => ({ name: p.name, hp: Math.round(p.hp), ...p.stats, dmg: Math.round(p.stats.dmg) })),
+      players: this.players.map((p) => ({ name: p.name, hp: Math.ceil(p.hp), ...p.stats, dmg: Math.round(p.stats.dmg) })),
     };
   }
 
@@ -676,7 +691,7 @@ export class Game {
       if (Math.abs(vx) > 0.2) p.facing = vx > 0 ? 1 : -1;
     }
     this._stretch(a.power);
-    if (a.power > 0.98 && !a.maxed) { a.maxed = true; vibrate(8); }
+    if (a.power > 0.98 && !a.maxed) { a.maxed = true; this._vibe(8); }
     if (a.power < 0.95) a.maxed = false;
   }
 
@@ -738,6 +753,10 @@ export class Game {
     }
     this.world.step(dt, 8, 3);
     // process deferred actions
+    if (this.pendingFalls.length) {
+      for (const f of this.pendingFalls) this._hurt(f.p, f.dmg, f.attacker);
+      this.pendingFalls.length = 0;
+    }
     if (this.dentQueue.length) {
       for (const d of this.dentQueue) {
         this.terrain.carve(d.x, d.y, d.r);
@@ -798,7 +817,7 @@ export class Game {
 
   _updateState(dt, realDt) {
     const p = this.players[this.turn];
-    if (p.dead && (this.state === 'aim' || this.state === 'ai-think' || this.state === 'ai-aim')) {
+    if ((this.players[0].dead || this.players[1].dead) && (this.state === 'aim' || this.state === 'ai-think' || this.state === 'ai-aim')) {
       // e.g. drove off a cliff: the turn is over
       this.aim = null;
       p.moveDir = 0;
@@ -856,11 +875,18 @@ export class Game {
         // AI ability timing
         if (p.isAI && this.aiAbilityAt != null && this.stateT >= this.aiAbilityAt) {
           this.aiAbilityAt = null;
-          this.activateAbility();
+          this.activateAbility(true);
         }
         if (this.projectiles.length === 0 && this.blastQueue.length === 0) this.setState('settle');
         if (this.stateT > 16) {
           for (const P of this.projectiles) { P.dead = true; this.killQueue.push(P.body); }
+        }
+        break;
+      }
+      case 'over': {
+        if (!this.overSent && this.stateT > 1.6) {
+          this.overSent = true;
+          this.emit('over', this.result());
         }
         break;
       }
@@ -1291,6 +1317,19 @@ export class Game {
 
   _stretch(t) {
     if (!this.silent) Sound.stretch(t);
+  }
+
+  _vibe(pattern) {
+    if (!this.silent) vibrate(pattern);
+  }
+
+  // Drop any in-progress touches/aim (pause, app switch). Keeps a CPU aim untouched.
+  cancelInput() {
+    this.pointers.clear();
+    this.pinch = null;
+    if (this.aim && !this.aim.ai) this.aim = null;
+    for (const p of this.players) if (!p.isAI) p.moveDir = 0;
+    this._stretch(null);
   }
 
   destroy() {

@@ -96,56 +96,81 @@ export function planShot(game, me, difficulty) {
 
   let best = null;
   let closest = null;
-  for (let deg = 10; deg <= 82; deg += 1.6) {
+  // Scores one launch for every available bird; returns a ranking value that also
+  // rewards near misses so the refine pass knows where to look.
+  const evalShot = (deg, pw) => {
     const a = (deg * Math.PI) / 180;
     const angle = dir > 0 ? a : Math.PI - a;
-    for (let pw = 0.32; pw <= 1.0001; pw += 0.022) {
-      const v = pw * VMAX;
-      const vx0 = Math.cos(angle) * v, vy0 = Math.sin(angle) * v;
-      const hit = sim(rest.x, rest.y, vx0, vy0, r, 7, true);
-      const d = Math.hypot(hit.x - ep.x, hit.y - ep.y);
-      if (hit.kind !== 'water' && hit.kind !== 'out' && hit.kind !== 'self' && hit.kind !== 'none') {
-        const selfD = Math.hypot(hit.x - mp.x, hit.y - mp.y);
-        if (selfD > 4 && (!closest || d < closest.d)) closest = { d, angle, power: pw, type: 'red', abilityAt: null };
-      }
-      for (const type of types) {
-        let dmg = 0;
-        let abilityAt = null;
-        if (hit.kind === 'self') dmg = -40;
-        else if (type === 'red') {
-          if (hit.kind === 'enemy') dmg = 28;
-          else if (hit.kind === 'terrain' || hit.kind === 'block') dmg = d < 1.8 ? 12 * (1 - d / 1.8) : 0;
-        } else if (type === 'black') {
-          if (hit.kind === 'enemy') dmg = BIRDS.black.blast.dmg + 6;
-          else if (hit.kind === 'terrain' || hit.kind === 'block') {
-            dmg = blastDmg(hit.x, hit.y, BIRDS.black.blast);
-            abilityAt = Math.max(0.1, hit.t - H * 2);
-          }
-          dmg -= 8; // save bombs for when they matter
-        } else if (type === 'blue') {
-          if (hit.kind === 'enemy') dmg = 22;
-          else if (hit.kind === 'terrain' || hit.kind === 'block') dmg = d < 2.2 ? 20 * (1 - d / 2.2) : 0;
-          abilityAt = hit.t * 0.62;
-          dmg -= 4;
-        } else if (type === 'white') {
-          // find the moment we pass above the enemy and simulate the egg from there
-          let x = rest.x, y = rest.y, vx = vx0, vy = vy0, tc = -1;
-          let px = x;
-          for (let i = 1; i * H < hit.t; i++) {
-            vx += wax * H; vy -= GRAV * H; x += vx * H; y += vy * H;
-            if ((px - ep.x) * (x - ep.x) <= 0 && y > ep.y + 1.2) { tc = i * H; break; }
-            px = x;
-          }
-          if (tc > 0) {
-            const e = sim(x, y - 0.45, vx * 0.15, -16, EGG.r, 4, false);
-            if (e.kind === 'enemy') dmg = EGG.blast.dmg;
-            else if (e.kind !== 'water' && e.kind !== 'out') dmg = blastDmg(e.x, e.y, EGG.blast);
-            abilityAt = tc;
-          } else if (hit.kind === 'enemy') dmg = 25;
-          dmg -= 6;
+    const v = pw * VMAX;
+    const vx0 = Math.cos(angle) * v, vy0 = Math.sin(angle) * v;
+    const hit = sim(rest.x, rest.y, vx0, vy0, r, 7, true);
+    const d = Math.hypot(hit.x - ep.x, hit.y - ep.y);
+    if (hit.kind !== 'water' && hit.kind !== 'out' && hit.kind !== 'self' && hit.kind !== 'none') {
+      const selfD = Math.hypot(hit.x - mp.x, hit.y - mp.y);
+      if (selfD > 4 && (!closest || d < closest.d)) closest = { d, angle, power: pw, type: 'red', abilityAt: null };
+    }
+    let top = -Infinity;
+    for (const type of types) {
+      let dmg = 0;
+      let abilityAt = null;
+      if (hit.kind === 'self') dmg = -40;
+      else if (type === 'red') {
+        if (hit.kind === 'enemy') dmg = 28;
+        else if (hit.kind === 'terrain' || hit.kind === 'block') dmg = d < 1.8 ? 12 * (1 - d / 1.8) : 0;
+      } else if (type === 'black') {
+        if (hit.kind === 'enemy') dmg = BIRDS.black.blast.dmg + 6;
+        else if (hit.kind === 'terrain' || hit.kind === 'block') {
+          dmg = blastDmg(hit.x, hit.y, BIRDS.black.blast);
+          abilityAt = Math.max(0.1, hit.t - H * 2);
         }
-        if (dmg > 0 && hit.kind === 'block' && d < 4) dmg += 2;
-        if (!best || dmg > best.dmg) best = { dmg, angle, power: pw, type, abilityAt };
+        dmg -= 8; // save bombs for when they matter
+      } else if (type === 'blue') {
+        if (hit.kind === 'enemy') dmg = 22;
+        else if (hit.kind === 'terrain' || hit.kind === 'block') dmg = d < 2.2 ? 20 * (1 - d / 2.2) : 0;
+        abilityAt = hit.t * 0.62;
+        dmg -= 4;
+      } else if (type === 'white') {
+        // find the moment we pass above the enemy and simulate the egg from there
+        let x = rest.x, y = rest.y, vx = vx0, vy = vy0, tc = -1;
+        let px = x;
+        for (let i = 1; i * H < hit.t; i++) {
+          vx += wax * H; vy -= GRAV * H; x += vx * H; y += vy * H;
+          if ((px - ep.x) * (x - ep.x) <= 0 && y > ep.y + 1.2) { tc = i * H; break; }
+          px = x;
+        }
+        if (tc > 0) {
+          const e = sim(x, y - 0.45, vx * 0.15, -16, EGG.r, 4, false);
+          if (e.kind === 'enemy') dmg = EGG.blast.dmg;
+          else if (e.kind !== 'water' && e.kind !== 'out') dmg = blastDmg(e.x, e.y, EGG.blast);
+          abilityAt = tc;
+        } else if (hit.kind === 'enemy') dmg = 25;
+        dmg -= 6;
+      }
+      if (dmg > 0 && hit.kind === 'block' && d < 4) dmg += 2;
+      if (!best || dmg > best.dmg) best = { dmg, angle, power: pw, type, abilityAt };
+      top = Math.max(top, dmg);
+    }
+    const near = hit.kind === 'terrain' || hit.kind === 'block' || hit.kind === 'enemy' ? Math.max(0, 8 - d) : 0;
+    return top + near;
+  };
+
+  // coarse grid, then refine around the three most promising spots
+  const coarse = [];
+  for (let deg = 10; deg <= 82; deg += 3) {
+    for (let pw = 0.32; pw <= 1.0001; pw += 0.04) coarse.push({ deg, pw, score: evalShot(deg, pw) });
+  }
+  coarse.sort((a, b) => b.score - a.score);
+  const seeds = [];
+  for (const c of coarse) {
+    if (seeds.length >= 3) break;
+    if (seeds.every((q) => Math.abs(q.deg - c.deg) > 4 || Math.abs(q.pw - c.pw) > 0.06)) seeds.push(c);
+  }
+  for (const c of seeds) {
+    for (let deg = c.deg - 3; deg <= c.deg + 3.001; deg += 0.75) {
+      if (deg < 5 || deg > 86) continue;
+      for (let pw = c.pw - 0.04; pw <= c.pw + 0.0401; pw += 0.01) {
+        if (pw < 0.25 || pw > 1) continue;
+        evalShot(deg, pw);
       }
     }
   }
