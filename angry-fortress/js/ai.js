@@ -4,10 +4,11 @@ import { GRAV, VMAX, WIND_ACC, BIRDS, EGG, CART_R, HEAD } from './config.js';
 import { WORLD } from './terrain.js';
 
 const H = 1 / 60;
+// sa/sp: angle (deg) and power error; learn: error floor as the CPU zeroes in over its shots.
 const PROFILE = {
-  easy: { sa: 5.5, sp: 0.065, wind: [0, 0.45], special: 0.35 },
-  normal: { sa: 2.3, sp: 0.028, wind: [0.8, 1.1], special: 0.7 },
-  hard: { sa: 0.8, sp: 0.011, wind: [0.97, 1.03], special: 1 },
+  easy: { sa: 5.5, sp: 0.065, wind: [0, 0.45], special: 0.35, learn: 0.8 },
+  normal: { sa: 3.0, sp: 0.035, wind: [0.75, 1.1], special: 0.65, learn: 0.55 },
+  hard: { sa: 1.0, sp: 0.013, wind: [0.95, 1.05], special: 1, learn: 0.4 },
 };
 
 function gauss() {
@@ -158,7 +159,7 @@ export function planShot(game, me, difficulty) {
   if (plan.type !== 'red' && Math.random() > prof.special) plan = { ...plan, type: 'red', abilityAt: null };
 
   // human-like error that shrinks as the CPU "learns" the range
-  const learn = Math.max(0.45, 1 - 0.12 * me.stats.shots);
+  const learn = Math.max(prof.learn, 1.35 - 0.15 * me.stats.shots);
   const angErr = ((gauss() * prof.sa * Math.PI) / 180) * learn;
   const pwErr = gauss() * prof.sp * learn;
   return {
