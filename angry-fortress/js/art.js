@@ -530,6 +530,7 @@ const PEA_PITS = (() => {
   const out = [];
   for (let row = -2; row <= 2; row++) {
     for (let col = -5; col <= 5; col++) {
+      if ((row === -2 || row === 2) && (col < -4 || col > 3)) continue;
       const x = col * 0.19 + (row & 1) * 0.095, y = row * 0.2 + 0.02;
       out.push([x, y * (1 - Math.abs(x + 0.1) * 0.12)]);
     }
@@ -591,10 +592,7 @@ function peanutTex(ctx, P, o) {
   const pits = PEA_PITS;
   ctx.beginPath();
   for (const p of pits) { ctx.moveTo(p[0] + 0.075, p[1]); ctx.ellipse(p[0], p[1], 0.075, 0.055, 0, 0, TAU); }
-  ctx.strokeStyle = 'rgba(122,76,30,0.45)'; ctx.lineWidth = o.lw * 0.7; ctx.stroke();
-  ctx.save(); ctx.translate(0.02, 0.025);
-  ctx.strokeStyle = 'rgba(255,238,200,0.4)'; ctx.lineWidth = o.lw * 0.45; ctx.stroke();
-  ctx.restore();
+  ctx.strokeStyle = 'rgba(122,76,30,0.5)'; ctx.lineWidth = o.lw * 0.75; ctx.stroke();
   // waist crease
   ctx.beginPath(); ctx.moveTo(PEA.ct[0], PEA.ct[1] - 0.04); ctx.quadraticCurveTo(-0.2, 0.05, PEA.cb[0], PEA.cb[1] + 0.04);
   ctx.strokeStyle = rgba(P.lo, 0.5); ctx.lineWidth = o.lw * 0.9; ctx.stroke();
@@ -611,53 +609,68 @@ function burrBehind(ctx, P, o) {
     ctx.beginPath(); ctx.arc(0, 0, 1.6, 0, TAU); ctx.fill();
     ctx.globalAlpha = 1;
   }
-  const N = 30, grow = 1 + 0.34 * fz, vib = fz * 0.03;
+  const N = 36, grow = 1 + 0.34 * fz, vib = fz * 0.03;
   const tips = [];
-  ctx.beginPath();
-  for (let i = 0; i < N; i++) {
-    const a = i * TAU / N + (i & 1) * 0.09 + Math.sin(t * 40 + i) * vib;
-    const len = ((i & 1) ? 0.98 : 1.1) * grow;
-    const ca = Math.cos(a), sa = Math.sin(a);
-    ctx.moveTo(ca * 0.6, sa * 0.6); ctx.lineTo(ca * len, sa * len);
-    tips.push(ca * len, sa * len);
-  }
   ctx.lineCap = 'round';
-  ctx.strokeStyle = P.line; ctx.lineWidth = 0.075 + o.lw * 1.6; ctx.stroke();
-  ctx.strokeStyle = P.spike; ctx.lineWidth = 0.075; ctx.stroke();
-  ctx.beginPath();
-  for (let i = 0; i < N; i++) { const x = tips[i * 2], y = tips[i * 2 + 1]; ctx.moveTo(x * 0.86, y * 0.86); ctx.lineTo(x, y); }
-  ctx.strokeStyle = P.spikeTip; ctx.lineWidth = 0.04; ctx.stroke();
-  if (fz > 0.3) {
-    const k = Math.floor(t * 12);
+  for (let layer = 0; layer < 2; layer++) {
     ctx.beginPath();
-    for (let j = 0; j < 5; j++) {
-      const i = Math.floor(hash(j, k) * N), s = 0.18 * fz * (0.6 + 0.4 * hash(k, j));
-      starPath(ctx, tips[i * 2], tips[i * 2 + 1], s, s * 0.3, 4, 0.3);
+    for (let i = 0; i < N; i++) {
+      const a = (i + layer * 0.5) * TAU / N + Math.sin(t * 40 + i * 1.7 + layer) * vib;
+      const len = (layer ? 0.93 + 0.09 * hash(i, 7) : 1.03 + 0.1 * hash(i, 3)) * grow;
+      const ca = Math.cos(a), sa = Math.sin(a);
+      ctx.moveTo(ca * 0.55, sa * 0.55); ctx.lineTo(ca * len, sa * len);
+      tips.push(ca * len, sa * len);
+    }
+    ctx.strokeStyle = mix(P.lo, P.line, 0.45); ctx.lineWidth = 0.05 + o.lw * 0.9; ctx.stroke();
+    ctx.strokeStyle = layer ? P.spike : mix(P.spike, P.lo, 0.35); ctx.lineWidth = 0.05; ctx.stroke();
+  }
+  ctx.beginPath();
+  for (let i = 0; i < tips.length; i += 2) { const x = tips[i], y = tips[i + 1]; ctx.moveTo(x * 0.86, y * 0.86); ctx.lineTo(x, y); }
+  ctx.strokeStyle = P.spikeTip; ctx.lineWidth = 0.026; ctx.stroke();
+  if (fz > 0.3) {
+    const k = Math.floor(t * 12), M = tips.length / 2;
+    ctx.beginPath();
+    for (let j = 0; j < 6; j++) {
+      const i = Math.floor(hash(j, k) * M), sz = 0.2 * fz * (0.6 + 0.4 * hash(k, j));
+      starPath(ctx, tips[i * 2], tips[i * 2 + 1], sz, sz * 0.28, 4, 0.3);
     }
     ctx.fillStyle = '#fff7c2'; ctx.fill();
   }
 }
 function burrTex(ctx, P, o) {
+  // short spines all over the husk surface
   ctx.beginPath();
-  for (let i = 0; i < 22; i++) {
-    const a = i * 2.39996, r = 0.34 + 0.4 * frac(i * 0.618);
-    const x = Math.cos(a) * r, y = Math.sin(a) * r;
-    ctx.moveTo(x, y); ctx.lineTo(x + Math.cos(a) * 0.1, y + Math.sin(a) * 0.1);
+  for (let i = 0; i < 44; i++) {
+    const a = i * 2.39996, r = 0.5 + 0.28 * frac(i * 0.618 + 0.3);
+    const x = Math.cos(a) * r, y = Math.sin(a) * r, a2 = a + 0.35;
+    ctx.moveTo(x, y); ctx.lineTo(x + Math.cos(a2) * 0.13, y + Math.sin(a2) * 0.13);
   }
-  ctx.strokeStyle = rgba(P.spikeTip, 0.7); ctx.lineWidth = o.lw * 0.9; ctx.lineCap = 'round'; ctx.stroke();
+  ctx.lineCap = 'round';
+  ctx.strokeStyle = rgba(P.line, 0.55); ctx.lineWidth = o.lw * 1.3; ctx.stroke();
+  ctx.strokeStyle = rgba(P.spikeTip, 0.85); ctx.lineWidth = o.lw * 0.6; ctx.stroke();
 }
 function burrOver(ctx, P, o) {
   const lw = o.lw, C = NP.chestnut;
   // split opening with pale fuzzy lining
-  ctx.beginPath(); ctx.ellipse(0.13, 0.1, 0.6, 0.52, -0.08, 0, TAU);
+  ctx.beginPath(); ctx.ellipse(0.13, 0.1, 0.56, 0.49, -0.08, 0, TAU);
   ctx.fillStyle = cgrad(ctx, 'burrlining', () => {
     const g = ctx.createRadialGradient(0.13, 0.3, 0.1, 0.13, 0.1, 0.62);
     g.addColorStop(0, P.lining); g.addColorStop(0.75, P.lining); g.addColorStop(1, P.liningLo);
     return g;
   });
   ctx.fill();
-  ctx.lineWidth = lw; ctx.strokeStyle = P.line; ctx.stroke();
+  ctx.lineWidth = lw * 0.8; ctx.strokeStyle = mix(P.lo, P.line, 0.5); ctx.stroke();
+  // spines on the lip of the split
+  ctx.beginPath();
+  for (let i = 0; i < 16; i++) {
+    const a = i * TAU / 16 + 0.1, ca = Math.cos(a), sa = Math.sin(a);
+    const ex = 0.13 + ca * 0.56 * 0.98, ey = 0.1 + sa * 0.49 * 0.98;
+    ctx.moveTo(ex, ey); ctx.lineTo(ex + ca * 0.1, ey + sa * 0.1);
+  }
+  ctx.strokeStyle = rgba(P.spikeTip, 0.9); ctx.lineWidth = lw * 0.7; ctx.lineCap = 'round'; ctx.stroke();
   // chestnut
+  ctx.save();
+  ctx.translate(0.15, 0.14); ctx.scale(0.92, 0.92); ctx.translate(-0.15, -0.14);
   ctx.beginPath();
   ctx.moveTo(0.15, -0.34);
   ctx.bezierCurveTo(0.5, -0.3, 0.66, -0.02, 0.64, 0.24);
@@ -680,6 +693,7 @@ function burrOver(ctx, P, o) {
   // pale tip tuft
   ctx.beginPath(); ctx.moveTo(0.15, -0.34); ctx.lineTo(0.1, -0.44); ctx.moveTo(0.15, -0.34); ctx.lineTo(0.2, -0.45);
   ctx.strokeStyle = C.hilum; ctx.lineWidth = lw * 0.9; ctx.lineCap = 'round'; ctx.stroke();
+  ctx.restore();
 }
 function walnutTex(ctx, P, o) {
   ctx.lineCap = 'round'; ctx.lineJoin = 'round';
@@ -728,7 +742,7 @@ const NL = {
     browAsym: 0.06, browLift1: 0.06, starsY: -0.98,
   },
   burr: {
-    path: burrHuskPath, behind: burrBehind, tex: burrTex, over: burrOver, faceP: 'chestnut',
+    path: burrHuskPath, behind: burrBehind, tex: burrTex, over: burrOver, faceP: 'chestnut', softOutline: true,
     eyes: [[0.0, 0.06, 0.2, 1], [0.35, 0.04, 0.18, 0.84]],
     brow: { th: 0.15, len: [0.33, 0.26], gap: 0.04, tilt: 0.42 },
     mouth: [0.24, 0.36, 0.14], idleMouth: 'frown',
@@ -807,7 +821,7 @@ function nutFigure(ctx, L, P, o) {
   ctx.fillStyle = 'rgba(255,255,255,0.8)'; ctx.fill();
   ctx.restore();
   ctx.beginPath(); L.path(ctx);
-  ctx.lineWidth = lw; ctx.strokeStyle = P.line; ctx.stroke();
+  ctx.lineWidth = lw; ctx.strokeStyle = L.softOutline ? mix(P.lo, P.line, 0.5) : P.line; ctx.stroke();
   if (L.over) L.over(ctx, P, o);
 
   // face
@@ -875,21 +889,17 @@ export function drawNut(ctx, type, x, y, r, angle, s) {
 }
 
 // downward-pound speed lines (render space, above the walnut)
+const SPEED = [[-0.55, 0.0, 0.8], [0.0, 0.33, 1.0], [0.55, 0.66, 0.75], [-0.26, 0.5, 0.5], [0.3, 0.15, 0.55]];
 function drawSpeedLines(ctx, x, y, r, time) {
   ctx.save();
   ctx.lineCap = 'round';
-  for (let pass = 0; pass < 2; pass++) {
-    ctx.beginPath();
-    for (let i = 0; i < 4; i++) {
-      const ph = frac(time * 2.6 + i * 0.29);
-      const px = x + (i - 1.5) * r * 0.5;
-      const top = y - r * (1.2 + (1 - ph) * 1.4 + (i & 1) * 0.3);
-      const len = r * (0.5 + 0.5 * (i & 1 ? 0.6 : 1));
-      ctx.moveTo(px, top); ctx.lineTo(px, top + len);
-    }
-    ctx.strokeStyle = pass ? 'rgba(255,255,255,0.9)' : 'rgba(40,60,90,0.35)';
-    ctx.lineWidth = r * (pass ? 0.07 : 0.13);
-    ctx.stroke();
+  for (const l of SPEED) {
+    const ph = frac(time * 2.4 + l[1]);
+    const top = y - r * (1.2 + (1 - ph) * 1.0), len = r * l[2] * 0.8;
+    ctx.globalAlpha = Math.min(1, ph * 4) * (0.35 + 0.65 * ph);
+    ctx.beginPath(); ctx.moveTo(x + l[0] * r, top); ctx.lineTo(x + l[0] * r, top + len);
+    ctx.strokeStyle = 'rgba(90,120,160,0.3)'; ctx.lineWidth = r * 0.11; ctx.stroke();
+    ctx.strokeStyle = 'rgba(255,255,255,0.95)'; ctx.lineWidth = r * 0.055; ctx.stroke();
   }
   ctx.restore();
 }
@@ -927,9 +937,9 @@ const SQ_P = [
   },
 ];
 const SQ_L = {
-  eyes: [[0.12, 0.0, 0.27, 1], [0.6, -0.03, 0.24, 0.84]],
+  eyes: [[0.12, 0.05, 0.27, 1], [0.6, 0.02, 0.24, 0.84]],
   brow: { th: 0.19, len: [0.46, 0.36], gap: 0.04, tilt: 0.36 },
-  blush: [[-0.4, 0.44, 0.2, 0.11], [0.66, 0.4, 0.14, 0.08]],
+  blush: [[-0.44, 0.46, 0.2, 0.11], [0.68, 0.42, 0.14, 0.08]],
 };
 
 function captainFaceOpts(s) {
@@ -969,21 +979,21 @@ function captainFaceOpts(s) {
 
 // head silhouette with puffable cheeks (p: 0..1)
 function squirrelHeadPath(ctx, p) {
-  const Rc = 1.0 + 0.34 * p, Lc = 0.98 + 0.34 * p, B = 0.92 + 0.12 * p, cy = 0.36 + 0.08 * p;
+  const Rc = 1.08 + 0.3 * p, Lc = 1.06 + 0.3 * p, B = 0.92 + 0.12 * p, cy = 0.4 + 0.06 * p;
   ctx.moveTo(0, -1.0);
-  ctx.bezierCurveTo(0.6, -1.0, 0.94, -0.64, 0.95, -0.22);
-  ctx.bezierCurveTo(0.96, 0.02, Rc, 0.08, Rc, cy);
-  ctx.bezierCurveTo(Rc, 0.72 + 0.1 * p, 0.62, B, 0.05, B);
-  ctx.bezierCurveTo(-0.55, B, -Lc, 0.74 + 0.1 * p, -Lc, cy - 0.04);
-  ctx.bezierCurveTo(-Lc, 0.02, -0.97, -0.06, -0.95, -0.26);
-  ctx.bezierCurveTo(-0.93, -0.66, -0.6, -1.0, 0, -1.0);
+  ctx.bezierCurveTo(0.58, -1.0, 0.9, -0.66, 0.9, -0.28);
+  ctx.bezierCurveTo(0.9, -0.02, Rc, 0.1, Rc, cy);
+  ctx.bezierCurveTo(Rc, 0.76 + 0.08 * p, 0.64, B, 0.04, B);
+  ctx.bezierCurveTo(-0.56, B, -Lc, 0.76 + 0.08 * p, -Lc, cy - 0.02);
+  ctx.bezierCurveTo(-Lc, 0.08, -0.9, -0.04, -0.9, -0.3);
+  ctx.bezierCurveTo(-0.9, -0.68, -0.58, -1.0, 0, -1.0);
   ctx.closePath();
 }
 
 function drawEar(ctx, bx, by, ang, team, P, lw, time, far) {
   ctx.save();
   ctx.translate(bx, by); ctx.rotate(ang);
-  const L = 0.5, W = 0.38;
+  const L = 0.6, W = 0.4;
   ctx.lineJoin = 'round';
   // ear tuft (long for the Korean squirrel)
   const sway = Math.sin(time * 2.3 + (far ? 1 : 0)) * 0.03;
@@ -1036,7 +1046,7 @@ function drawAcornCapHelmet(ctx, lw, gx, gy, time) {
   const dome = () => {
     ctx.moveTo(-1.06, -0.4);
     ctx.bezierCurveTo(-1.1, -1.24, 1.04, -1.3, 1.08, -0.46);
-    ctx.quadraticCurveTo(0.02, -0.24, -1.06, -0.4);
+    ctx.quadraticCurveTo(0.02, -0.38, -1.06, -0.4);
     ctx.closePath();
   };
   ctx.beginPath(); dome();
@@ -1059,62 +1069,74 @@ function drawAcornCapHelmet(ctx, lw, gx, gy, time) {
   ctx.beginPath(); dome();
   ctx.lineWidth = lw; ctx.strokeStyle = C.capLine; ctx.stroke();
   // rim lip
-  ctx.beginPath(); ctx.moveTo(-1.08, -0.42); ctx.quadraticCurveTo(0.02, -0.2, 1.1, -0.48);
+  ctx.beginPath(); ctx.moveTo(-1.08, -0.42); ctx.quadraticCurveTo(0.02, -0.34, 1.1, -0.48);
   ctx.strokeStyle = C.capLine; ctx.lineWidth = 0.17 + lw * 2; ctx.stroke();
   ctx.strokeStyle = C.capLo; ctx.lineWidth = 0.17; ctx.stroke();
-  ctx.beginPath(); ctx.moveTo(-1.02, -0.46); ctx.quadraticCurveTo(0.02, -0.25, 1.04, -0.52);
+  ctx.beginPath(); ctx.moveTo(-1.02, -0.46); ctx.quadraticCurveTo(0.02, -0.39, 1.04, -0.52);
   ctx.strokeStyle = rgba(C.capHi, 0.7); ctx.lineWidth = 0.045; ctx.stroke();
   ctx.restore();
 }
 
-function drawPineconeHelmet(ctx, lw, gx, gy) {
+const PINE_TOP = -1.38;
+function pineHalfWidth(y) {
+  const e = clamp((y - PINE_TOP) / (-0.44 - PINE_TOP), 0, 1);
+  return 1.05 * Math.pow(e, 0.62);
+}
+function drawPineconeHelmet(ctx, lw, gx, gy, time) {
   ctx.save();
   ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+  // pine-needle sprig on the tip
+  const sway = Math.sin((time || 0) * 2.4) * 0.05;
+  ctx.beginPath();
+  for (let i = 0; i < 6; i++) {
+    const a = -PI / 2 - 0.75 + i * 0.3 + sway, l = 0.34 + 0.08 * Math.sin(i * 2.1);
+    ctx.moveTo(0.02, PINE_TOP + 0.05); ctx.quadraticCurveTo(0.02 + Math.cos(a) * l * 0.5, PINE_TOP + Math.sin(a) * l * 0.5 - 0.03, 0.02 + Math.cos(a) * l, PINE_TOP + Math.sin(a) * l);
+  }
+  ctx.strokeStyle = '#1e4a12'; ctx.lineWidth = 0.075 + lw; ctx.stroke();
+  ctx.strokeStyle = '#4f9e34'; ctx.lineWidth = 0.075; ctx.stroke();
+  ctx.strokeStyle = 'rgba(200,245,160,0.6)'; ctx.lineWidth = 0.022; ctx.stroke();
   const dome = () => {
-    ctx.moveTo(-1.05, -0.4);
-    ctx.bezierCurveTo(-1.08, -1.26, 1.04, -1.32, 1.07, -0.46);
-    ctx.quadraticCurveTo(0.02, -0.22, -1.05, -0.4);
+    ctx.moveTo(-1.05, -0.42);
+    ctx.bezierCurveTo(-1.05, -0.95, -0.42, PINE_TOP + 0.06, 0.02, PINE_TOP);
+    ctx.bezierCurveTo(0.46, PINE_TOP + 0.06, 1.07, -0.97, 1.07, -0.48);
+    ctx.quadraticCurveTo(0.02, -0.34, -1.05, -0.42);
     ctx.closePath();
   };
   ctx.beginPath(); dome();
-  ctx.fillStyle = '#4a2a10'; ctx.fill();
+  ctx.fillStyle = '#3e200c'; ctx.fill();
   ctx.save(); ctx.clip();
-  const sg = cgrad(ctx, 'pinescale', () => {
-    const g = ctx.createRadialGradient(-0.35, -0.95, 0.05, 0, -0.66, 1.35);
-    g.addColorStop(0, '#e2aa6c'); g.addColorStop(0.4, '#a8683a'); g.addColorStop(1, '#5e3414');
+  const sg = cgrad(ctx, 'pinescale2', () => {
+    const g = ctx.createRadialGradient(-0.35, -1.0, 0.05, 0, -0.7, 1.35);
+    g.addColorStop(0, '#f0b474'); g.addColorStop(0.38, '#b06a34'); g.addColorStop(1, '#5c2e10');
     return g;
   });
-  const rows = [[-0.36, 0.4, 7], [-0.6, 0.36, 7], [-0.82, 0.32, 6], [-1.0, 0.27, 5], [-1.14, 0.22, 3]];
+  const rows = [[-0.34, 0.36, 7], [-0.56, 0.34, 7], [-0.78, 0.3, 6], [-0.98, 0.26, 5], [-1.15, 0.22, 3], [-1.28, 0.16, 2]];
   for (const row of rows) {
     const y = row[0], sh = row[1], n = row[2];
-    const e = (y + 0.44) / 0.86;
-    const hw = 1.06 * Math.sqrt(Math.max(0.05, 1 - e * e));
-    const sp = (2 * hw) / n, sw = sp * 1.18;
+    const hw = pineHalfWidth(y - sh * 0.2) + 0.04;
+    const sp = (2 * hw) / n, sw = sp * 1.15;
     ctx.beginPath();
     for (let i = 0; i < n; i++) {
       const cx = -hw + sp * (i + 0.5);
-      ctx.moveTo(cx - sw / 2, y - sh * 0.5);
-      ctx.quadraticCurveTo(cx - sw * 0.52, y + sh * 0.3, cx, y + sh * 0.52);
-      ctx.quadraticCurveTo(cx + sw * 0.52, y + sh * 0.3, cx + sw / 2, y - sh * 0.5);
+      ctx.moveTo(cx - sw / 2, y - sh * 0.55);
+      ctx.quadraticCurveTo(cx - sw * 0.5, y + sh * 0.18, cx, y + sh * 0.5);
+      ctx.quadraticCurveTo(cx + sw * 0.5, y + sh * 0.18, cx + sw / 2, y - sh * 0.55);
       ctx.closePath();
     }
     ctx.fillStyle = sg; ctx.fill();
-    ctx.lineWidth = lw * 0.9; ctx.strokeStyle = '#2e1606'; ctx.stroke();
+    ctx.lineWidth = lw * 0.9; ctx.strokeStyle = '#2a1204'; ctx.stroke();
     ctx.beginPath();
     for (let i = 0; i < n; i++) {
       const cx = -hw + sp * (i + 0.5);
-      ctx.moveTo(cx - sw * 0.22, y + sh * 0.3); ctx.quadraticCurveTo(cx, y + sh * 0.42, cx + sw * 0.22, y + sh * 0.3);
+      ctx.moveTo(cx - sw * 0.2, y + sh * 0.26); ctx.quadraticCurveTo(cx, y + sh * 0.4, cx + sw * 0.2, y + sh * 0.26);
     }
-    ctx.strokeStyle = 'rgba(255,220,170,0.55)'; ctx.lineWidth = lw * 0.7; ctx.stroke();
+    ctx.strokeStyle = 'rgba(255,226,176,0.7)'; ctx.lineWidth = lw * 0.8; ctx.stroke();
   }
-  ctx.beginPath(); ctx.ellipse(gx * 0.5 - 0.05, -0.82 + gy * 0.28, 0.32, 0.1, Math.atan2(gy, gx) + PI / 2 + 0.25, 0, TAU);
+  ctx.beginPath(); ctx.ellipse(gx * 0.45 - 0.08, -0.86 + gy * 0.25, 0.26, 0.09, Math.atan2(gy, gx) + PI / 2 + 0.35, 0, TAU);
   ctx.fillStyle = 'rgba(255,236,200,0.3)'; ctx.fill();
   ctx.restore();
   ctx.beginPath(); dome();
   ctx.lineWidth = lw; ctx.strokeStyle = '#26120a'; ctx.stroke();
-  // little pinecone nub on top
-  ctx.beginPath(); ctx.ellipse(0.02, -1.14, 0.12, 0.09, 0, 0, TAU);
-  ctx.fillStyle = '#8a5428'; ctx.fill(); ctx.stroke();
   ctx.restore();
 }
 
@@ -1179,7 +1201,7 @@ function drawSquirrelMouth(ctx, mode, P, lw) {
 function drawSquirrelHead(ctx, team, P, o) {
   const lw = o.lw, gx = o.gx, gy = o.gy, p = o.puff || 0;
   ctx.lineJoin = 'round'; ctx.lineCap = 'round';
-  drawEar(ctx, -0.5, -0.72, -2.1, team, P, lw, o.time, true);
+  drawEar(ctx, -0.52, -0.8, -2.15, team, P, lw, o.time, true);
   ctx.beginPath(); squirrelHeadPath(ctx, p);
   const g = ctx.createRadialGradient(gx * 0.42, gy * 0.42, 0, gx * 0.42, gy * 0.42, 1.55);
   g.addColorStop(0, P.hi); g.addColorStop(0.3, P.body); g.addColorStop(0.62, P.body); g.addColorStop(1, P.lo);
@@ -1210,8 +1232,8 @@ function drawSquirrelHead(ctx, team, P, o) {
   ctx.lineWidth = lw; ctx.strokeStyle = P.line; ctx.stroke();
   // cheek fur notches
   ctx.beginPath();
-  const lc = 0.98 + 0.34 * p;
-  ctx.moveTo(-lc + 0.02, 0.3); ctx.lineTo(-lc - 0.07, 0.4); ctx.lineTo(-lc + 0.04, 0.44);
+  const lc = 1.06 + 0.3 * p;
+  ctx.moveTo(-lc + 0.02, 0.32); ctx.lineTo(-lc - 0.07, 0.42); ctx.lineTo(-lc + 0.03, 0.47);
   ctx.strokeStyle = P.line; ctx.lineWidth = lw * 0.8; ctx.stroke();
   // blush (grows with puffed cheeks)
   const bs = 1 + 0.5 * p;
@@ -1222,8 +1244,8 @@ function drawSquirrelHead(ctx, team, P, o) {
   drawEye(ctx, E[0][0], E[0][1], E[0][2] * es, E[0][3], 1, o, P);
   drawEye(ctx, E[1][0], E[1][1], E[1][2] * es, E[1][3], -1, o, P);
   drawSquirrelMouth(ctx, o.mouth, P, lw);
+  drawEar(ctx, 0.26, -0.9, -1.7, team, P, lw, o.time, false);
   if (o.hook) o.hook(ctx);
-  drawEar(ctx, 0.3, -0.82, -1.72, team, P, lw, o.time, false);
   const B = SQ_L.brow;
   const d0 = E[0][2] * es + B.gap + B.th * 0.3 - o.browDy;
   const d1 = E[1][2] * es + B.gap + B.th * 0.3 - o.browDy;
@@ -1250,7 +1272,7 @@ function cubicPt(p0, p1, p2, p3, t) {
   return [a * p0[0] + b * p1[0] + c * p2[0] + d * p3[0], a * p0[1] + b * p1[1] + c * p2[1] + d * p3[1]];
 }
 function tailSpine(S, sway) {
-  const N = 20, pts = [];
+  const N = 16, pts = [];
   for (let i = 0; i <= N; i++) {
     const u = i / N;
     const seg = u < 0.5 ? 0 : 1, t = seg ? (u - 0.5) * 2 : u * 2;
@@ -1296,7 +1318,7 @@ function drawTail(ctx, P, lw, time, flop, lightX) {
   const pts = tailSpine(S, sway);
   ctx.save();
   ctx.lineJoin = 'round'; ctx.lineCap = 'round';
-  ctx.beginPath(); tailOutline(ctx, pts, 1, 0.34);
+  ctx.beginPath(); tailOutline(ctx, pts, 1, 0.3);
   const g = ctx.createLinearGradient(-0.4, 0, -1.3, -1.6);
   g.addColorStop(0, P.tailLo); g.addColorStop(0.45, P.tail); g.addColorStop(1, mix(P.tail, P.tailHi, 0.35));
   ctx.fillStyle = g; ctx.fill();
@@ -1319,7 +1341,7 @@ function drawTail(ctx, P, lw, time, flop, lightX) {
   }
   ctx.strokeStyle = rgba(P.tailLo, 0.55); ctx.lineWidth = lw * 0.7; ctx.stroke();
   ctx.restore();
-  ctx.beginPath(); tailOutline(ctx, pts, 1, 0.34);
+  ctx.beginPath(); tailOutline(ctx, pts, 1, 0.3);
   ctx.lineWidth = lw; ctx.strokeStyle = P.line; ctx.stroke();
   ctx.restore();
 }
@@ -1640,7 +1662,7 @@ export function drawCommander(ctx, x, y, s, drawAmmo) {
   ho.hook = (c) => {
     c.save();
     if (dead) { c.translate(-0.25, -0.1); c.rotate(-0.3); }
-    if (team) drawPineconeHelmet(c, hlw, gxLocal, LIGHT_Y); else drawAcornCapHelmet(c, hlw, gxLocal, LIGHT_Y, time);
+    if (team) drawPineconeHelmet(c, hlw, gxLocal, LIGHT_Y, time); else drawAcornCapHelmet(c, hlw, gxLocal, LIGHT_Y, time);
     c.restore();
   };
   ho.front = (c) => {
@@ -1849,8 +1871,9 @@ function branchDetail(L, S, seed) {
     grooves.push([xs, yy, Math.min(xe, L / 2 - L * 0.03), S * (0.02 + R() * 0.03), R() * TAU]);
   }
   const knots = [];
-  const nk = L > 0.6 ? (R() < 0.5 ? 1 : 2) : (R() < 0.4 ? 1 : 0);
-  for (let i = 0; i < nk; i++) knots.push([(R() - 0.5) * L * 0.7, (R() - 0.5) * S * 0.4, Math.min(S * 0.18, 0.09)]);
+  const nk = L > 1.6 ? 2 : (L > 0.5 ? (R() < 0.7 ? 1 : 0) : 0);
+  const k0 = (R() - 0.5) * L * 0.5;
+  for (let i = 0; i < nk; i++) knots.push([i ? -Math.sign(k0 || 1) * L * (0.2 + R() * 0.15) : k0, (R() - 0.5) * S * 0.35, Math.min(S * 0.13, 0.065)]);
   const sprout = (seed % 3 === 0) ? { x: (R() - 0.5) * L * 0.6, side: R() < 0.7 ? -1 : 1, a: (R() - 0.5) * 0.6 } : null;
   return { grooves, knots, sprout };
 }
@@ -1884,11 +1907,11 @@ function drawBranchBox(ctx, w, h, b, lw) {
   if (D.knots.length) {
     ctx.beginPath();
     for (const k of D.knots) { ctx.moveTo(k[0] + k[2] * 1.5, k[1]); ctx.ellipse(k[0], k[1], k[2] * 1.5, k[2], 0, 0, TAU); }
-    ctx.fillStyle = '#6a4020'; ctx.fill();
-    ctx.lineWidth = clamp(S * 0.02, 0.008, 0.02); ctx.strokeStyle = 'rgba(40,20,6,0.7)'; ctx.stroke();
+    ctx.fillStyle = '#80522a'; ctx.fill();
+    ctx.lineWidth = clamp(S * 0.018, 0.007, 0.018); ctx.strokeStyle = 'rgba(40,20,6,0.55)'; ctx.stroke();
     ctx.beginPath();
-    for (const k of D.knots) { ctx.moveTo(k[0] + k[2] * 0.6, k[1]); ctx.ellipse(k[0], k[1], k[2] * 0.6, k[2] * 0.4, 0, 0, TAU); }
-    ctx.fillStyle = '#e8c088'; ctx.fill();
+    for (const k of D.knots) { ctx.moveTo(k[0] + k[2] * 0.55, k[1]); ctx.ellipse(k[0], k[1], k[2] * 0.55, k[2] * 0.35, 0, 0, TAU); }
+    ctx.fillStyle = '#c99660'; ctx.fill();
   }
   if (vert) ctx.rotate(-PI / 2);
   const bv = Math.min(S * 0.08, 0.04), br = Math.max(cr - bv / 2, 0.001);
@@ -2089,6 +2112,7 @@ function hiveDetail(w, h, seed, isCircle) {
   for (let row = -Math.ceil(hh / dy) - 1; row <= Math.ceil(hh / dy) + 1; row++) {
     for (let col = -Math.ceil(hw / dx) - 1; col <= Math.ceil(hw / dx) + 1; col++) {
       const cx = col * dx + (row & 1 ? dx / 2 : 0), cy = row * dy;
+      if (Math.abs(cx) > hw + hr * 0.9 || Math.abs(cy) > hh + hr * 0.9) continue;
       cells.push([cx, cy]);
       if (R() < 0.2 && Math.abs(cx) < hw - hr && Math.abs(cy) < hh - hr) honey.push([cx, cy]);
     }
@@ -2096,10 +2120,23 @@ function hiveDetail(w, h, seed, isCircle) {
   const bees = [];
   const nb = S > 0.5 ? 2 : 1;
   for (let i = 0; i < nb; i++) bees.push([(R() - 0.5) * hw * 1.1, -hh * 0.35 + (R() - 0.5) * hh * 0.6, R() < 0.5 ? -1 : 1, (R() - 0.5) * 0.6]);
+  // honeycomb walls as zigzag rows + vertical segments (each shared edge stroked once)
+  const zig = [], vert = [];
+  const r0 = Math.floor(-(hh + hr) / dy), r1 = Math.ceil((hh + hr) / dy) + 1;
+  const c0 = Math.floor(-(hw + dx) / dx) - 1, c1 = Math.ceil((hw + dx) / dx) + 1;
+  for (let row = r0; row <= r1; row++) {
+    const cy = row * dy, off = (row & 1) ? dx / 2 : 0, line = [];
+    for (let col = c0; col <= c1; col++) {
+      const cx = col * dx + off;
+      line.push(cx - dx / 2, cy - hr / 2, cx, cy - hr);
+      if (row < r1 && Math.abs(cx - dx / 2) <= hw + dx && Math.abs(cy) <= hh + hr) vert.push(cx - dx / 2, cy - hr / 2, cy + hr / 2);
+    }
+    zig.push(line);
+  }
   const drips = [];
   const nd = isCircle ? 1 : clamp(Math.round(w / 0.5), 1, 3);
   for (let i = 0; i < nd; i++) drips.push([(isCircle ? 0.2 * w : -w / 2 + w * (i + 0.3 + R() * 0.4) / nd), clamp(S * 0.22, 0.06, 0.16) * (0.7 + R() * 0.5), clamp(S * 0.07, 0.025, 0.05)]);
-  return { hr, cells, honey, bees, drips };
+  return { hr, cells, honey, bees, drips, zig, vert };
 }
 function hexPath(ctx, cx, cy, r) {
   for (let i = 0; i < 6; i++) {
@@ -2119,10 +2156,13 @@ function drawBee(ctx, x, y, s, dir, rot, lw) {
   // body
   ctx.beginPath(); ctx.ellipse(0, 0, 0.62, 0.45, 0, 0, TAU);
   ctx.fillStyle = '#ffd23a'; ctx.fill();
-  ctx.save(); ctx.clip();
-  ctx.fillStyle = '#2a2230'; ctx.fillRect(-0.28, -0.6, 0.18, 1.2); ctx.fillRect(0.06, -0.6, 0.18, 1.2);
-  ctx.restore();
   ctx.lineWidth = l; ctx.strokeStyle = '#2a2230'; ctx.stroke();
+  ctx.beginPath();
+  for (const x0 of [-0.28, 0.06]) {
+    const x1 = x0 + 0.18, y0 = 0.45 * Math.sqrt(1 - (x0 / 0.62) * (x0 / 0.62)), y1 = 0.45 * Math.sqrt(1 - (x1 / 0.62) * (x1 / 0.62));
+    ctx.moveTo(x0, -y0); ctx.lineTo(x1, -y1); ctx.lineTo(x1, y1); ctx.lineTo(x0, y0); ctx.closePath();
+  }
+  ctx.fillStyle = '#2a2230'; ctx.fill();
   // stinger + eye + angry brow
   ctx.beginPath(); ctx.moveTo(-0.6, -0.08); ctx.lineTo(-0.85, 0.02); ctx.lineTo(-0.6, 0.1); ctx.fillStyle = '#2a2230'; ctx.fill();
   ctx.beginPath(); ctx.arc(0.36, -0.06, 0.1, 0, TAU); ctx.fill();
@@ -2165,11 +2205,10 @@ function drawHiveBox(ctx, w, h, b, lw) {
   ctx.fillStyle = 'rgba(214,122,8,0.6)'; ctx.fill();
   // honeycomb walls
   ctx.beginPath();
-  for (const c of D.cells) hexPath(ctx, c[0], c[1], hr);
+  for (const L of D.zig) { ctx.moveTo(L[0], L[1]); for (let i = 2; i < L.length; i += 2) ctx.lineTo(L[i], L[i + 1]); }
+  const V = D.vert;
+  for (let i = 0; i < V.length; i += 3) { ctx.moveTo(V[i], V[i + 1]); ctx.lineTo(V[i], V[i + 2]); }
   ctx.strokeStyle = 'rgba(150,84,6,0.6)'; ctx.lineWidth = clamp(hr * 0.2, 0.008, 0.02); ctx.stroke();
-  ctx.save(); ctx.translate(hr * 0.1, hr * 0.12);
-  ctx.strokeStyle = 'rgba(255,240,170,0.45)'; ctx.lineWidth = clamp(hr * 0.1, 0.004, 0.01); ctx.stroke();
-  ctx.restore();
   // danger stripes (bee-striped bands) top & bottom
   const bh = Math.min(h * 0.14, 0.12);
   const sw = bh * 1.1;
@@ -2527,14 +2566,15 @@ export function drawCaptainIcon(canvas, team) {
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.clearRect(0, 0, w, h);
   const m = Math.min(w, h);
-  const k = m / (team ? 3.0 : 2.8);          // head unit → px (fits ears/tufts, helmet and cheeks)
-  ctx.setTransform(k, 0, 0, k, w / 2 - 0.04 * m, h / 2 + (team ? 0.3 : 0.24) * k);
+  // head unit → px; fits cheeks, whiskers, helmet and ears (the Korean squirrel's long tufts are taller)
+  const k = m / (team ? 3.4 : 3.05);
+  ctx.setTransform(k, 0, 0, k, w / 2 - 0.03 * m, h / 2 + (team ? 0.64 : 0.44) * k);
   const P = SQ_P[team ? 1 : 0];
   const fo = captainFaceOpts({ mood: 'normal', hp: 1 });
   fo.llx = 0.55; fo.lly = 0.1;
   const lw = outlineW(HEAD_R) / HEAD_R * 1.15;
   const ho = Object.assign({}, fo, { lw, gx: LIGHT_X, gy: LIGHT_Y, time: 0.5 });
-  ho.hook = (c) => { if (team) drawPineconeHelmet(c, lw, LIGHT_X, LIGHT_Y); else drawAcornCapHelmet(c, lw, LIGHT_X, LIGHT_Y, 0.5); };
+  ho.hook = (c) => { if (team) drawPineconeHelmet(c, lw, LIGHT_X, LIGHT_Y, 0.5); else drawAcornCapHelmet(c, lw, LIGHT_X, LIGHT_Y, 0.5); };
   drawSquirrelHead(ctx, team ? 1 : 0, P, ho);
   ctx.restore();
 }
