@@ -5,9 +5,10 @@ import { buildLandscape, WORLD } from './terrain.js';
 import * as Art from './art.js';
 import Sound from './audio.js';
 import { storage, prefs, clamp } from './util.js';
-import { AMMO, HP_MAX, STAMINA, TEAM } from './config.js';
+import { AMMO, HP_MAX, STAMINA, TEAM, WEB_URL } from './config.js';
 import { Online } from './online.js';
 import { makeCode, cleanCode } from './net.js';
+import { Haptics, isNativeApp } from './haptics.js';
 
 const $ = (sel) => document.querySelector(sel);
 const $$ = (sel) => [...document.querySelectorAll(sel)];
@@ -153,7 +154,7 @@ function buildOpts() {
 }
 
 function tryFullscreen() {
-  if (!matchMedia('(pointer: coarse)').matches) return;
+  if (isNativeApp() || !matchMedia('(pointer: coarse)').matches) return;
   const el = document.documentElement;
   try {
     const p = el.requestFullscreen ? el.requestFullscreen({ navigationUI: 'hide' }) : null;
@@ -181,7 +182,10 @@ function onGameEvent(evt, data) {
         if (!seen.tutorial) hint('새총 근처를 누른 채 뒤로 당겼다 놓으세요!', 0);
         else hint('', 0);
       } else hint('CPU가 조준하고 있어요…', 0);
-      if (!p.remote && !p.isAI && game.online) Sound.play('select', { vol: 0.8 });
+      if (!p.remote && !p.isAI && game.online) {
+        Sound.play('select', { vol: 0.8 });
+        Haptics.myTurn();
+      }
       break;
     }
     case 'fired': {
@@ -393,6 +397,8 @@ function showResult(r) {
     record.pvp++;
   }
   storage.set('af.record', record);
+  const iWon = r.winner >= 0 && (friend ? r.winner === me : cpu ? !r.isAIWin : true);
+  if (iWon) Haptics.win(); else Haptics.lose();
   $('#result-title').textContent = title;
   $('#result-sub').textContent = sub;
   const face = $('#result-face');
@@ -698,6 +704,7 @@ function onOnline(evt, data) {
         const i = game.players.findIndex((p) => p.remote);
         game.showEmote(i, data);
         cardEmote(i, data);
+        Haptics.emote();
       }
       break;
     case 'rematch-asked':
@@ -745,8 +752,16 @@ async function shareCode() {
   if (!online) return;
   const code = online.code;
   const inClaude = !!(window.claude && window.claude.use);
-  const url = inClaude ? '' : `${location.origin}${location.pathname}?join=${code}`;
+  const web = WEB_URL || (/^https?:$/.test(location.protocol) && !inClaude ? `${location.origin}${location.pathname}` : '');
+  const url = web ? `${web}?join=${code}` : '';
   const text = `도토리 포트리스 한 판 해요! 🐿️ '친구와 대결 → 방 들어가기'에서 코드 ${code}`;
+  const native = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.Share;
+  if (isNativeApp() && native) {
+    try {
+      await native.share(url ? { title: '도토리 포트리스', text, url, dialogTitle: '친구에게 코드 알려주기' } : { title: '도토리 포트리스', text, dialogTitle: '친구에게 코드 알려주기' });
+      return;
+    } catch (e) { /* cancelled or unavailable: fall through */ }
+  }
   try {
     if (navigator.share) {
       await navigator.share(url ? { title: '도토리 포트리스', text, url } : { title: '도토리 포트리스', text });
@@ -808,6 +823,7 @@ function renderEmotes() {
 function bind() {
   const click = (sel, fn) => $(sel).addEventListener('click', (e) => {
     Sound.unlock();
+    Haptics.tap();
     fn(e);
   });
   click('#btn-solo', () => { Sound.play('tap'); goSetup('cpu'); });

@@ -424,7 +424,7 @@ export class Forest {
     g.fx.text(tree.x, tree.ground + tree.h + 1.6, '나무가 쓰러진다!', '#ffe45c', 0.9, { life: 1.6 });
     g.fx.shake(0.3);
     g._sfx('timber');
-    g._vibe([30, 40, 50]);
+    g._hap('topple');
   }
 
   // ------------------------------------------------------------------ per frame (looks only)

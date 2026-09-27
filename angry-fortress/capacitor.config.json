@@ -1,0 +1,12 @@
+{
+  "appId": "com.coolusikstack.dotorifortress",
+  "appName": "도토리 포트리스",
+  "webDir": "www",
+  "backgroundColor": "#58b7f5",
+  "ios": {
+    "contentInset": "never",
+    "scrollEnabled": false,
+    "backgroundColor": "#58b7f5",
+    "limitsNavigationsToAppBoundDomains": false
+  }
+}

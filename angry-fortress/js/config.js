@@ -61,3 +61,6 @@ export const TEAM = [
   { name: '참나무단', captain: '토리', color: '#f0572f', dark: '#b8321a' },
   { name: '솔숲단', captain: '솔이', color: '#2f9be8', dark: '#1a6db0' },
 ];
+
+// Public address of the web version (used in invite links shared from the iOS app). Empty = share the code only.
+export const WEB_URL = '';

@@ -8,7 +8,8 @@ import * as Art from './art.js';
 import Sound from './audio.js';
 import { planShot } from './ai.js';
 import { Forest } from './obstacles.js';
-import { clamp, rng, vibrate, lerp, dist } from './util.js';
+import { Haptics } from './haptics.js';
+import { clamp, rng, lerp, dist } from './util.js';
 import {
   GRAV, VMAX, WIND_ACC, MAX_PULL, CART_R, HEAD, HP_MAX, STAMINA, STAMINA_PER_M, MOVE_SPEED,
   MAT, AMMO, KERNEL, POUND_SPEED, HIVE_BLAST, SUPPLY, WIND_LEVELS, TEAM, HIT_K, HIT_CAP, FLOOD_TURN, FLOOD_STEP,
@@ -342,6 +343,7 @@ export class Game {
       this.fx.burst(pos.x, pos.y, 'dust', 4, { speed: 1.5 });
       if (B.mat === 'wood') { this.fx.burst(pos.x, pos.y, 'leaf', 3, { speed: 2.5, jitter }); this._sfx('rustle', { vol: 0.5 }); }
       this._sfx(BREAK_SFX[B.mat], { vol: 0.9 });
+      this._hap('block', B.mat);
       const shooter = this.players[this.turn];
       if (B.lastHitBy >= 0 || fromProj) shooter.stats.blocks++;
       if (B.mat === 'hive') this.blastQueue.push({ x: pos.x, y: pos.y, spec: HIVE_BLAST, owner: shooter, kind: 'hive' });
@@ -369,6 +371,7 @@ export class Game {
   _hurt(p, dmg, attacker) {
     if (p.dead || dmg <= 0) return;
     dmg = Math.min(dmg, p.hp);
+    if (dmg >= 1.5) this._hap(this.isMine(p) ? 'hurt' : 'hit', dmg);
     p.hp -= dmg;
     p.dmgAcc += dmg;
     if (p.dmgT <= 0) p.dmgT = 0.3;
@@ -380,7 +383,6 @@ export class Game {
     if (dmg >= 12) {
       this.fx.shake(0.12 + dmg * 0.006);
       if (dmg >= 25) this.slowmo(0.35);
-      this._vibe(dmg >= 25 ? [30, 40, 60] : 25);
     }
     if (dmg >= 6) {
       const pos = p.body.getPosition();
@@ -405,6 +407,7 @@ export class Game {
     this.fx.burst(pos.x, pos.y + 1.4, 'star', 8, { speed: 5 });
     this.fx.text(pos.x, pos.y + 2.6, drowned ? '풍덩!' : 'K.O.!', '#ffe45c', 1.4, { life: 1.8 });
     this.slowmo(0.8);
+    this._hap('ko', this.isMine(p));
   }
 
   slowmo(sec) {
@@ -440,7 +443,7 @@ export class Game {
     }
     if (crater > 0.6) this.fx.burst(x, y, 'dirt', Math.round(8 + crater * 6), { speed: 7 + r * 2, color: this.theme.ground.dirtDark });
     this.fx.shake(0.12 + r * 0.1);
-    this._vibe(r > 1.6 ? [40, 30, 60] : 25);
+    this._hap('boom', r);
     if (r > 1.6) this.slowmo(0.18);
     // captains
     for (const p of this.players) {
@@ -535,7 +538,8 @@ export class Game {
     this._stretch(null);
     this._sfx('launch', { vol: 0.6 + power * 0.5 });
     this._sfx('chitter', { vol: 0.8, pitch: p.team ? 0.92 : 1.12 });
-    this._vibe(15);
+    if (p.remote || p.isAI) this._hap('friendLaunch');
+    else this._hap('launch', power);
     this.fx.burst(rest.x, rest.y, 'leaf', 3, { speed: 2 });
     this.aim = null;
     this.setState('flight');
@@ -596,6 +600,7 @@ export class Game {
       this.fx.burst(pos.x, pos.y, 'star', 4, { speed: 3 });
     }
     this._sfx('ability', { vol: 0.5 });
+    if (!fromAI && !fromNet) this._hap('ability', spec.ability);
     if (this.online && !fromNet) this.emit('net', { t: 'ab', q: this.snapSeq, k: this.shotTick });
     return true;
   }
@@ -1077,7 +1082,11 @@ export class Game {
       if (Math.abs(vx) > 0.2) p.facing = vx > 0 ? 1 : -1;
     }
     this._stretch(a.power);
-    if (a.power > 0.98 && !a.maxed) { a.maxed = true; this._vibe(8); }
+    // ratchet clicks while pulling back, a hard click at full power
+    const notch = Math.floor(a.power * 14);
+    if (notch > (a.notch ?? 0) && a.power < 0.98) this._hap('pull', a.power);
+    a.notch = notch;
+    if (a.power > 0.98 && !a.maxed) { a.maxed = true; this._hap('pullMax'); }
     if (a.power < 0.95) a.maxed = false;
   }
 
@@ -1093,6 +1102,7 @@ export class Game {
     if (!this.canControl() || p.ammo[type] <= 0) { this._sfx('deny'); return false; }
     p.sel = type;
     this._sfx('select');
+    this._hap('select');
     this._sfx('chitter', { vol: 0.35, pitch: p.team ? 0.95 : 1.15 });
     return true;
   }
@@ -1161,6 +1171,7 @@ export class Game {
     if (this.dentQueue.length) {
       for (const d of this.dentQueue) {
         this.terrain.carve(d.x, d.y, d.r);
+        this._hap('dent');
         this.fx.burst(d.x, d.y, 'dirt', 8, { speed: 5, color: this.theme.ground.dirtDark });
         this.fx.burst(d.x, d.y, 'dust', 4, { speed: 1.2 });
         this.fx.shake(0.08);
@@ -1787,8 +1798,16 @@ export class Game {
     if (!this.silent) Sound.stretch(t);
   }
 
-  _vibe(pattern) {
-    if (!this.silent) vibrate(pattern);
+  // haptics, from this phone's point of view (see haptics.js)
+  _hap(name, ...args) {
+    if (!this.silent && this.damageOn) Haptics[name](...args);
+  }
+
+  // Whose side is "me" for haptics: my captain online / vs CPU; the shooter when sharing one phone.
+  isMine(p) {
+    if (this.online) return !p.remote;
+    if (this.opts.mode === 'cpu') return !p.isAI;
+    return p === this.players[this.turn];
   }
 
   // Drop any in-progress touches/aim (pause, app switch). Keeps a CPU aim untouched.

@@ -926,3 +926,5 @@ svg { width: 1em; height: 1em; fill: currentColor; flex: none; }
   100% { opacity: 0; transform: translateY(-6px); }
 }
 .pause-note { margin: -8px 0 0; text-align: center; font-size: 15px; color: var(--ink-soft); }
+/* iOS WebKit won't let you type into a field whose ancestors disable selection */
+.code-input { -webkit-user-select: text; user-select: text; -webkit-touch-callout: default; }

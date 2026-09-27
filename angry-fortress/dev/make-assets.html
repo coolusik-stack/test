@@ -13,6 +13,8 @@
 <!-- Renders the PWA icons and the share image from the in-game art. Used by a Playwright script. -->
 <canvas id="icon" width="512" height="512"></canvas>
 <canvas id="og" width="1200" height="630"></canvas>
+<canvas id="appicon" width="1024" height="1024"></canvas>
+<canvas id="splash" width="2732" height="2732"></canvas>
 <script type="module">
 import * as Art from '../js/art.js';
 
@@ -37,8 +39,8 @@ function burst(g, w, h, c1, c2, cx = w / 2, cy = h / 2) {
   g.restore();
 }
 
-function drawIcon(maskable) {
-  const c = document.getElementById('icon');
+function drawIcon(maskable, id = 'icon') {
+  const c = document.getElementById(id);
   const g = c.getContext('2d');
   const S = c.width;
   g.clearRect(0, 0, S, S);
@@ -198,6 +200,53 @@ function drawOG() {
   return c;
 }
 
+// iOS launch screen: shown aspect-filled, so a landscape phone only sees the middle band
+function drawSplash() {
+  const c = document.getElementById('splash');
+  const g = c.getContext('2d');
+  const S = c.width;
+  const sky = g.createLinearGradient(0, 0, 0, S);
+  sky.addColorStop(0, '#58b7f5');
+  sky.addColorStop(1, '#bfe8ff');
+  g.fillStyle = sky;
+  g.fillRect(0, 0, S, S);
+  g.save();
+  g.translate(S / 2, S / 2);
+  g.rotate(-0.05);
+  g.textAlign = 'center';
+  g.textBaseline = 'middle';
+  g.lineJoin = 'round';
+  g.font = '150px "Black Han Sans"';
+  g.lineWidth = 26; g.strokeStyle = '#2b1a12';
+  g.strokeText('도토리', -170, -190);
+  g.fillStyle = '#ffd21f';
+  g.fillText('도토리', -170, -190);
+  g.font = '330px "Black Han Sans"';
+  g.lineWidth = 64;
+  g.strokeText('포트리스', 0, 60);
+  g.fillStyle = '#2b1a12';
+  g.fillText('포트리스', 0, 82);
+  const tg = g.createLinearGradient(0, -80, 0, 200);
+  tg.addColorStop(0, '#fff2a8');
+  tg.addColorStop(0.4, '#ffc53a');
+  tg.addColorStop(0.65, '#ff8a26');
+  tg.addColorStop(1, '#e2461d');
+  g.fillStyle = tg;
+  g.fillText('포트리스', 0, 60);
+  g.restore();
+  // the two captains face off under the title (inside the band a landscape phone shows)
+  const cap = (x, team, facing) => {
+    g.save();
+    g.translate(x, S / 2 + 520);
+    g.scale(170, 170);
+    Art.drawCommander(g, 0, 0, { team, facing, time: 0.4 + team, hp: 1, mood: 'aim', pouch: null });
+    g.restore();
+  };
+  cap(S / 2 - 620, 0, 1);
+  cap(S / 2 + 620, 1, -1);
+  return c;
+}
+
 window.makeAssets = async () => {
   await document.fonts.load('150px "Black Han Sans"');
   await document.fonts.load('30px Jua');
@@ -214,6 +263,10 @@ window.makeAssets = async () => {
   drawIcon(false);
   drawOG();
   out.og = document.getElementById('og').toDataURL('image/jpeg', 0.88);
+  // App Store icon: 1024², full bleed (iOS rounds the corners), raw pixels so it can be saved without alpha
+  const ai = drawIcon(false, 'appicon');
+  out.appicon = { w: ai.width, h: ai.height, rgba: Array.from(ai.getContext('2d').getImageData(0, 0, ai.width, ai.height).data) };
+  out.splash = drawSplash().toDataURL('image/png');
   return out;
 };
 window.assetsReady = true;
