@@ -24,7 +24,10 @@ export class Terrain {
     this.body = null;
     this.version = 0;
     this.heights = opts.heights; // function x -> surface height (for generation)
+    this.opLog = []; // every carve since generation, [x, y, r] in centimetres (quantised so peers agree)
     this._generate(opts);
+    this.f0 = this.f.slice();
+    this.scar0 = this.scar.slice();
     this._contour();
   }
 
@@ -108,6 +111,36 @@ export class Terrain {
 
   // ---------- destruction ----------
   carve(cx, cy, r) {
+    const op = [Math.round(cx * 100), Math.round(cy * 100), Math.round(r * 100)];
+    this.opLog.push(op);
+    const changed = this._carveRaw(op[0] / 100, op[1] / 100, op[2] / 100);
+    this.craters.push({ x: op[0] / 100, y: op[1] / 100, r: op[2] / 100 });
+    if (this.craters.length > 80) this.craters.shift();
+    if (changed) {
+      this._removeDust();
+      this._contour();
+      this.version++;
+    }
+    return changed;
+  }
+
+  // Throw away every carve and replay `ops` from the freshly generated ground (used when a
+  // peer's authoritative history differs from ours). Same order, same dust pass, same result.
+  rebuild(ops) {
+    this.f.set(this.f0);
+    this.scar.set(this.scar0);
+    this.opLog = ops.map((o) => [o[0], o[1], o[2]]);
+    this.craters = [];
+    for (const o of this.opLog) {
+      if (this._carveRaw(o[0] / 100, o[1] / 100, o[2] / 100)) this._removeDust();
+      this.craters.push({ x: o[0] / 100, y: o[1] / 100, r: o[2] / 100 });
+    }
+    if (this.craters.length > 80) this.craters.splice(0, this.craters.length - 80);
+    this._contour();
+    this.version++;
+  }
+
+  _carveRaw(cx, cy, r) {
     const { nx, ny, cell, f, stride, scar } = this;
     const pad = 0.6;
     const i0 = Math.max(1, Math.floor((cx - r - pad) / cell));
@@ -126,13 +159,6 @@ export class Terrain {
           f[k] = Math.min(v, SDF_MAX);
         }
       }
-    }
-    this.craters.push({ x: cx, y: cy, r });
-    if (this.craters.length > 80) this.craters.shift();
-    if (changed) {
-      this._removeDust();
-      this._contour();
-      this.version++;
     }
     return changed;
   }
@@ -247,6 +273,7 @@ export class Terrain {
     this.planck = planck;
     this.body = world.createBody({ type: 'static' });
     this.body.setUserData({ kind: 'terrain' });
+    this.fixtures = [];
     this._buildFixtures();
   }
 

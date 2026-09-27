@@ -4,14 +4,14 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <title>도토리 포트리스</title>
-<meta name="description" content="볼 가득 도토리를 장전하고 상대 요새를 무너뜨려라! 다람쥐들의 턴제 새총 포격 대결 — 혼자서 CPU와, 또는 친구와 한 폰으로.">
+<meta name="description" content="친구와 각자 폰으로 1:1! 볼 가득 도토리를 장전하고 상대 요새를 무너뜨리는 다람쥐 새총 포격 대결. 방 코드 하나로 바로 시작.">
 <meta name="theme-color" content="#2a78c9">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="도토리 포트리스">
 <meta property="og:title" content="도토리 포트리스">
-<meta property="og:description" content="볼 가득 도토리를 장전하고 상대 요새를 무너뜨려라! 다람쥐들의 턴제 새총 대결">
+<meta property="og:description" content="친구와 각자 폰으로 1:1, 다람쥐들의 도토리 새총 대결! 방 코드로 바로 한 판.">
 <meta property="og:type" content="website">
 <meta property="og:image" content="assets/og.jpg">
 <link rel="manifest" href="manifest.webmanifest">
@@ -38,6 +38,8 @@
   <symbol id="i-gear" viewBox="0 0 24 24"><path d="M12 8.2a3.8 3.8 0 1 0 0 7.6 3.8 3.8 0 0 0 0-7.6zm8.3 5.4-1.9.5a6.8 6.8 0 0 1-.7 1.6l1 1.7-1.9 1.9-1.7-1a6.8 6.8 0 0 1-1.6.7l-.5 1.9h-2.7l-.5-1.9a6.8 6.8 0 0 1-1.6-.7l-1.7 1-1.9-1.9 1-1.7a6.8 6.8 0 0 1-.7-1.6l-1.9-.5v-2.7l1.9-.5a6.8 6.8 0 0 1 .7-1.6l-1-1.7 1.9-1.9 1.7 1a6.8 6.8 0 0 1 1.6-.7l.5-1.9h2.7l.5 1.9a6.8 6.8 0 0 1 1.6.7l1.7-1 1.9 1.9-1 1.7a6.8 6.8 0 0 1 .7 1.6l1.9.5z"/></symbol>
   <symbol id="i-rotate" viewBox="0 0 24 24"><rect x="3" y="8" width="18" height="10" rx="2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M6.5 5.5A8 8 0 0 1 17 4.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M17.8 2v4h-4z"/></symbol>
   <symbol id="i-acorn" viewBox="0 0 48 56"><path d="M24 2c1.6 0 2.6 1 2.6 2.6V9" fill="none" stroke="#2b1a12" stroke-width="4" stroke-linecap="round"/><path d="M8 26c0 14 7 26 16 28 9-2 16-14 16-28z" fill="#d88a3e" stroke="#2b1a12" stroke-width="4" stroke-linejoin="round"/><path d="M14 30c0 8 3 14 7 17" fill="none" stroke="#f3b76a" stroke-width="4" stroke-linecap="round"/><path d="M3 24c0-8 9-15 21-15s21 7 21 15c0 3-2 5-5 5H8c-3 0-5-2-5-5z" fill="#7a4a22" stroke="#2b1a12" stroke-width="4" stroke-linejoin="round"/><path d="M12 16l6 10M22 12l4 14M32 14l-2 12M40 20l-6 7" stroke="#5a3416" stroke-width="2.5" stroke-linecap="round"/></symbol>
+  <symbol id="i-share" viewBox="0 0 24 24"><path d="M12 3.5v11M7.5 7.8 12 3.5l4.5 4.3" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/><path d="M6 11H5a1.5 1.5 0 0 0-1.5 1.5v6A1.5 1.5 0 0 0 5 20h14a1.5 1.5 0 0 0 1.5-1.5v-6A1.5 1.5 0 0 0 19 11h-1" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></symbol>
+  <symbol id="i-smile" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.6" fill="none" stroke="currentColor" stroke-width="2.3"/><circle cx="9" cy="10" r="1.4"/><circle cx="15" cy="10" r="1.4"/><path d="M8.3 14a4.4 4.4 0 0 0 7.4 0" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></symbol>
   <symbol id="i-wind" viewBox="0 0 24 24"><path d="M3 9h11a3 3 0 1 0-3-3M3 14h15a3 3 0 1 1-3 3M3 11.5h8" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></symbol>
 </svg>
 
@@ -52,8 +54,12 @@
       <span class="logo-tag">볼 가득 도토리 장전, 요새를 무너뜨려라!</span>
     </div>
     <div class="menu">
-      <button class="btn btn-red btn-big" id="btn-solo"><span class="btn-kicker">혼자 하기</span>CPU와 대결</button>
-      <button class="btn btn-blue btn-big" id="btn-duo"><span class="btn-kicker">둘이 하기</span>한 폰으로 대결</button>
+      <button class="btn btn-yellow btn-big btn-hero" id="btn-friend"><span class="btn-kicker">각자 폰으로 1:1</span>친구와 대결</button>
+      <button class="btn btn-cream btn-sm btn-rejoin" id="btn-rejoin" hidden></button>
+      <div class="menu-row menu-duo">
+        <button class="btn btn-blue btn-mid" id="btn-duo"><span class="btn-kicker">폰 하나로</span>번갈아 대결</button>
+        <button class="btn btn-red btn-mid" id="btn-solo"><span class="btn-kicker">혼자서</span>CPU 연습</button>
+      </div>
       <div class="menu-row">
         <button class="btn btn-cream btn-icon" id="btn-help" aria-label="게임 방법"><svg><use href="#i-help"/></svg></button>
         <button class="btn btn-cream btn-icon" id="btn-settings" aria-label="설정"><svg><use href="#i-gear"/></svg></button>
@@ -61,6 +67,47 @@
     </div>
   </div>
   <p class="record" id="record"></p>
+</section>
+
+<!-- ============ FRIEND LOBBY ============ -->
+<section id="lobby" class="screen" hidden>
+  <div class="panel lobby-panel">
+    <header class="panel-head">
+      <button class="btn btn-cream btn-icon btn-sm" id="lobby-back" aria-label="뒤로"><svg><use href="#i-left"/></svg></button>
+      <h2 id="lobby-title">친구와 대결</h2>
+      <span class="spacer"></span>
+    </header>
+    <div class="lobby-pane" id="lobby-choose">
+      <p class="lobby-lead">각자 폰으로 1:1! 한 명이 방을 만들고,<br>다른 한 명이 코드로 들어와요.</p>
+      <div class="lobby-choices">
+        <button class="btn btn-yellow btn-big" id="btn-host"><span class="btn-kicker">내가 방장</span>방 만들기</button>
+        <button class="btn btn-blue btn-big" id="btn-join"><span class="btn-kicker">코드를 받았어요</span>방 들어가기</button>
+      </div>
+    </div>
+    <div class="lobby-pane" id="lobby-enter" hidden>
+      <p class="lobby-lead">친구에게 받은 4자리 방 코드</p>
+      <input id="code-input" class="code-input" type="text" inputmode="text" autocomplete="off" autocapitalize="characters" spellcheck="false" maxlength="4" placeholder="• • • •" aria-label="방 코드">
+      <button class="btn btn-blue" id="btn-join-go">들어가기</button>
+    </div>
+    <div class="lobby-pane" id="lobby-room" hidden>
+      <div class="room-code">
+        <span class="room-code-label">방 코드</span>
+        <div class="code-tiles" id="code-tiles"></div>
+        <button class="btn btn-cream btn-sm" id="btn-share"><svg><use href="#i-share"/></svg>알려주기</button>
+      </div>
+      <div class="versus">
+        <div class="vs-side" id="vs-0"><canvas width="96" height="96"></canvas><b></b></div>
+        <span class="vs-mark">VS</span>
+        <div class="vs-side" id="vs-1"><canvas width="96" height="96"></canvas><b></b></div>
+      </div>
+      <p class="lobby-status" id="lobby-status"></p>
+      <p class="lobby-rule" id="lobby-rule"></p>
+      <div class="menu-row">
+        <button class="btn btn-cream" id="btn-room-setup" hidden>전장 설정</button>
+        <button class="btn btn-yellow" id="btn-room-go" hidden disabled>전투 시작!</button>
+      </div>
+    </div>
+  </div>
 </section>
 
 <!-- ============ SETUP ============ -->
@@ -112,6 +159,7 @@
   <div class="hud-top">
     <button class="hud-btn" id="btn-pause" aria-label="일시정지"><svg><use href="#i-pause"/></svg></button>
     <div class="pcard" id="pcard-0">
+      <span class="pemote" hidden></span>
       <canvas class="pface" width="96" height="96"></canvas>
       <div class="pinfo">
         <span class="pname"></span>
@@ -127,6 +175,7 @@
       </div>
     </div>
     <div class="pcard right" id="pcard-1">
+      <span class="pemote" hidden></span>
       <canvas class="pface" width="96" height="96"></canvas>
       <div class="pinfo">
         <span class="pname"></span>
@@ -147,12 +196,25 @@
   </div>
   <div class="banner" id="banner" hidden><strong id="banner-text"></strong><span id="banner-sub"></span></div>
   <div class="tip" id="tip" hidden></div>
+  <button class="hud-btn emote-btn" id="btn-emote" hidden aria-label="이모티콘 보내기"><svg><use href="#i-smile"/></svg></button>
+  <div class="emote-pop" id="emote-pop" hidden></div>
 </div>
+
+<!-- ============ FRIEND CONNECTION LOST ============ -->
+<section id="netlost" class="screen modal" hidden>
+  <div class="panel small-panel">
+    <h2 id="netlost-title">연결이 끊겼어요</h2>
+    <p class="netlost-sub" id="netlost-sub">친구가 돌아오기를 기다리는 중…</p>
+    <div class="spinner" aria-hidden="true"></div>
+    <button class="btn btn-cream" id="btn-netlost-leave"><svg><use href="#i-home"/></svg>메뉴로</button>
+  </div>
+</section>
 
 <!-- ============ PAUSE ============ -->
 <section id="pause" class="screen modal" hidden>
   <div class="panel small-panel">
-    <h2>일시정지</h2>
+    <h2 id="pause-title">일시정지</h2>
+    <p class="pause-note" id="pause-note" hidden>친구와의 대결은 계속 진행돼요</p>
     <div class="toggles">
       <button class="tgl" data-toggle="sfx"><svg><use href="#i-sound"/></svg><span>효과음</span></button>
       <button class="tgl" data-toggle="music"><svg><use href="#i-music"/></svg><span>음악</span></button>
@@ -185,6 +247,7 @@
     <button class="btn btn-cream btn-icon btn-sm panel-x" id="help-x" aria-label="닫기"><svg><use href="#i-play"/></svg></button>
     <h2>게임 방법</h2>
     <ol class="steps">
+      <li><b>친구와 대결</b><span>'친구와 대결'에서 방을 만들고 4자리 코드를 친구에게 알려주세요. 친구가 코드로 들어오면 각자 폰으로 번갈아 쏘며 싸워요. 대결 중에는 😆 버튼으로 이모티콘을 보낼 수 있어요.</span></li>
       <li><b>당기고 놓기</b><span>내 새총 근처를 터치한 채 뒤로 당겼다 놓으면 발사! 더 멀리 당길수록 세게 날아가요. 조준선의 빨간 X는 내 요새에 걸린다는 뜻이에요.</span></li>
       <li><b>바람을 읽기</b><span>위쪽 바람 표시를 보세요. 높이 쏠수록 바람에 많이 밀려요. 흰 점선은 지난 발사 궤적이에요.</span></li>
       <li><b>특수 견과 쓰기</b><span>날아가는 중 화면을 터치하면 능력 발동! 잣은 돌진, 땅콩은 분열, 밤송이는 가시 대폭발, 호두는 수직으로 쿵.</span></li>
@@ -207,8 +270,9 @@
           <div class="stars" id="stars"><i></i><i></i><i></i></div>
         </div>
       </div>
+      <p class="rematch-note" id="rematch-note" hidden></p>
       <div class="menu-row">
-        <button class="btn btn-yellow" id="btn-again"><svg><use href="#i-redo"/></svg>한 판 더</button>
+        <button class="btn btn-yellow" id="btn-again"><svg><use href="#i-redo"/></svg><span id="again-label">한 판 더</span></button>
         <button class="btn btn-cream" id="btn-menu"><svg><use href="#i-home"/></svg>메뉴로</button>
       </div>
     </div>
@@ -223,6 +287,7 @@
   <button class="btn btn-cream btn-sm" id="rotate-ok">이대로 할래요</button>
 </div>
 
+<div class="toast" id="toast" hidden></div>
 <div id="boot"><div class="boot-dot"></div></div>
 
 <script src="vendor/planck.min.js"></script>

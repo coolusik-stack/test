@@ -6,6 +6,8 @@ import * as Art from './art.js';
 import Sound from './audio.js';
 import { storage, prefs, clamp } from './util.js';
 import { AMMO, HP_MAX, STAMINA, TEAM } from './config.js';
+import { Online } from './online.js';
+import { makeCode, cleanCode } from './net.js';
 
 const $ = (sel) => document.querySelector(sel);
 const $$ = (sel) => [...document.querySelectorAll(sel)];
@@ -17,7 +19,7 @@ const settings = Object.assign(
 );
 // maps from older versions were renamed when the game moved into the forest
 if (settings.theme !== 'random' && !THEMES[settings.theme]) settings.theme = 'oak';
-const record = Object.assign({ wins: 0, losses: 0, pvp: 0 }, storage.get('af.record', {}));
+const record = Object.assign({ wins: 0, losses: 0, pvp: 0, fw: 0, fl: 0 }, storage.get('af.record', {}));
 const seen = storage.get('af.seen', { tutorial: false });
 
 let game = null; // the active match (or the title-screen demo)
@@ -30,6 +32,10 @@ let rotateDismissed = false;
 let demoRestartT = null;
 let releaseKeys = () => {};
 let rotatePaused = false;
+let online = null; // link to a friend's phone (friend matches)
+let hostTries = 0;
+let emoteT = 0;
+const EMOTES = ['😆', '😤', '😱', '👍', '🔥', '😭'];
 
 // ---------------------------------------------------------------- sizing
 function resize() {
@@ -48,8 +54,8 @@ function updateRotateHint() {
   const portrait = size.h > size.w * 1.05;
   const show = screen === 'battle' && portrait && !rotateDismissed;
   $('#rotate').hidden = !show;
-  // freeze the match (turn timer, CPU) while the overlay covers it
-  if (show && game && !game.paused) {
+  // freeze the match (turn timer, CPU) while the overlay covers it; a friend match can't pause
+  if (show && game && !game.paused && !game.online) {
     game.paused = true;
     game.cancelInput();
     rotatePaused = true;
@@ -61,7 +67,7 @@ function updateRotateHint() {
 
 // ---------------------------------------------------------------- screens
 function show(id) {
-  for (const s of ['title', 'setup', 'pause', 'settings', 'help', 'result']) $('#' + s).hidden = s !== id;
+  for (const s of ['title', 'lobby', 'setup', 'pause', 'settings', 'help', 'result']) $('#' + s).hidden = s !== id;
 }
 
 function goTitle() {
@@ -69,6 +75,8 @@ function goTitle() {
   rotatePaused = false;
   show('title');
   $('#hud').hidden = true;
+  $('#netlost').hidden = true;
+  renderRejoin();
   startDemo();
   Sound.music(settings.music ? 'menu' : null);
   renderRecord();
@@ -79,15 +87,19 @@ function goSetup(m) {
   mode = m;
   screen = 'setup';
   show('setup');
-  $('#setup-title').textContent = m === 'cpu' ? 'CPU와 대결' : '한 폰으로 2인 대결';
+  $('#setup-title').textContent = m === 'cpu' ? 'CPU 연습' : m === 'online' ? '친구 대결 전장' : '한 폰으로 번갈아 대결';
   $('#field-diff').hidden = m !== 'cpu';
+  $('#btn-go').textContent = m === 'online' ? '이걸로 할래요' : '전투 시작!';
   syncSegs();
   renderMaps();
 }
 
 function renderRecord() {
-  const total = record.wins + record.losses;
-  $('#record').textContent = total || record.pvp ? `CPU 전적 ${record.wins}승 ${record.losses}패${record.pvp ? ` · 2인 대결 ${record.pvp}판` : ''}` : '';
+  const parts = [];
+  if (record.fw + record.fl) parts.push(`친구 대결 ${record.fw}승 ${record.fl}패`);
+  if (record.wins + record.losses) parts.push(`CPU ${record.wins}승 ${record.losses}패`);
+  if (record.pvp) parts.push(`한 폰 대결 ${record.pvp}판`);
+  $('#record').textContent = parts.join(' · ');
 }
 
 // ---------------------------------------------------------------- demo
@@ -113,10 +125,13 @@ function startBattle(opts) {
   $('#tip').hidden = true;
   hint('', 0);
   rotatePaused = false;
-  const g = new Game(canvas, { ...opts, seed: (Math.random() * 1e9) | 0 }, (evt, data) => {
+  const g = new Game(canvas, { ...opts, seed: opts.seed ?? ((Math.random() * 1e9) | 0) }, (evt, data) => {
     if (g === game) onGameEvent(evt, data); // ignore late events from a replaced match
   }, size);
   game = g;
+  $('#btn-emote').hidden = !g.online;
+  $('#emote-pop').hidden = true;
+  $('#btn-restart').hidden = !!g.online;
   setupHud();
   Sound.play('start');
   Sound.music(settings.music ? 'battle' : null);
@@ -158,23 +173,24 @@ function onGameEvent(evt, data) {
     case 'turn': {
       const p = game.players[data.player];
       const team = TEAM[p.team];
-      const who = game.opts.mode === 'cpu' ? (p.isAI ? 'CPU 차례' : '내 차례!') : `${p.id + 1}P 차례!`;
-      banner(who, data.flood || windText(data.wind), team.color);
+      banner(turnLabel(p, true), data.flood || windText(data.wind), team.color);
       syncTurn();
       renderSlots();
-      if (!p.isAI) {
+      if (p.remote) hint('친구가 조준하고 있어요…', 0);
+      else if (!p.isAI) {
         if (!seen.tutorial) hint('새총 근처를 누른 채 뒤로 당겼다 놓으세요!', 0);
         else hint('', 0);
       } else hint('CPU가 조준하고 있어요…', 0);
+      if (!p.remote && !p.isAI && game.online) Sound.play('select', { vol: 0.8 });
       break;
     }
     case 'fired': {
       const p = game.players[data.player];
       renderSlots();
       $('#tip').hidden = true;
-      if (!p.isAI && AMMO[data.type].ability) hint('날아가는 중 화면을 터치하면 능력 발동!', 2.5);
+      if (!p.isAI && !p.remote && AMMO[data.type].ability) hint('날아가는 중 화면을 터치하면 능력 발동!', 2.5);
       else hint('', 0);
-      if (!p.isAI && !seen.tutorial) {
+      if (!p.isAI && !p.remote && !seen.tutorial) {
         seen.tutorial = true;
         storage.set('af.seen', seen);
       }
@@ -189,7 +205,16 @@ function onGameEvent(evt, data) {
     case 'over':
       showResult(data);
       break;
+    case 'net':
+      if (online) online.onGameNet(data);
+      break;
   }
+}
+
+function turnLabel(p, shout) {
+  if (game.online) return p.remote ? '친구 차례' : shout ? '내 차례!' : '내 차례';
+  if (game.opts.mode === 'cpu') return p.isAI ? 'CPU 차례' : shout ? '내 차례!' : '내 차례';
+  return `${p.id + 1}P 차례${shout ? '!' : ''}`;
 }
 
 function windText(w) {
@@ -286,7 +311,7 @@ function syncTurn() {
   const p = game.players[game.turn];
   const pill = $('#turnpill');
   pill.style.setProperty('--team', TEAM[p.team].color);
-  $('#turntext').textContent = game.state === 'intro' ? '전투 준비' : game.opts.mode === 'cpu' ? (p.isAI ? 'CPU 차례' : '내 차례') : `${p.id + 1}P 차례`;
+  $('#turntext').textContent = game.state === 'intro' ? (game.hold ? '친구와 맞추는 중' : '전투 준비') : turnLabel(p, false);
   for (const q of game.players) $('#pcard-' + q.id).classList.toggle('active', q === p && game.state !== 'intro');
   const w = game.wind, max = 10;
   const fill = $('#windfill');
@@ -299,7 +324,8 @@ function syncTurn() {
 
 function renderSlots() {
   if (!game) return;
-  const p = game.players[game.turn];
+  // in a friend match the ammo bar always shows *my* pouch
+  const p = game.online ? game.players.find((q) => !q.remote) : game.players[game.turn];
   for (const b of $$('#ammo .slot')) {
     const type = b.dataset.type;
     const n = p.ammo[type];
@@ -326,7 +352,7 @@ function syncHud(force) {
   put($('#controls'), 'class:off', !game.canControl());
   put($('#stfill'), 'width', `${Math.round((cur.stamina / STAMINA) * 100)}%`);
   const tm = $('#timer');
-  if (game.opts.timer && game.state === 'aim' && !cur.isAI) {
+  if (game.opts.timer && game.state === 'aim' && !cur.isAI && !cur.remote) {
     tm.hidden = false;
     const sec = Math.max(0, Math.ceil(game.turnTimer));
     put(tm, 'text', String(sec));
@@ -342,10 +368,21 @@ function showResult(r) {
   updateRotateHint();
   show('result');
   const cpu = lastOpts.mode === 'cpu';
+  const friend = lastOpts.mode === 'online';
+  const me = friend ? lastOpts.side : 0;
   let title, sub;
+  $('#rematch-note').hidden = true;
+  $('#again-label').textContent = '한 판 더';
+  $('#btn-again').disabled = false;
   if (r.winner < 0) {
     title = '무승부';
     sub = '둘 다 쓰러졌어요!';
+  } else if (friend) {
+    const won = r.winner === me;
+    title = won ? '승리!' : '패배…';
+    sub = won ? `친구를 이겼어요! 남은 체력 ${r.players[me].hp}` : '친구가 이겼어요. 복수전 한 판?';
+    if (won) record.fw++; else record.fl++;
+    if (online) online.lastWinner = r.winner;
   } else if (cpu) {
     title = r.isAIWin ? '패배…' : '승리!';
     sub = r.isAIWin ? `CPU ${TEAM[1].name}이 창고를 지켰어요. 다시 도전!` : `남은 체력 ${r.players[r.winner].hp}로 도토리 창고를 지켰어요`;
@@ -362,7 +399,7 @@ function showResult(r) {
   face.getContext('2d').clearRect(0, 0, face.width, face.height);
   try { Art.drawCaptainIcon(face, r.winner < 0 ? 0 : r.winner); } catch (e) { /* ignore */ }
   const stars = $$('#stars i');
-  const n = r.winner < 0 || (cpu && r.isAIWin) ? 0 : r.stars;
+  const n = r.winner < 0 || (cpu && r.isAIWin) || (friend && r.winner !== me) ? 0 : r.stars;
   stars.forEach((s, i) => s.classList.toggle('on', i < n));
   for (let i = 0; i < n; i++) setTimeout(() => Sound.play('star', { pitch: 1 + i * 0.12 }), 350 + i * 300);
   const P = r.players;
@@ -514,6 +551,259 @@ function syncToggles() {
   for (const t of $$('.tgl')) t.classList.toggle('on', !!settings[t.dataset.toggle]);
 }
 
+
+// ---------------------------------------------------------------- friend matches (two phones)
+function goLobby(pane) {
+  screen = 'lobby';
+  show('lobby');
+  $('#hud').hidden = true;
+  setPane(pane || (online ? 'room' : 'choose'));
+  if (!game || !game.opts.demo) startDemo();
+}
+
+function setPane(p) {
+  for (const id of ['choose', 'enter', 'room']) $('#lobby-' + id).hidden = id !== p;
+  $('#lobby-title').textContent = p === 'room' ? (online && online.role === 'host' ? '내가 만든 방' : '친구의 방') : '친구와 대결';
+  if (p === 'enter') setTimeout(() => $('#code-input').focus(), 60);
+  if (p === 'room') renderRoom();
+}
+
+function lobbySettings() {
+  return { theme: settings.theme, wind: settings.wind, timer: Number(settings.timer) || 0 };
+}
+
+function describe(ls) {
+  if (!ls) return '';
+  const map = ls.theme === 'random' ? '랜덤 전장' : THEMES[ls.theme] ? THEMES[ls.theme].name : '';
+  const wind = { off: '바람 없음', normal: '바람 보통', strong: '강풍' }[ls.wind] || '';
+  const timer = ls.timer ? `턴 ${ls.timer}초` : '턴 제한 없음';
+  return [map, wind, timer].filter(Boolean).join(' · ');
+}
+
+function saveSession() {
+  try { sessionStorage.setItem('af.online', JSON.stringify({ code: online.code, role: online.role, t: Date.now() })); } catch (e) { /* private mode */ }
+}
+
+function savedSession() {
+  try {
+    const v = JSON.parse(sessionStorage.getItem('af.online') || 'null');
+    return v && Date.now() - v.t < 20 * 60 * 1000 ? v : null;
+  } catch (e) { return null; }
+}
+
+function renderRejoin() {
+  const v = !online && savedSession();
+  const b = $('#btn-rejoin');
+  b.hidden = !v;
+  if (v) b.textContent = `방 ${v.code}로 돌아가기`;
+}
+
+function openLink(role, code, resume) {
+  leaveOnline(false);
+  const o = new Online({ role, code, onEvent: (evt, data) => { if (o === online) onOnline(evt, data); } });
+  online = o;
+  o.resume = !!resume;
+  saveSession();
+  setPane('room');
+  lobbyStatus(role === 'host' ? '방을 여는 중…' : '방을 찾는 중…');
+  o.start().then(() => {
+    if (o !== online) return;
+    if (role === 'host') o.setLobby(lobbySettings());
+    renderRoom();
+  }).catch((e) => {
+    if (o !== online) return;
+    if (o.status === 'taken' && role === 'host' && !resume && hostTries++ < 4) { openLink('host', makeCode()); return; }
+    if (o.status === 'taken' && resume && hostTries++ < 6) { setTimeout(() => { if (o === online) openLink(role, code, true); }, 2500); return; }
+    console.warn('online link failed', e);
+    lobbyStatus('연결할 수 없어요. 인터넷 연결을 확인하거나, 폰 하나로 번갈아 대결을 해 보세요.', true);
+  });
+}
+
+function leaveOnline(bye = true) {
+  if (!online) return;
+  online.close(bye);
+  online = null;
+  try { sessionStorage.removeItem('af.online'); } catch (e) { /* ignore */ }
+}
+
+function lobbyStatus(text, bad) {
+  const el = $('#lobby-status');
+  el.textContent = text;
+  el.classList.toggle('bad', !!bad);
+}
+
+function renderRoom() {
+  if (!online) return;
+  const host = online.role === 'host';
+  const tiles = $('#code-tiles');
+  tiles.innerHTML = '';
+  for (const ch of online.code) {
+    const t = document.createElement('b');
+    t.textContent = ch;
+    tiles.appendChild(t);
+  }
+  const mine = host ? 0 : 1;
+  for (const i of [0, 1]) {
+    const side = $('#vs-' + i);
+    const c = side.querySelector('canvas');
+    c.getContext('2d').clearRect(0, 0, c.width, c.height);
+    const present = i === mine || online.paired;
+    side.classList.toggle('empty', !present);
+    side.style.setProperty('--team', TEAM[i].color);
+    if (present) { try { Art.drawCaptainIcon(c, i); } catch (e) { /* art not ready */ } }
+    side.querySelector('b').textContent = i === mine ? '나' : online.paired ? '친구' : '???';
+  }
+  $('#btn-room-setup').hidden = !host;
+  const go = $('#btn-room-go');
+  go.hidden = !host;
+  go.disabled = !online.paired;
+  const ls = host ? lobbySettings() : online.peer && online.peer.lobby;
+  $('#lobby-rule').textContent = describe(ls);
+  const st = online.status;
+  if (st === 'paired') lobbyStatus(host ? '친구가 들어왔어요! 준비되면 시작하세요' : '연결됐어요! 방장이 시작하면 전투가 시작돼요');
+  else if (st === 'waiting') lobbyStatus(host ? '친구를 기다리는 중… 코드를 알려주세요' : '방장을 기다리는 중…');
+  else if (st === 'nohost') lobbyStatus('이 코드의 방을 찾고 있어요… 코드를 다시 확인해 주세요', true);
+  else if (st === 'lost') lobbyStatus('친구 연결이 끊겼어요. 다시 들어오기를 기다리는 중…', true);
+  else if (st === 'error') lobbyStatus('연결할 수 없어요. 인터넷 연결을 확인해 주세요', true);
+}
+
+function onOnline(evt, data) {
+  switch (evt) {
+    case 'status':
+      if (data === 'taken' && online.role === 'host' && !online.match && !online.resume && hostTries++ < 4) { openLink('host', makeCode()); return; }
+      if (data === 'paired') Sound.play('chitter', { vol: 0.8 });
+      if (screen === 'lobby') renderRoom();
+      syncNetLost();
+      break;
+    case 'peer':
+      if (screen === 'lobby') renderRoom();
+      syncNetLost();
+      break;
+    case 'match': {
+      const { match, needSync } = data;
+      const side = online.role === 'host' ? 0 : 1;
+      tryFullscreen();
+      startBattle({
+        mode: 'online', side, names: side === 0 ? ['나', '친구'] : ['친구', '나'], seed: match.seed,
+        theme: THEMES[match.theme] ? match.theme : 'oak', wind: match.wind, timer: match.timer,
+        guide: settings.guide !== 'off', firstTurn: match.first, difficulty: 'normal',
+      });
+      online.attach(game, needSync);
+      saveSession();
+      break;
+    }
+    case 'emote':
+      if (!EMOTES.includes(data)) break; // only our own six, never arbitrary text
+      if (game && game.online) {
+        const i = game.players.findIndex((p) => p.remote);
+        game.showEmote(i, data);
+        cardEmote(i, data);
+      }
+      break;
+    case 'rematch-asked':
+      if (screen === 'result') {
+        const n = $('#rematch-note');
+        n.textContent = online.mine.rm ? '곧 시작해요!' : '친구가 한 판 더 원해요!';
+        n.hidden = false;
+        Sound.play('select');
+      }
+      break;
+    case 'rematch-go': {
+      const ls = lobbySettings();
+      let theme = ls.theme;
+      if (theme === 'random') theme = THEME_ORDER[Math.floor(Math.random() * THEME_ORDER.length)];
+      online.hostStart({ ...ls, theme });
+      break;
+    }
+    case 'bye':
+      if (screen === 'lobby') {
+        lobbyStatus('친구가 방을 나갔어요', true);
+      } else if (screen === 'battle' || screen === 'paused' || screen === 'result') {
+        showNetLost('친구가 나갔어요', '대결이 끝났어요. 메뉴로 돌아가 새 방을 만들어 주세요.', false);
+      }
+      break;
+  }
+}
+
+// connection trouble during a match
+function syncNetLost() {
+  if (!online || !game || !game.online || screen === 'title' || screen === 'lobby') { $('#netlost').hidden = true; return; }
+  if (online.peer && online.peer.bye) return;
+  const lost = online.status === 'lost' || online.status === 'error';
+  if (lost) showNetLost('연결이 끊겼어요', '친구가 돌아오기를 기다리는 중…', true);
+  else $('#netlost').hidden = true;
+}
+
+function showNetLost(title, sub, spin) {
+  $('#netlost-title').textContent = title;
+  $('#netlost-sub').textContent = sub;
+  $('#netlost .spinner').hidden = !spin;
+  $('#netlost').hidden = false;
+}
+
+async function shareCode() {
+  if (!online) return;
+  const code = online.code;
+  const inClaude = !!(window.claude && window.claude.use);
+  const url = inClaude ? '' : `${location.origin}${location.pathname}?join=${code}`;
+  const text = `도토리 포트리스 한 판 해요! 🐿️ '친구와 대결 → 방 들어가기'에서 코드 ${code}`;
+  try {
+    if (navigator.share) {
+      await navigator.share(url ? { title: '도토리 포트리스', text, url } : { title: '도토리 포트리스', text });
+      return;
+    }
+  } catch (e) {
+    if (e && e.name === 'AbortError') return;
+  }
+  try {
+    await navigator.clipboard.writeText(url ? `${text}\n${url}` : text);
+    toast('초대 문구를 복사했어요');
+  } catch (e) {
+    toast(`코드: ${code}`);
+  }
+}
+
+let toastT = null;
+function toast(text) {
+  const t = $('#toast');
+  t.textContent = text;
+  t.hidden = true;
+  void t.offsetWidth;
+  t.hidden = false;
+  clearTimeout(toastT);
+  toastT = setTimeout(() => { t.hidden = true; }, 1900);
+}
+
+// the emote also pops beside the sender's HUD card, in case their captain is off-screen
+function cardEmote(i, e) {
+  const el = $('#pcard-' + i + ' .pemote');
+  el.textContent = e;
+  el.hidden = true;
+  void el.offsetWidth;
+  el.hidden = false;
+  clearTimeout(el._t);
+  el._t = setTimeout(() => (el.hidden = true), 2400);
+}
+
+function renderEmotes() {
+  const pop = $('#emote-pop');
+  if (pop.childElementCount) return;
+  for (const e of EMOTES) {
+    const b = document.createElement('button');
+    b.textContent = e;
+    b.addEventListener('click', () => {
+      pop.hidden = true;
+      if (!online || !game || !game.online || game.time - emoteT < 1) return;
+      emoteT = game.time;
+      online.sendEmote(e);
+      const i = game.players.findIndex((p) => !p.remote);
+      game.showEmote(i, e);
+      cardEmote(i, e);
+    });
+    pop.appendChild(b);
+  }
+}
+
 // ---------------------------------------------------------------- wiring
 function bind() {
   const click = (sel, fn) => $(sel).addEventListener('click', (e) => {
@@ -522,13 +812,63 @@ function bind() {
   });
   click('#btn-solo', () => { Sound.play('tap'); goSetup('cpu'); });
   click('#btn-duo', () => { Sound.play('tap'); goSetup('pvp'); });
+  click('#btn-friend', () => { Sound.play('tap'); goLobby(); });
+  click('#btn-rejoin', () => {
+    const v = savedSession();
+    if (!v) return;
+    Sound.play('tap');
+    goLobby('room');
+    hostTries = 0;
+    openLink(v.role, v.code, true);
+  });
+  click('#lobby-back', () => {
+    Sound.play('back');
+    const enter = !$('#lobby-enter').hidden;
+    if (online || enter) { leaveOnline(); setPane('choose'); } else goTitle();
+  });
+  click('#btn-host', () => { Sound.play('tap'); hostTries = 0; openLink('host', makeCode()); });
+  click('#btn-join', () => { Sound.play('tap'); $('#code-input').value = ''; setPane('enter'); });
+  const joinGo = () => {
+    const code = cleanCode($('#code-input').value);
+    if (code.length !== 4) { Sound.play('deny'); $('#code-input').classList.add('shake'); setTimeout(() => $('#code-input').classList.remove('shake'), 400); return; }
+    Sound.play('tap');
+    $('#code-input').blur();
+    openLink('guest', code);
+  };
+  click('#btn-join-go', joinGo);
+  $('#code-input').addEventListener('input', (e) => {
+    const v = cleanCode(e.target.value);
+    if (e.target.value !== v) e.target.value = v;
+  });
+  $('#code-input').addEventListener('keydown', (e) => { if (e.key === 'Enter') { Sound.unlock(); joinGo(); } });
+  click('#btn-share', () => { Sound.play('tap'); shareCode(); });
+  click('#btn-room-setup', () => { Sound.play('tap'); goSetup('online'); });
+  click('#btn-room-go', () => {
+    if (!online || !online.paired) return;
+    Sound.play('tap');
+    let theme = settings.theme;
+    if (theme === 'random') theme = THEME_ORDER[Math.floor(Math.random() * THEME_ORDER.length)];
+    online.hostStart({ ...lobbySettings(), theme });
+  });
+  click('#btn-emote', () => {
+    renderEmotes();
+    Sound.play('tap', { vol: 0.5 });
+    $('#emote-pop').hidden = !$('#emote-pop').hidden;
+  });
+  click('#btn-netlost-leave', () => { Sound.play('back'); leaveOnline(); goTitle(); });
   click('#btn-help', () => { Sound.play('tap'); renderHelpBirds(); show('help'); });
   click('#help-close', () => { Sound.play('back'); show('title'); });
   click('#help-x', () => { Sound.play('back'); show('title'); });
   click('#btn-settings', () => { Sound.play('tap'); syncToggles(); show('settings'); });
   click('#settings-close', () => { Sound.play('back'); show('title'); });
-  click('#setup-back', () => { Sound.play('back'); goTitle(); });
+  click('#setup-back', () => { Sound.play('back'); if (mode === 'online') goLobby('room'); else goTitle(); });
   click('#btn-go', () => {
+    if (mode === 'online') {
+      Sound.play('tap');
+      if (online) online.setLobby(lobbySettings());
+      goLobby('room');
+      return;
+    }
     tryFullscreen();
     startBattle(buildOpts());
   });
@@ -557,9 +897,16 @@ function bind() {
   click('#btn-pause', () => pause(true));
   click('#btn-resume', () => pause(false));
   click('#btn-restart', () => { Sound.play('tap'); startBattle(lastOpts); });
-  click('#btn-home', () => { Sound.play('back'); goTitle(); });
-  click('#btn-again', () => { Sound.play('tap'); startBattle(lastOpts); });
-  click('#btn-menu', () => { Sound.play('back'); goTitle(); });
+  click('#btn-home', () => { Sound.play('back'); leaveOnline(); goTitle(); });
+  click('#btn-again', () => {
+    Sound.play('tap');
+    if (lastOpts.mode !== 'online') { startBattle(lastOpts); return; }
+    if (!online || !online.paired) { toast('친구와 연결이 끊겼어요'); return; }
+    online.requestRematch();
+    $('#again-label').textContent = '친구 기다리는 중…';
+    $('#btn-again').disabled = true;
+  });
+  click('#btn-menu', () => { Sound.play('back'); leaveOnline(); goTitle(); });
   click('#btn-overview', () => {
     if (!game) return;
     Sound.play('tap');
@@ -593,6 +940,7 @@ function bind() {
     Sound.unlock();
     if (screen !== 'battle' || !game) return;
     try { canvas.setPointerCapture(e.pointerId); } catch (err) { /* ignore */ }
+    $('#emote-pop').hidden = true;
     game.pointerDown(e.pointerId, e.clientX, e.clientY);
   });
   canvas.addEventListener('pointermove', (e) => {
@@ -658,11 +1006,14 @@ function pause(on) {
   if (!game) return;
   if (on) {
     if (screen !== 'battle') return;
-    game.paused = true;
+    if (!game.online) game.paused = true;
     game.cancelInput();
     releaseKeys();
     screen = 'paused';
     syncToggles();
+    $('#pause-title').textContent = game.online ? '메뉴' : '일시정지';
+    $('#pause-note').hidden = !game.online;
+    $('#btn-home').lastChild.textContent = game.online ? '나가기' : '메뉴로';
     show('pause');
     Sound.play('tap');
   } else {
@@ -713,6 +1064,11 @@ async function boot() {
     await Promise.race([document.fonts.ready, new Promise((r) => setTimeout(r, 1500))]);
   } catch (e) { /* fonts optional */ }
   goTitle();
+  const join = cleanCode(new URLSearchParams(location.search).get('join') || '');
+  if (join.length === 4) {
+    goLobby('enter');
+    $('#code-input').value = join;
+  }
   requestAnimationFrame((t) => { last = t; frame(t); });
   setTimeout(() => $('#boot').classList.add('gone'), 150);
   if ('serviceWorker' in navigator && /^https:|^http:\/\/localhost/.test(location.href) && !window.claude) {
@@ -721,6 +1077,6 @@ async function boot() {
 }
 
 // expose for debugging / automated checks
-window.__af = { get game() { return game; }, startBattle, buildOpts, goTitle };
+window.__af = { get game() { return game; }, get online() { return online; }, startBattle, buildOpts, goTitle };
 
 boot();

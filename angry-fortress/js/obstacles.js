@@ -93,36 +93,112 @@ export class Forest {
       x, ground, h, canopyR, kind, nuts: r.int(3, 6), hp: TREE.hp, maxHp: TREE.hp,
       shake: 0, seed: r.int(1, 99999), dead: false, hive: null, web: null,
     };
-    const trunkH = h - canopyR * 0.35;
-    tree.body = g.world.createBody({ type: 'static', position: V(x, ground) });
-    tree.body.createFixture(planck.Box(0.32, trunkH / 2 + 0.2, V(0, trunkH / 2 - 0.2), 0), { friction: 0.8 });
-    tree.body.setUserData({ kind: 'tree', ref: tree });
-    tree.canopy = g.world.createBody({ type: 'static', position: V(x, ground + h) });
-    tree.canopy.createFixture(planck.Circle(canopyR * 0.85), { isSensor: true });
-    tree.canopy.setUserData({ kind: 'canopy', ref: tree });
+    this._treeBodies(tree);
     this.trees.push(tree);
     this.taken.push([x - canopyR * 0.7, x + canopyR * 0.7]);
     const a = this.anchors(tree);
     // a beehive hanging from a branch on a rope
     if (r() < 0.4) {
       const hive = g._makeBlock('hive', 'box', a.branch.x, a.branch.y - 1.3, 0.66, 0.66);
-      const joint = g.world.createJoint(new planck.RopeJoint({
-        bodyA: tree.body, bodyB: hive.body,
-        localAnchorA: V(a.branch.x - x, a.branch.y - ground), localAnchorB: V(0, 0.33), maxLength: 1.0,
-      }));
-      tree.hive = { block: hive, joint, released: false };
-      hive.hanging = tree;
+      tree.hive = { block: hive, blockId: hive.id, joint: null, released: false };
+      this._hangHive(tree, hive);
     }
     // a spider web between trunk and branch
     if (r() < 0.45) {
       const web = { x: a.web.x, y: a.web.y, r: 0.95, tree, broken: 0, wobble: 0, holding: null, seed: r.int(1, 9999) };
-      web.body = g.world.createBody({ type: 'static', position: V(web.x, web.y) });
-      web.body.createFixture(planck.Circle(web.r * 0.9), { isSensor: true });
-      web.body.setUserData({ kind: 'web', ref: web });
+      this._webBody(web);
       tree.web = web;
       this.webs.push(web);
     }
     return true;
+  }
+
+  _treeBodies(tree) {
+    const g = this.g;
+    const trunkH = tree.h - tree.canopyR * 0.35;
+    tree.body = g.world.createBody({ type: 'static', position: V(tree.x, tree.ground) });
+    tree.body.createFixture(planck.Box(0.32, trunkH / 2 + 0.2, V(0, trunkH / 2 - 0.2), 0), { friction: 0.8 });
+    tree.body.setUserData({ kind: 'tree', ref: tree });
+    tree.canopy = g.world.createBody({ type: 'static', position: V(tree.x, tree.ground + tree.h) });
+    tree.canopy.createFixture(planck.Circle(tree.canopyR * 0.85), { isSensor: true });
+    tree.canopy.setUserData({ kind: 'canopy', ref: tree });
+  }
+
+  _hangHive(tree, hive) {
+    const a = this.anchors(tree);
+    tree.hive.joint = this.g.world.createJoint(new planck.RopeJoint({
+      bodyA: tree.body, bodyB: hive.body,
+      localAnchorA: V(a.branch.x - tree.x, a.branch.y - tree.ground), localAnchorB: V(0, 0.33), maxLength: 1.0,
+    }));
+    tree.hive.block = hive;
+    hive.hanging = tree;
+  }
+
+  _webBody(web) {
+    web.body = this.g.world.createBody({ type: 'static', position: V(web.x, web.y) });
+    web.body.createFixture(planck.Circle(web.r * 0.9), { isSensor: true });
+    web.body.setUserData({ kind: 'web', ref: web });
+  }
+
+  _dandelionBody(d) {
+    d.body = this.g.world.createBody({ type: 'static', position: V(d.x, d.ground + d.h) });
+    d.body.createFixture(planck.Circle(0.55), { isSensor: true });
+    d.body.setUserData({ kind: 'dandelion', ref: d });
+  }
+
+  _stumpFor(tree) {
+    const stump = { x: tree.x, ground: tree.ground, w: 0.95, h: 0.6, kind: tree.kind, seed: tree.seed };
+    stump.body = this.g.world.createBody({ type: 'static', position: V(tree.x, tree.ground) });
+    stump.body.createFixture(planck.Box(0.45, 0.4, V(0, 0.2), 0), { friction: 0.9 });
+    stump.body.setUserData({ kind: 'stump' });
+    this.stumps.push(stump);
+    return stump;
+  }
+
+  // ------------------------------------------------------------------ lockstep state
+  state() {
+    return {
+      t: this.trees.map((t) => [Math.round(t.hp * 100), t.nuts, t.dead ? 1 : 0, t.hive ? (t.hive.released ? 2 : 1) : 0]),
+      w: this.webs.map((w) => (w.torn ? 1 : 0)),
+      d: this.dandelions.map((d) => (d.done ? 1 : 0)),
+    };
+  }
+
+  // Recreate every static forest body in the game's fresh world (blocks already exist).
+  load(s, blockById) {
+    this.stumps = [];
+    this.trees.forEach((tree, i) => {
+      const [hp, nuts, dead, hive] = s.t[i];
+      tree.hp = hp / 100;
+      tree.nuts = nuts;
+      tree.dead = !!dead;
+      tree.body = tree.canopy = null;
+      if (tree.dead) this._stumpFor(tree);
+      else this._treeBodies(tree);
+      if (tree.hive) {
+        const blk = blockById.get(tree.hive.blockId);
+        tree.hive.joint = null;
+        tree.hive.released = hive === 2 || !blk || tree.dead;
+        if (blk) {
+          tree.hive.block = blk;
+          blk.hanging = tree;
+          if (!tree.hive.released) this._hangHive(tree, blk);
+        }
+      }
+    });
+    this.webs.forEach((web, i) => {
+      web.holding = null;
+      web.body = null;
+      web.torn = !!s.w[i];
+      if (web.torn) web.broken = Math.max(web.broken, 0.001);
+      else { web.broken = 0; this._webBody(web); }
+    });
+    this.dandelions.forEach((d, i) => {
+      d.body = null;
+      d.done = d.blowing = !!s.d[i];
+      if (!d.done) { d.blown = 0; this._dandelionBody(d); }
+    });
+    this.terrainVersion = this.g.terrain.version;
   }
 
   // Branch and web points in world space (y up). The branch tip comes from the art module when
@@ -149,9 +225,7 @@ export class Forest {
     const ground = this._flat(x, 0.6, 0.6);
     if (ground == null) return false;
     const d = { x, ground, h: 1.1, headR: 0.45, blown: 0, blowing: false, seed: this.r.int(1, 9999) };
-    d.body = g.world.createBody({ type: 'static', position: V(x, ground + d.h) });
-    d.body.createFixture(planck.Circle(0.55), { isSensor: true });
-    d.body.setUserData({ kind: 'dandelion', ref: d });
+    this._dandelionBody(d);
     this.dandelions.push(d);
     this.taken.push([x - 0.5, x + 0.5]);
     return true;
@@ -336,15 +410,12 @@ export class Forest {
     }
     this._dropNuts(tree, tree.nuts, g.players[g.turn]);
     // stump stays behind
-    const stump = { x: tree.x, ground: tree.ground, w: 0.95, h: 0.6, kind: tree.kind, seed: tree.seed };
-    stump.body = g.world.createBody({ type: 'static', position: V(tree.x, tree.ground) });
-    stump.body.createFixture(planck.Box(0.45, 0.4, V(0, 0.2), 0), { friction: 0.9 });
-    stump.body.setUserData({ kind: 'stump' });
-    this.stumps.push(stump);
+    this._stumpFor(tree);
     // the felled trunk is a heavy dynamic log that crashes down
     const len = Math.max(2.4, tree.h - 0.2);
     const B = g._makeBlock('trunk', 'box', tree.x, tree.ground + 0.65 + len / 2, len, 0.7, 0, Math.PI / 2);
     B.treeKind = tree.kind;
+    g.blockSpecs[B.id].treeKind = tree.kind;
     B.lastHitBy = g.turn;
     B.body.setAngularVelocity(-dir * 0.7);
     B.body.setLinearVelocity(V(dir * 0.8, 0));
@@ -356,15 +427,19 @@ export class Forest {
     g._vibe([30, 40, 50]);
   }
 
-  // ------------------------------------------------------------------ per frame
+  // ------------------------------------------------------------------ per frame (looks only)
   update(dt) {
-    const g = this.g;
     for (const tree of this.trees) tree.shake = Math.max(0, tree.shake - dt * 1.6);
     for (const web of this.webs) {
       web.wobble = Math.max(0, web.wobble - dt * 2);
       if (web.torn) web.broken = Math.min(1, web.broken + dt * 3);
     }
     for (const d of this.dandelions) if (d.done) d.blown = Math.min(1, d.blown + dt * 2.5);
+  }
+
+  // ------------------------------------------------------------------ per physics tick
+  tick() {
+    const g = this.g;
     // trees lose their footing when the ground under them is blown away
     if (g.terrain.version !== this.terrainVersion) {
       this.terrainVersion = g.terrain.version;

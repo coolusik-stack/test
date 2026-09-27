@@ -23,6 +23,10 @@ const FUR = ['#d9642c', '#8a8580']; // captain fur colours for tufts that fly of
 const V = (x, y) => planck.Vec2(x, y);
 const DT = 1 / 60;
 const TAU = Math.PI * 2;
+const AMMO_KEYS = Object.keys(AMMO);
+const q4 = (v) => Math.round(v * 1e4);
+const q3 = (v) => Math.round(v * 1e3);
+const q2 = (v) => Math.round(v * 100);
 
 export class Game {
   constructor(canvas, opts, emit, size) {
@@ -61,6 +65,25 @@ export class Game {
     this.over = false;
     this.lastTickSec = -1;
     this.silent = !!opts.demo;
+    // Lockstep bookkeeping. Everything that changes the match runs in fixed 1/60 s ticks, and at
+    // every hand-over (a shot, the end of a turn) the whole world is rebuilt from a snapshot, so
+    // two phones replaying the same inputs stay in step.
+    this.online = opts.mode === 'online';
+    this.simT = 0;
+    this.shotTick = 0;
+    this.snapSeq = 0;
+    this.nextBlockId = 0;
+    this.blockSpecs = [];
+    this.opMark = 0;
+    this.lrng = rng((this.seed ^ 0x9e3779b9) >>> 0);
+    this.netGate = null; // watching a friend's shot: last tick their phone has reached
+    this.netAb = null; // tick at which their ability fired
+    this.netEnd = null; // their end-of-turn snapshot, applied once the replay catches up
+    this.netLive = null; // their live pose/aim while they line up a shot
+    this._netT = 0;
+    this.hold = false; // online: wait in the intro until the friend's state has arrived
+    this.lastKind = 'start'; // what the last snapshot hand-over was: start | shot | end | turn
+    this.emotes = [];
     if (size) this.resize(size.w, size.h, size.dpr);
     this._build();
   }
@@ -82,16 +105,13 @@ export class Game {
     this.players = [0, 1].map((i) => {
       const x = land.bases[i];
       const y = this.terrain.surfaceY(x) + CART_R + 0.05;
-      // heavy cart: direct hits hurt but shouldn't shove the captain off the island
-      const body = this.world.createBody({ type: 'dynamic', position: V(x, y), fixedRotation: true, linearDamping: 0.35 });
-      body.createFixture(planck.Circle(CART_R), { density: 5.0, friction: 1.2, restitution: 0.02 });
-      body.createFixture(planck.Circle(V(0, HEAD.y), HEAD.r), { density: 0.6, friction: 0.6, restitution: 0.05 });
       const p = {
         id: i,
         team: i,
         name: TEAM[i].name,
         isAI: this.opts.demo || (this.opts.mode === 'cpu' && i === 1),
-        body,
+        remote: this.online && i !== this.opts.side,
+        body: null,
         hp: HP_MAX,
         shownHp: HP_MAX,
         facing: i === 0 ? 1 : -1,
@@ -113,15 +133,16 @@ export class Game {
         moodT: 0,
         stats: { shots: 0, hits: 0, dmg: 0, blocks: 0 },
       };
-      body.setUserData({ kind: 'captain', ref: p });
+      this._captainBody(p, x, y);
       return p;
     });
     if (this.opts.mode === 'pvp') {
       this.players[0].name = '1P ' + TEAM[0].name;
       this.players[1].name = '2P ' + TEAM[1].name;
-    } else {
+    } else if (this.opts.mode === 'cpu') {
       this.players[1].name = 'CPU ' + TEAM[1].name;
     }
+    if (this.opts.names) this.players.forEach((p, i) => { if (this.opts.names[i]) p.name = this.opts.names[i]; });
 
     // forts (same blueprint mirrored for fairness), with a random material twist
     const base = FORTS[r.int(0, FORTS.length - 1)];
@@ -134,6 +155,8 @@ export class Game {
     // trees, webs, dandelions, props and nut baskets across the middle
     this.forest = new Forest(this, r);
     this.forest.populate();
+    this.forest.r = this.lrng;
+    this.baseBlockCount = this.nextBlockId;
 
     this._wireContacts();
     // let everything settle before anyone is watching
@@ -141,6 +164,8 @@ export class Game {
     this.blastQueue.length = this.dentQueue.length = 0;
     for (const p of this.players) p.body.setLinearVelocity(V(0, 0));
     this.damageOn = true;
+    this.turn = this.opts.firstTurn ?? 0;
+    this.loadSnapshot(this.snapshot());
 
     // intro camera: sweep from enemy to player 1
     this.cam.resize(this.cssW || 800, this.cssH || 400);
@@ -160,14 +185,18 @@ export class Game {
     }
   }
 
-  _makeBlock(mat, shape, x, y, w, h, rad, angle = 0) {
+  _makeBlock(mat, shape, x, y, w, h, rad, angle = 0, o = {}) {
     const M = MAT[mat];
-    const body = this.world.createBody({ type: 'dynamic', position: V(x, y), angle, angularDamping: 0.1, linearDamping: 0.05 });
+    const id = o.id ?? this.nextBlockId;
+    this.nextBlockId = Math.max(this.nextBlockId, id + 1);
+    if (!this.blockSpecs[id]) this.blockSpecs[id] = { mat, shape, w, h, r: rad };
+    const body = this.world.createBody({ type: 'dynamic', position: V(x, y), angle, angularDamping: 0.1, linearDamping: 0.05, awake: o.awake ?? true });
     const fix = shape === 'circle' ? planck.Circle(rad) : planck.Box(w / 2, h / 2);
     body.createFixture(fix, { density: M.density, friction: M.friction, restitution: M.restitution });
     const area = shape === 'circle' ? Math.PI * rad * rad : w * h;
-    const hp = M.hp * clamp(0.6 + area * 0.9, 0.7, 1.8);
-    const blk = { body, mat, shape, w, h, r: rad, hp, maxHp: hp, seed: (Math.random() * 1e6) | 0, flash: 0, dead: false, lastHitBy: -1 };
+    const maxHp = M.hp * clamp(0.6 + area * 0.9, 0.7, 1.8);
+    const seed = (Math.imul(id + 1, 2654435761) ^ this.seed) >>> 12;
+    const blk = { id, body, mat, shape, w, h, r: rad, hp: o.hp ?? maxHp, maxHp, seed, flash: 0, dead: false, lastHitBy: -1 };
     body.setUserData({ kind: 'block', ref: blk });
     this.blocks.push(blk);
     return blk;
@@ -193,7 +222,7 @@ export class Game {
         const p = s.ref;
         const vy = -p.body.getLinearVelocity().y;
         if (vy > 6) this._sfx('land', { vol: clamp(vy / 14, 0.3, 1) });
-        if (vy > 7.5 && !p.dead && this.time - (p.projHitT ?? -9) > 0.3) {
+        if (vy > 7.5 && !p.dead && this.simT - (p.projHitT ?? -9) > 0.3) {
           const dmg = (vy - 7.5) * 2.5;
           const attacker = this.state === 'flight' || this.state === 'settle' ? this.players[this.turn] : null;
           this.pendingFalls.push({ p, dmg, attacker: attacker === p ? null : attacker });
@@ -283,7 +312,7 @@ export class Game {
         const room = HIT_CAP - (P.dealt || 0);
         dmg = Math.min(room, Math.max(0, imp - 1.5) * HIT_K * (P.spec.hit ?? 1));
         P.dealt = (P.dealt || 0) + dmg;
-        p.projHitT = this.time;
+        p.projHitT = this.simT;
         if (dmg > 4) {
           p.hurtT = 1;
           const pos = p.body.getPosition();
@@ -292,7 +321,7 @@ export class Game {
         }
       } else if (o.kind === 'block') {
         // a bird slamming a block into the captain is already counted as the bird's hit
-        if (this.time - (p.projHitT ?? -9) < 0.3) return;
+        if (this.simT - (p.projHitT ?? -9) < 0.3) return;
         dmg = Math.min(25, Math.max(0, imp - 2.5) * 1.2);
       }
       if (dmg > 0.3) this._hurt(p, dmg, o.kind === 'proj' ? o.ref.owner : null);
@@ -328,7 +357,7 @@ export class Game {
 
   // Breaking a nut basket hands the shooter a bonus special nut.
   _reward(p, pos) {
-    const type = SUPPLY[Math.floor(Math.random() * SUPPLY.length)];
+    const type = SUPPLY[Math.floor(this.lrng() * SUPPLY.length)];
     p.ammo[type] = (p.ammo[type] || 0) + 1;
     this.fx.burst(pos.x, pos.y, 'nutbit', 8, { speed: 5 });
     this.fx.burst(pos.x, pos.y, 'star', 6, { speed: 4 });
@@ -478,9 +507,20 @@ export class Game {
   launch(power, angle) {
     // angle: radians in world space (0 = right, ccw)
     const p = this.players[this.turn];
-    if (p.dead || this.state !== 'aim') return;
+    if (p.dead || this.state !== 'aim' || p.remote) return;
     const type = p.sel;
     if (p.ammo[type] <= 0) return;
+    // the shot starts from a canonical rebuild so the friend's phone can replay it exactly
+    const snap = this.snapshot();
+    this.loadSnapshot(snap);
+    this.lastKind = 'shot';
+    this._fire(power, angle);
+    if (this.online) this.emit('net', { t: 'shot', q: snap.q, n: this.turnNo, snap, pw: power, an: angle, sel: type });
+  }
+
+  _fire(power, angle) {
+    const p = this.players[this.turn];
+    const type = p.sel;
     p.ammo[type]--;
     const spec = AMMO[type];
     const rest = this.restPos(p);
@@ -510,10 +550,11 @@ export class Game {
     return { x: a.rest.x, y: -a.rest.y };
   }
 
-  activateAbility(fromAI = false) {
+  activateAbility(fromAI = false, fromNet = false) {
     const P = this.lead;
     if (!P || P.dead || P.used || P.kind !== 'nut') return false;
     if (P.owner.isAI !== fromAI) return false; // humans can't fire the CPU's ability (and vice versa)
+    if (P.owner.remote && !fromNet) return false; // nor their friend's
     const spec = P.spec;
     if (!spec.ability) return false;
     if (P.firstHit && spec.ability !== 'boom') return false;
@@ -555,6 +596,7 @@ export class Game {
       this.fx.burst(pos.x, pos.y, 'star', 4, { speed: 3 });
     }
     this._sfx('ability', { vol: 0.5 });
+    if (this.online && !fromNet) this.emit('net', { t: 'ab', q: this.snapSeq, k: this.shotTick });
     return true;
   }
 
@@ -567,7 +609,7 @@ export class Game {
   startTurn() {
     const p = this.players[this.turn];
     this.turnNo++;
-    const r = Math.random;
+    const r = rng((this.seed + Math.imul(this.turnNo, 7919)) >>> 0); // both phones roll the same wind
     const prev = this.wind;
     this.wind = this.windMax ? Math.round((r() * 2 - 1) * this.windMax) : 0;
     if (Math.abs(this.wind - prev) >= 3) this._sfx('wind', { vol: 0.6 });
@@ -584,9 +626,10 @@ export class Game {
     this.cam.manual = 0;
     this.cam.focus(pos.x + p.facing * 5, pos.y + 2.2, this.cam.baseZoom, 3);
     this.lead = null;
-    this.setState(p.isAI ? 'ai-think' : 'aim');
+    this.netGate = this.netAb = this.netEnd = this.netLive = null;
+    this.setState(p.isAI ? 'ai-think' : p.remote ? 'remote' : 'aim');
     this._sfx('turn');
-    this.emit('turn', { player: p.id, name: p.name, isAI: p.isAI, wind: this.wind, turnNo: this.turnNo, flood });
+    this.emit('turn', { player: p.id, name: p.name, isAI: p.isAI, remote: p.remote, wind: this.wind, turnNo: this.turnNo, flood });
     if (p.isAI) {
       this.aiPlan = null;
     }
@@ -596,6 +639,72 @@ export class Game {
     const shooter = this.players[this.turn];
     if ((shooter.turnDmg || 0) >= 3) shooter.stats.hits++;
     shooter.turnDmg = 0;
+    const k = this.shotTick;
+    const snap = this.snapshot();
+    this.loadSnapshot(snap);
+    this.lastKind = 'end';
+    if (this.online) this.emit('net', { t: 'end', q: snap.q, n: this.turnNo, k, snap });
+    this._afterTurn();
+  }
+
+  // The friend's phone finished its turn: once our replay has reached the same tick, adopt
+  // their snapshot and move on exactly as they did.
+  _netFinish() {
+    const msg = this.netEnd;
+    this.netEnd = this.netGate = this.netAb = null;
+    this.aim = null;
+    if (window.__afNetDebug) (this.netDiffs || (this.netDiffs = [])).push(diffSnaps(this.snapshot(), msg.snap));
+    this.loadSnapshot(msg.snap);
+    this.lastKind = 'end';
+    this._afterTurn();
+  }
+
+  // Pick a turn back up after a resync (nobody has fired in it yet, as far as both phones agree).
+  _resumeTurn() {
+    const p = this.players[this.turn];
+    this.netGate = this.netAb = this.netEnd = this.netLive = null;
+    this.aim = null;
+    this.lead = null;
+    this.turnTimer = this.opts.timer || 0;
+    this.setState(p.isAI ? 'ai-think' : p.remote ? 'remote' : 'aim');
+    this.emit('turn', { player: p.id, name: p.name, isAI: p.isAI, remote: p.remote, wind: this.wind, turnNo: this.turnNo, resumed: true });
+  }
+
+  // State for a friend who (re)joined this match: our last hand-over snapshot with the whole
+  // carve history, and what happened after it.
+  syncPayload() {
+    let after = this.lastKind;
+    const s = this.lastSnap;
+    if (after === 'shot' && this.players[s.tu].remote) {
+      // we were replaying *their* shot and their phone lost it: void it, they shoot again
+      this.loadSnapshot(s);
+      this._resumeTurn();
+      after = this.lastKind = 'turn';
+    }
+    const upto = s.o[0] + (s.o.length - 1) / 3;
+    const o = [0];
+    for (const op of this.terrain.opLog.slice(0, upto)) o.push(op[0], op[1], op[2]);
+    return { after, snap: { ...s, o } };
+  }
+
+  applySync(y) {
+    this.hold = false;
+    this.loadSnapshot(y.snap);
+    this.lastKind = y.after;
+    if (y.after === 'start') return; // still in the intro, same as them
+    if (y.after === 'end') { this._afterTurn(); return; }
+    if (y.after === 'shot') this.snapSeq = y.snap.q - 1; // their shot is still flying: replay it
+    this._resumeTurn();
+  }
+
+  // A quick emote bubble over a captain.
+  showEmote(playerId, e) {
+    this.emotes = this.emotes.filter((m) => m.p !== playerId);
+    this.emotes.push({ p: playerId, e, t: 0 });
+    this._sfx('chitter', { vol: 0.7, pitch: this.players[playerId].team ? 0.95 : 1.15 });
+  }
+
+  _afterTurn() {
     const alive = this.players.filter((p) => !p.dead);
     if (alive.length < 2) {
       this.finish(alive.length === 1 ? alive[0] : null);
@@ -642,6 +751,211 @@ export class Game {
     this.setState('settle');
   }
 
+
+  // ------------------------------------------------------------------ snapshots (lockstep)
+  // The whole match as small integers: captains, live blocks, forest state and the terrain
+  // carves since the last snapshot. `full` sends the entire carve history (for a rejoin).
+  snapshot(full = false) {
+    // deferred structural work (a toppling tree, dead bodies) must not straddle a snapshot
+    if (this.afterStep.length) for (const job of this.afterStep.splice(0)) job();
+    this._flushKills();
+    const P = this.players.map((p) => {
+      const b = p.body, pos = b.getPosition(), v = b.getLinearVelocity();
+      return [q4(pos.x), q4(pos.y), q3(v.x), q3(v.y), q2(p.hp), (p.dead ? 1 : 0) | (p.drowned ? 2 : 0) | (b.isAwake() ? 4 : 0),
+        p.facing, q2(p.stamina), AMMO_KEYS.map((k) => (p.ammo[k] === Infinity ? -1 : p.ammo[k])), p.stats.shots, p.stats.hits, q2(p.stats.dmg), p.stats.blocks, AMMO_KEYS.indexOf(p.sel)];
+    });
+    const B = [], S = {};
+    for (const blk of this.blocks) {
+      if (blk.dead) continue;
+      const b = blk.body, pos = b.getPosition(), aw = b.isAwake();
+      const e = [blk.id, q4(pos.x), q4(pos.y), q4(b.getAngle()), q2(blk.hp), (aw ? 1 : 0) | (blk.dropped ? 2 : 0)];
+      if (aw) {
+        const v = b.getLinearVelocity();
+        e.push(q3(v.x), q3(v.y), q3(b.getAngularVelocity()));
+      }
+      B.push(e);
+      if (blk.id >= this.baseBlockCount) {
+        const sp = this.blockSpecs[blk.id];
+        S[blk.id] = [sp.mat, sp.shape, q4(sp.w || 0), q4(sp.h || 0), q4(sp.r || 0), sp.treeKind || ''];
+      }
+    }
+    const base = full ? 0 : Math.min(this.opMark, this.terrain.opLog.length);
+    const o = [base];
+    for (const op of this.terrain.opLog.slice(base)) o.push(op[0], op[1], op[2]);
+    return {
+      q: this.snapSeq + 1, n: this.turnNo, tu: this.turn, w: this.wind,
+      sea: [q4(WORLD.SEA), q4(this.seaTarget)], nb: this.nextBlockId,
+      p: P, b: B, s: S, f: this.forest.state(), o,
+    };
+  }
+
+  // Tear the physics world down and rebuild it from a snapshot. Both phones do this at every
+  // hand-over, so they start each shot from identical bodies (same order, no stale contacts).
+  loadSnapshot(s) {
+    const log = this.terrain.opLog;
+    const base = s.o[0], n = (s.o.length - 1) / 3;
+    let same = log.length === base + n;
+    for (let i = 0; same && i < n; i++) {
+      const a = log[base + i];
+      same = a[0] === s.o[1 + i * 3] && a[1] === s.o[2 + i * 3] && a[2] === s.o[3 + i * 3];
+    }
+    if (!same) {
+      const ops = log.slice(0, Math.min(base, log.length));
+      for (let i = 0; i < n; i++) ops.push([s.o[1 + i * 3], s.o[2 + i * 3], s.o[3 + i * 3]]);
+      this.historyGap = log.length < base;
+      this.terrain.rebuild(ops);
+    }
+    this.opMark = this.terrain.opLog.length;
+
+    this.world = new planck.World({ gravity: V(0, -GRAV) });
+    this.terrain.attach(this.world, planck);
+    this._wireContacts();
+    s.p.forEach((e, i) => {
+      const p = this.players[i];
+      this._captainBody(p, e[0] / 1e4, e[1] / 1e4, !!(e[5] & 4));
+      if (e[5] & 4) p.body.setLinearVelocity(V(e[2] / 1e3, e[3] / 1e3));
+      p.hp = e[4] / 100;
+      p.dead = !!(e[5] & 1);
+      p.drowned = !!(e[5] & 2);
+      p.facing = e[6];
+      p.stamina = e[7] / 100;
+      AMMO_KEYS.forEach((k, j) => { p.ammo[k] = e[8][j] < 0 ? Infinity : e[8][j]; }); // JSON has no Infinity
+      p.stats.shots = e[9]; p.stats.hits = e[10]; p.stats.dmg = e[11] / 100; p.stats.blocks = e[12];
+      if (e[13] >= 0) p.sel = AMMO_KEYS[e[13]];
+      p.moveDir = 0;
+      p.moving = false;
+      p.turnDmg = 0;
+      p.projHitT = -9;
+    });
+    this.blocks = [];
+    for (const e of s.b) {
+      const id = e[0];
+      let sp = this.blockSpecs[id];
+      const x = s.s && s.s[id];
+      if (!sp && x) sp = this.blockSpecs[id] = { mat: x[0], shape: x[1], w: x[2] / 1e4, h: x[3] / 1e4, r: x[4] / 1e4, treeKind: x[5] || undefined };
+      if (!sp) continue;
+      const B = this._makeBlock(sp.mat, sp.shape, e[1] / 1e4, e[2] / 1e4, sp.w, sp.h, sp.r, e[3] / 1e4, { id, awake: !!(e[5] & 1), hp: e[4] / 100 });
+      if (sp.treeKind) B.treeKind = sp.treeKind;
+      if (e[5] & 2) B.dropped = true;
+      if (e.length > 6) {
+        B.body.setLinearVelocity(V(e[6] / 1e3, e[7] / 1e3));
+        B.body.setAngularVelocity(e[8] / 1e3);
+      }
+    }
+    this.nextBlockId = Math.max(this.nextBlockId, s.nb);
+    this.forest.load(s.f, new Map(this.blocks.map((b) => [b.id, b])));
+    // nothing transient survives a hand-over
+    this.projectiles = [];
+    this.lead = null;
+    this.killQueue.length = this.afterStep.length = this.pendingFalls.length = 0;
+    this.blastQueue.length = this.dentQueue.length = 0;
+    this.turnNo = s.n;
+    this.turn = s.tu;
+    this.wind = s.w;
+    WORLD.SEA = s.sea[0] / 1e4;
+    this.seaTarget = s.sea[1] / 1e4;
+    this.snapSeq = s.q;
+    this.shotTick = 0;
+    this.lrng = rng((this.seed ^ Math.imul(s.q + 1, 0x9e3779b1)) >>> 0);
+    this.forest.r = this.lrng;
+    this.lastSnap = s;
+  }
+
+  _captainBody(p, x, y, awake = true) {
+    // heavy cart: direct hits hurt but shouldn't shove the captain off the island
+    const body = this.world.createBody({ type: 'dynamic', position: V(x, y), fixedRotation: true, linearDamping: 0.35, awake });
+    body.createFixture(planck.Circle(CART_R), { density: 5.0, friction: 1.2, restitution: 0.02 });
+    body.createFixture(planck.Circle(V(0, HEAD.y), HEAD.r), { density: 0.6, friction: 0.6, restitution: 0.05 });
+    body.setUserData({ kind: 'captain', ref: p });
+    p.body = body;
+    return body;
+  }
+
+  _flushKills() {
+    if (!this.killQueue.length) return;
+    for (const body of this.killQueue) {
+      if (body._destroyed) continue;
+      body._destroyed = true;
+      this.world.destroyBody(body);
+    }
+    this.killQueue.length = 0;
+    this.blocks = this.blocks.filter((b) => !b.dead);
+    this.projectiles = this.projectiles.filter((p) => !p.dead);
+  }
+
+  // ------------------------------------------------------------------ online (friend's phone)
+  // Their shot: rebuild from the snapshot they fired from and replay it, never running past the
+  // tick their phone has reported (so an ability tap lands on exactly the same tick).
+  netShot(m) {
+    if (m.q <= this.snapSeq || this.over) return;
+    const p = this.players[m.snap.tu];
+    if (!p || !p.remote) return;
+    this.loadSnapshot(m.snap);
+    this.lastKind = 'shot';
+    p.sel = m.sel;
+    this.aim = null;
+    this._fire(m.pw, m.an);
+    this.netGate = Math.max(0, this.netGate ?? 0);
+    this.netAb = null;
+    this.netEnd = null;
+  }
+
+  netProgress(m) {
+    if (m.q !== this.snapSeq || this.netGate == null) return;
+    this.netGate = Math.max(this.netGate, m.k);
+    if (m.ab != null && m.ab >= 0 && this._abQ !== m.q) {
+      this._abQ = m.q; // arm their ability once per shot
+      this.netAb = m.ab;
+      this.netGate = Math.max(this.netGate, m.ab);
+    }
+  }
+
+  netEndTurn(m) {
+    if (m.q <= this.snapSeq || this.over) return;
+    this.netEnd = m;
+    if (this.netGate != null) this.netGate = Math.max(this.netGate, m.k);
+  }
+
+  netLiveUpdate(m) {
+    if (m.n !== this.turnNo) return;
+    this.netLive = m;
+  }
+
+  _applyNetLive(realDt) {
+    const L = this.netLive;
+    const p = this.players[this.turn];
+    if (!L || !p.remote || p.dead) return;
+    const pos = p.body.getPosition();
+    const k = 1 - Math.exp(-10 * realDt);
+    const nx = lerp(pos.x, L.x, k), ny = lerp(pos.y, L.y, k);
+    p.wheel += (nx - pos.x) / 0.28;
+    p.moving = Math.abs(L.x - pos.x) > 0.03;
+    p.body.setTransform(V(nx, ny), 0);
+    p.facing = L.f;
+    if (L.sel && p.ammo[L.sel] > 0) p.sel = L.sel;
+    this.aim = L.pw > 0.04 ? { ai: true, remote: true, power: L.pw, angle: L.an } : null;
+  }
+
+  // What this phone tells the friend's phone every frame (throttled): live aim while it is our
+  // turn to shoot, and how far our replay-authoritative simulation has run during a shot.
+  _netOut(realDt) {
+    const p = this.players[this.turn];
+    if (!p || p.remote || this.over) return;
+    this._netT -= realDt;
+    if (this._netT > 0) return;
+    this._netT = 0.09;
+    if (this.state === 'aim') {
+      const pos = p.body.getPosition();
+      const a = this.aim;
+      this.emit('net', {
+        t: 'live', n: this.turnNo, x: Math.round(pos.x * 100) / 100, y: Math.round(pos.y * 100) / 100, f: p.facing,
+        pw: a ? Math.round(a.power * 100) / 100 : 0, an: a ? Math.round(a.angle * 100) / 100 : 0, sel: p.sel,
+      });
+    } else if (this.state === 'flight' || this.state === 'settle') {
+      this.emit('net', { t: 'fl', q: this.snapSeq, k: this.shotTick });
+    }
+  }
+
   // ------------------------------------------------------------------ input
   resize(cssW, cssH, dpr) {
     this.cssW = cssW;
@@ -652,7 +966,7 @@ export class Game {
 
   canControl() {
     const p = this.players[this.turn];
-    return this.state === 'aim' && !p.isAI && !p.dead && !this.paused;
+    return this.state === 'aim' && !p.isAI && !p.remote && !p.dead && !this.paused;
   }
 
   pointerDown(id, sx, sy) {
@@ -797,17 +1111,25 @@ export class Game {
     this.time += realDt;
     this.stateT += dt;
     this._updateState(dt, realDt);
+    if (this.state === 'remote') this._applyNetLive(realDt);
     this.acc += dt;
-    let steps = 0;
-    while (this.acc >= DT && steps < 4) {
+    let steps = 0, maxSteps = 4;
+    const replay = this.netGate != null;
+    if (replay && this.netGate - this.shotTick > 24) { maxSteps = 12; this.acc += DT * 3; } // catch up after a hiccup
+    if (this.state === 'remote') this.acc = 0; // the friend's phone owns this turn
+    while (this.acc >= DT && steps < maxSteps) {
+      if (replay && this.shotTick >= this.netGate) { this.acc = Math.min(this.acc, DT); break; }
+      if (replay && this.netAb != null && this.netAb <= this.shotTick) { this.netAb = null; this.activateAbility(false, true); }
       this._physicsStep(DT, false);
       this.acc -= DT;
       steps++;
     }
-    if (steps === 4) this.acc = 0;
+    if (steps === maxSteps) this.acc = 0;
     this._updateActors(dt, realDt);
-    if (WORLD.SEA < this.seaTarget) WORLD.SEA = Math.min(this.seaTarget, WORLD.SEA + realDt * 0.4);
     this.forest.update(dt);
+    for (const m of this.emotes) m.t += realDt;
+    if (this.emotes.length) this.emotes = this.emotes.filter((m) => m.t < 2.4);
+    if (this.online) this._netOut(realDt);
     this.scene.update(realDt, this.wind);
     this.fx.update(dt);
     this._updateCamera(realDt);
@@ -815,6 +1137,7 @@ export class Game {
   }
 
   _physicsStep(dt, warmup) {
+    if (!warmup) this._tickControls(dt);
     // wind + per-projectile bookkeeping
     for (const P of this.projectiles) {
       if (P.dead) continue;
@@ -855,16 +1178,7 @@ export class Game {
       }
       if (!warmup) this._explode(b.x, b.y, b.spec, b.owner, b.kind);
     }
-    if (this.killQueue.length) {
-      for (const body of this.killQueue) {
-        if (body._destroyed) continue;
-        body._destroyed = true;
-        this.world.destroyBody(body);
-      }
-      this.killQueue.length = 0;
-      this.blocks = this.blocks.filter((b) => !b.dead);
-      this.projectiles = this.projectiles.filter((p) => !p.dead);
-    }
+    this._flushKills();
     this.terrain.syncPhysics();
     // water & bounds
     for (const B of this.blocks) {
@@ -885,6 +1199,76 @@ export class Game {
         }
       }
     }
+    if (warmup) return;
+    this._tickProjectiles(dt);
+    this.shotTick++;
+    this.simT += dt;
+    if (WORLD.SEA < this.seaTarget) WORLD.SEA = Math.min(this.seaTarget, WORLD.SEA + dt * 0.4);
+    this.forest.tick();
+  }
+
+  // Driving the cart (only the phone whose turn it is ever does this).
+  _tickControls(dt) {
+    for (const p of this.players) {
+      const moving = p === this.players[this.turn] && this.state === 'aim' && p.moveDir && p.stamina > 0 && !p.dead && !p.remote;
+      const v = p.body.getLinearVelocity();
+      if (moving) {
+        const grounded = Math.abs(v.y) < 2.5;
+        if (grounded) {
+          p.body.setLinearVelocity(V(p.moveDir * MOVE_SPEED, v.y));
+          p.stamina = Math.max(0, p.stamina - Math.abs(v.x) * dt * STAMINA_PER_M);
+          p.wheel += v.x * dt / 0.28;
+          p.moveSoundT -= dt;
+          if (p.moveSoundT <= 0) { p.moveSoundT = 0.26; this._sfx('move', { vol: 0.5 }); }
+          if (Math.random() < 0.3) {
+            const pos = p.body.getPosition();
+            this.fx.burst(pos.x - p.moveDir * 0.5, pos.y - CART_R + 0.05, 'dust', 1, { speed: 0.8 });
+          }
+        }
+        p.moving = true;
+      } else if (p.moving && !p.remote) {
+        if (!p.dead) p.body.setLinearVelocity(V(v.x * 0.2, v.y));
+        p.moving = false;
+      }
+    }
+  }
+
+  // Fuses, spent nuts and splashes: part of the simulation, so they run per tick.
+  _tickProjectiles(dt) {
+    for (const P of this.projectiles) {
+      if (P.dead) continue;
+      const pos = P.body.getPosition();
+      const vel = P.body.getLinearVelocity();
+      const sp = Math.hypot(vel.x, vel.y);
+      if (P.fuse > 0) {
+        P.fuse -= dt;
+        if (P.fuse <= 0) {
+          this.blastQueue.push({ x: pos.x, y: pos.y, spec: P.spec.blast, owner: P.owner, proj: P });
+          P.fuse = -1;
+        }
+      }
+      if (P.firstHit) {
+        P.hitT += dt;
+        P.slowT = sp < 0.7 ? P.slowT + dt : 0;
+        const done = (P.kind === 'nut' || P.kind === 'fallnut') && !(P.kind === 'nut' && P.type === 'burr') && (P.slowT > 0.6 || P.hitT > 4.5);
+        const blackDone = P.kind === 'nut' && P.type === 'burr' && P.fuse === 0 && P.hitT > 3;
+        if (done || blackDone) this._poof(P);
+      } else if (P.t > 14 || this.shotTick > 16 * 60) {
+        this._poof(P);
+      }
+      if (pos.y < WORLD.SEA - 0.3) {
+        this._splash(pos.x, 0.7);
+        P.dead = true;
+        this.killQueue.push(P.body);
+      } else if (pos.x < -6 || pos.x > WORLD.W + 6) {
+        P.dead = true;
+        this.killQueue.push(P.body);
+      }
+    }
+    if (this.lead && this.lead.dead) {
+      const alive = this.projectiles.filter((q) => !q.dead);
+      this.lead = alive[0] || null;
+    }
   }
 
   _splash(x, size) {
@@ -894,7 +1278,11 @@ export class Game {
 
   _updateState(dt, realDt) {
     const p = this.players[this.turn];
-    if ((this.players[0].dead || this.players[1].dead) && (this.state === 'intro' || this.state === 'aim' || this.state === 'ai-think' || this.state === 'ai-aim')) {
+    if (p.remote && this.netEnd && (this.state === 'remote' || this.state === 'intro' || this.shotTick >= this.netEnd.k)) {
+      this._netFinish();
+      return;
+    }
+    if (!p.remote && (this.players[0].dead || this.players[1].dead) && (this.state === 'intro' || this.state === 'aim' || this.state === 'ai-think' || this.state === 'ai-aim')) {
       // e.g. drove off a cliff, or sank while the turn banner was up: the turn is over
       this.aim = null;
       p.moveDir = 0;
@@ -908,7 +1296,7 @@ export class Game {
           const p0 = this.players[this.turn].body.getPosition();
           this.cam.focus(p0.x, p0.y + 3, this.cam.baseZoom, 1.1);
         }
-        if (this.stateT > 2.4) this.startTurn();
+        if (this.stateT > 2.4 && !this.hold) this.startTurn();
         break;
       }
       case 'aim': {
@@ -955,9 +1343,6 @@ export class Game {
           this.activateAbility(true);
         }
         if (this.projectiles.length === 0 && this.blastQueue.length === 0) this.setState('settle');
-        if (this.stateT > 16) {
-          for (const P of this.projectiles) { P.dead = true; this.killQueue.push(P.body); }
-        }
         break;
       }
       case 'over': {
@@ -968,6 +1353,10 @@ export class Game {
         break;
       }
       case 'settle': {
+        if (p.remote) {
+          if (this.projectiles.length) this.setState('flight');
+          break; // their phone decides when the turn is over
+        }
         let maxV = 0;
         for (const B of this.blocks) {
           if (!B.body.isAwake()) continue;
@@ -1010,30 +1399,7 @@ export class Game {
           this.emit('hud');
         }
       }
-      // movement
-      const moving = p === this.players[this.turn] && this.state === 'aim' && p.moveDir && p.stamina > 0 && !p.dead;
-      const v = p.body.getLinearVelocity();
-      if (moving) {
-        const grounded = Math.abs(v.y) < 2.5;
-        if (grounded) {
-          p.body.setLinearVelocity(V(p.moveDir * MOVE_SPEED, v.y));
-          p.stamina = Math.max(0, p.stamina - Math.abs(v.x) * dt * STAMINA_PER_M);
-          p.wheel += v.x * dt / 0.28;
-          p.moveSoundT -= realDt;
-          if (p.moveSoundT <= 0) { p.moveSoundT = 0.26; this._sfx('move', { vol: 0.5 }); }
-          if (Math.random() < 0.3) {
-            const pos = p.body.getPosition();
-            this.fx.burst(pos.x - p.moveDir * 0.5, pos.y - CART_R + 0.05, 'dust', 1, { speed: 0.8 });
-          }
-        }
-        p.moving = true;
-      } else {
-        if (p.moving && !p.dead) {
-          p.body.setLinearVelocity(V(v.x * 0.2, v.y));
-        }
-        p.moving = false;
-        p.wheel += v.x * dt / 0.28;
-      }
+      if (!p.moving) p.wheel += p.body.getLinearVelocity().x * dt / 0.28;
     }
     for (const B of this.blocks) B.flash = Math.max(0, B.flash - realDt * 5);
     // projectiles lifecycle
@@ -1042,8 +1408,6 @@ export class Game {
       P.squash *= Math.exp(-8 * realDt);
       if (P.dash) P.dash = Math.max(0, P.dash - realDt);
       const pos = P.body.getPosition();
-      const vel = P.body.getLinearVelocity();
-      const sp = Math.hypot(vel.x, vel.y);
       // trail
       if (P === this.lead || P.kind === 'kernel') {
         P.trailT -= dt;
@@ -1056,35 +1420,6 @@ export class Game {
           if (P.dash) this.fx.add({ x: pos.x, y: pos.y, vx: 0, vy: 0, type: 'trailpuff', life: 0.3, size: 0.18, color: 'rgba(255,240,160,0.8)', g: 0, drag: 0 });
         }
       }
-      if (P.fuse > 0) {
-        P.fuse -= dt;
-        if (P.fuse <= 0) {
-          this.blastQueue.push({ x: pos.x, y: pos.y, spec: P.spec.blast, owner: P.owner, proj: P });
-          P.fuse = -1;
-        }
-      }
-      if (P.firstHit) {
-        P.hitT += dt;
-        P.slowT = sp < 0.7 ? P.slowT + dt : 0;
-        const done = (P.kind === 'nut' || P.kind === 'fallnut') && !(P.kind === 'nut' && P.type === 'burr') && (P.slowT > 0.6 || P.hitT > 4.5);
-        const blackDone = P.kind === 'nut' && P.type === 'burr' && P.fuse === 0 && P.hitT > 3;
-        if (done || blackDone) this._poof(P);
-      } else if (P.t > 14) {
-        this._poof(P);
-      }
-      if (pos.y < WORLD.SEA - 0.3) {
-        this._splash(pos.x, 0.7);
-        P.dead = true;
-        this.killQueue.push(P.body);
-      } else if (pos.x < -6 || pos.x > WORLD.W + 6) {
-        P.dead = true;
-        this.killQueue.push(P.body);
-      }
-    }
-    if (this.lead && this.lead.dead) {
-      // store trail for the shooter and hand focus to any remaining projectile
-      const alive = this.projectiles.filter((q) => !q.dead);
-      this.lead = alive[0] || null;
     }
     if (this.state === 'flight' || this.state === 'settle') {
       const p = this.players[this.turn];
@@ -1138,7 +1473,7 @@ export class Game {
 
     const cur = this.players[this.turn];
     // previous shot trail
-    if ((this.state === 'aim' || this.state === 'ai-aim') && cur.lastTrail.length) {
+    if ((this.state === 'aim' || this.state === 'ai-aim' || this.state === 'remote') && cur.lastTrail.length) {
       ctx.fillStyle = 'rgba(255,255,255,0.55)';
       for (const d of cur.lastTrail) {
         ctx.beginPath();
@@ -1198,10 +1533,11 @@ export class Game {
     this.scene.drawWater(ctx, view, this.time, true);
 
     // aim guide
-    if (this.aim && (this.state === 'aim' || this.state === 'ai-aim')) this._drawAimGuide(ctx, cur);
+    if (this.aim && (this.state === 'aim' || this.state === 'ai-aim' || this.state === 'remote')) this._drawAimGuide(ctx, cur);
 
     // name tags + mini hp bars
     for (const p of this.players) this._drawTag(ctx, p);
+    for (const m of this.emotes) this._drawEmote(ctx, m);
     this.fx.drawTexts(ctx, cam.zoom);
 
     // screen-space overlays
@@ -1218,14 +1554,14 @@ export class Game {
     const pos = p.body.getPosition();
     const x = pos.x, y = -pos.y;
     const isCur = p === this.players[this.turn];
-    const aiming = isCur && this.aim && (this.state === 'aim' || this.state === 'ai-aim');
+    const aiming = isCur && this.aim && (this.state === 'aim' || this.state === 'ai-aim' || this.state === 'remote');
     let pouch = null;
     if (aiming) {
       const a = Art.slingAnchors(x, y, p.facing);
       const pull = this.aim.power * MAX_PULL;
       pouch = { x: a.rest.x - Math.cos(this.aim.angle) * pull, y: a.rest.y + Math.sin(this.aim.angle) * pull };
     }
-    const showAmmo = isCur && !p.dead && (this.state === 'aim' || this.state === 'ai-think' || this.state === 'ai-aim' || this.state === 'intro');
+    const showAmmo = isCur && !p.dead && (this.state === 'aim' || this.state === 'ai-think' || this.state === 'ai-aim' || this.state === 'intro' || this.state === 'remote');
     Art.drawCommander(ctx, x, y, {
       team: p.team, facing: p.facing, time: this.time + p.id * 1.7, blink: p.blink > 0 ? 1 : 0,
       hurt: p.hurtT, hp: p.hp / HP_MAX, moving: p.moving, wheelAngle: p.wheel, dead: p.dead,
@@ -1263,7 +1599,7 @@ export class Game {
       ctx.fill();
     }
     // turn arrow
-    if (p === this.players[this.turn] && (this.state === 'aim' || this.state === 'ai-think' || this.state === 'ai-aim')) {
+    if (p === this.players[this.turn] && (this.state === 'aim' || this.state === 'ai-think' || this.state === 'ai-aim' || this.state === 'remote')) {
       const bob = Math.sin(this.time * 5) * 0.12;
       ctx.fillStyle = TEAM[p.team].color;
       ctx.strokeStyle = '#fff';
@@ -1278,6 +1614,35 @@ export class Game {
     }
     ctx.restore();
     void z;
+  }
+
+  _drawEmote(ctx, m) {
+    const p = this.players[m.p];
+    const pos = p.body.getPosition();
+    const z = this.cam.zoom;
+    const pop = m.t < 0.18 ? m.t / 0.18 : m.t > 2.1 ? Math.max(0, (2.4 - m.t) / 0.3) : 1;
+    const s = (0.6 + 0.4 * pop) / z;
+    ctx.save();
+    ctx.translate(pos.x + p.facing * 0.2, -pos.y - 3.1 - Math.sin(Math.min(1, m.t * 3)) * 0.3);
+    ctx.scale(s, s);
+    ctx.globalAlpha = Math.min(1, pop * 1.4);
+    ctx.fillStyle = '#fffaf0';
+    ctx.strokeStyle = '#2b1a12';
+    ctx.lineWidth = 3;
+    roundRect(ctx, -30, -30, 60, 52, 18);
+    ctx.fill();
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(-8, 21); ctx.lineTo(0, 34); ctx.lineTo(8, 21);
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillRect(-9, 17, 18, 5);
+    ctx.font = '34px "Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = '#000';
+    ctx.fillText(m.e, 0, -3);
+    ctx.restore();
   }
 
   _drawAimGuide(ctx, p) {
@@ -1399,12 +1764,19 @@ export class Game {
     for (const p of this.players) {
       if (p.dead) continue;
       const pos = p.body.getPosition();
-      mark(pos.x, pos.y, TEAM[p.team].color, p.id === 0 ? (this.opts.mode === 'cpu' ? '나' : '1P') : this.opts.mode === 'cpu' ? 'CPU' : '2P');
+      mark(pos.x, pos.y, TEAM[p.team].color, this.tagOf(p));
     }
     if (this.lead && !this.lead.dead && this.state === 'flight') {
       const pos = this.lead.body.getPosition();
       mark(pos.x, pos.y, '#fff', '●');
     }
+  }
+
+  // Short label for a captain: 나 / CPU / 친구 / 1P / 2P
+  tagOf(p) {
+    if (this.online) return p.remote ? '친구' : '나';
+    if (this.opts.mode === 'cpu') return p.isAI ? 'CPU' : '나';
+    return p.id === 0 ? '1P' : '2P';
   }
 
   _sfx(name, opts) {
@@ -1431,6 +1803,22 @@ export class Game {
   destroy() {
     if (!this.silent) Sound.stretch(null);
   }
+}
+
+// How far our replay drifted from the shooter's result (debug/tests only).
+function diffSnaps(a, b) {
+  let pos = 0, hp = 0;
+  a.p.forEach((e, i) => { pos = Math.max(pos, Math.abs(e[0] - b.p[i][0]), Math.abs(e[1] - b.p[i][1])); hp = Math.max(hp, Math.abs(e[4] - b.p[i][4])); });
+  const bm = new Map(b.b.map((e) => [e[0], e]));
+  let missing = 0;
+  for (const e of a.b) {
+    const o = bm.get(e[0]);
+    if (!o) { missing++; continue; }
+    bm.delete(e[0]);
+    pos = Math.max(pos, Math.abs(e[1] - o[1]), Math.abs(e[2] - o[2]));
+  }
+  missing += bm.size;
+  return { pos: pos / 1e4, hp: hp / 100, missing, ops: a.o.length === b.o.length && a.o.every((v, i) => v === b.o[i]) };
 }
 
 function roundRect(ctx, x, y, w, h, r) {
