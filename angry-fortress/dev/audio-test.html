@@ -43,6 +43,7 @@
     <button id="teamA">chitter team A (0.9)</button>
     <button id="teamB">chitter team B (1.2)</button>
     <button id="burr">burr (spikes + explode_big)</button>
+    <button id="drops">nut_drop ×3</button>
   </div>
   <label>vol <input id="vol" type="range" min="0" max="2" step="0.05" value="1"><span id="volV">1</span></label>
   <label>pitch <input id="pitch" type="range" min="0.5" max="2" step="0.01" value="1"><span id="pitchV">1</span></label>
@@ -80,6 +81,7 @@ const GROUPS = {
   Captain: ['hurt', 'ko', 'splash', 'move', 'land'],
   Results: ['win', 'lose', 'star', 'wind'],
   Squirrels: ['chitter', 'squeak_hurt', 'squeak_ko', 'nut_hit', 'crack', 'pound', 'spikes', 'buzz', 'honey', 'boing', 'rustle'],
+  Forest: ['web', 'web_tear', 'seeds', 'tree_shake', 'nut_drop', 'timber', 'rope_snap', 'pickup', 'log_roll', 'splash_small'],
 };
 window.SOUND_GROUPS = GROUPS;
 
@@ -118,6 +120,7 @@ $('stars').onclick = () => { [1, 1.12, 1.26].forEach((p, i) => setTimeout(() => 
 $('teamA').onclick = () => { Sound.init(); Sound.play('chitter', { pitch: 0.9 }); };
 $('teamB').onclick = () => { Sound.init(); Sound.play('chitter', { pitch: 1.2 }); };
 $('burr').onclick = () => { Sound.init(); Sound.play('explode_big'); Sound.play('spikes'); };
+$('drops').onclick = () => { Sound.init(); [1, 0.9, 1.15].forEach((p, i) => setTimeout(() => Sound.play('nut_drop', { pitch: p }), i * 140)); };
 $('stress').onclick = () => {
   const names = GROUPS.Impacts;
   for (let i = 0; i < 80; i++) Sound.play(names[i % names.length], { vol: Math.random(), pan: Math.random() * 2 - 1 });

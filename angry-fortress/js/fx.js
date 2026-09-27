@@ -40,7 +40,6 @@ export class FX {
       if (kind === 'feather') this.add({ ...base, type: 'feather', life: 1.4 + Math.random(), size: 0.16 + Math.random() * 0.12, color: opts.color || '#e5392f', g: 0.18, drag: 2.4, rot: Math.random() * TAU, vr: (Math.random() - 0.5) * 8 });
       else if (kind === 'wood') this.add({ ...base, type: 'chip', life: 1 + Math.random() * 0.6, size: 0.1 + Math.random() * 0.16, color: Math.random() < 0.5 ? '#d9934a' : '#a8642a', rot: Math.random() * TAU, vr: (Math.random() - 0.5) * 16 });
       else if (kind === 'stone') this.add({ ...base, type: 'rock', life: 1 + Math.random() * 0.6, size: 0.1 + Math.random() * 0.16, color: Math.random() < 0.5 ? '#9aa3ad' : '#6d7680', rot: Math.random() * TAU, vr: (Math.random() - 0.5) * 12 });
-      else if (kind === 'ice') this.add({ ...base, type: 'shard', life: 0.8 + Math.random() * 0.6, size: 0.1 + Math.random() * 0.18, color: Math.random() < 0.5 ? 'rgba(200,240,255,0.9)' : 'rgba(150,215,245,0.9)', rot: Math.random() * TAU, vr: (Math.random() - 0.5) * 18 });
       else if (kind === 'dirt') this.add({ ...base, type: 'rock', life: 0.9 + Math.random() * 0.5, size: 0.08 + Math.random() * 0.14, color: opts.color || '#7a4a24', rot: Math.random() * TAU, vr: (Math.random() - 0.5) * 12 });
       else if (kind === 'dust') this.add({ ...base, vx: base.vx * 0.35, vy: base.vy * 0.25 + 0.4, type: 'puff', life: 0.7 + Math.random() * 0.5, size: 0.25 + Math.random() * 0.35, grow: 1.4, color: opts.color || 'rgba(235,220,200,0.8)', g: -0.02, drag: 2.5 });
       else if (kind === 'spark') this.add({ ...base, type: 'spark', life: 0.3 + Math.random() * 0.35, size: 0.06, color: Math.random() < 0.5 ? '#fff3a0' : '#ffb13b', g: 0.5, drag: 1.2 });
@@ -51,6 +50,7 @@ export class FX {
       else if (kind === 'nutbit') this.add({ ...base, type: 'acornbit', life: 1.1 + Math.random() * 0.5, size: 0.1 + Math.random() * 0.05, g: 1, drag: 0.5, rot: Math.random() * TAU, vr: (Math.random() - 0.5) * 12 });
       else if (kind === 'shell') this.add({ ...base, type: 'rock', life: 0.8 + Math.random() * 0.5, size: 0.06 + Math.random() * 0.09, color: Math.random() < 0.5 ? '#a8733f' : '#e2c08a', rot: Math.random() * TAU, vr: (Math.random() - 0.5) * 14 });
       else if (kind === 'needle') this.add({ ...base, type: 'needle', life: 0.5 + Math.random() * 0.35, size: 0.2 + Math.random() * 0.14, color: Math.random() < 0.5 ? '#8bc34a' : '#c5e17a', g: 0.35, drag: 1.2 });
+      else if (kind === 'seed') this.add({ ...base, vx: base.vx * 0.5, vy: Math.abs(base.vy) * 0.4 + 0.6, type: 'seed', life: 2.2 + Math.random() * 1.2, size: 0.12 + Math.random() * 0.06, g: -0.02, drag: 1.2, rot: Math.random() * TAU, vr: (Math.random() - 0.5) * 3 });
       else if (kind === 'honey') this.add({ ...base, type: 'drop', life: 0.9 + Math.random() * 0.5, size: 0.08 + Math.random() * 0.1, color: Math.random() < 0.6 ? '#f6b21b' : '#ffd45a', g: 0.9, drag: 0.6 });
     }
   }
@@ -226,6 +226,24 @@ export class FX {
           ctx.fillStyle = p.color;
           starPath(ctx, p.size);
           ctx.fill();
+          ctx.restore();
+          break;
+        }
+        case 'seed': {
+          // dandelion seed: a tiny parachute
+          ctx.save();
+          ctx.translate(x, y);
+          ctx.rotate(p.rot * 0.3);
+          ctx.globalAlpha = Math.min(1, k * 2);
+          ctx.strokeStyle = 'rgba(255,255,255,0.95)';
+          ctx.lineWidth = 0.015;
+          ctx.beginPath();
+          ctx.moveTo(0, 0);
+          ctx.lineTo(0, p.size);
+          for (let i = -3; i <= 3; i++) { ctx.moveTo(0, 0); ctx.lineTo(i * p.size * 0.22, -p.size * 0.55); }
+          ctx.stroke();
+          ctx.fillStyle = '#8a6a3a';
+          ctx.fillRect(-0.012, p.size, 0.024, 0.05);
           ctx.restore();
           break;
         }

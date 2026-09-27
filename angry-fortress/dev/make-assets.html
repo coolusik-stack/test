@@ -78,11 +78,23 @@ function drawOG() {
     }
   };
   cloud(170, 110, 34); cloud(640, 70, 26); cloud(1010, 330, 30);
-  // far hills
-  g.fillStyle = '#9fd0a8';
-  g.beginPath(); g.moveTo(0, H);
-  for (let x = 0; x <= W; x += 10) g.lineTo(x, 400 - Math.sin(x / 140) * 40 - Math.sin(x / 57) * 12);
-  g.lineTo(W, H); g.fill();
+  // far forest line: soft round crowns with a few pines
+  const crowns = (base, col, step, rMin, rVar, seed) => {
+    g.fillStyle = col;
+    g.beginPath(); g.moveTo(0, H);
+    for (let x = -20, i = 0; x <= W + 40; x += step, i++) {
+      const r = rMin + ((Math.sin(i * 12.9898 + seed) * 43758.5453) % 1 + 1) % 1 * rVar;
+      g.moveTo(x + r, base); g.arc(x, base - r * 0.6, r, 0, Math.PI * 2);
+    }
+    g.fill();
+    g.fillRect(0, base - 4, W, H - base + 4);
+  };
+  crowns(400, '#b9dcc0', 46, 30, 26, 1);
+  g.fillStyle = '#a6cfae';
+  for (const [x, h] of [[70, 150], [300, 120], [760, 140], [1130, 160]]) {
+    g.beginPath(); g.moveTo(x, 330 - h * 0.35); g.lineTo(x - 34, 420); g.lineTo(x + 34, 420); g.closePath(); g.fill();
+  }
+  crowns(450, '#98c9a0', 58, 34, 30, 7);
   // ground islands
   const ground = (x0, x1, top) => {
     g.fillStyle = '#9a6334';
@@ -97,6 +109,10 @@ function drawOG() {
     g.strokeStyle = '#6fcb3c'; g.lineWidth = 10;
     g.beginPath(); g.moveTo(x0 + 10, top); g.lineTo(x1 - 10, top); g.stroke();
   };
+  const HZ = 36;
+  const home = (x, y, team, facing) => { g.save(); g.translate(x, y); g.scale(HZ, HZ); Art.drawHomeTree(g, { x: 0, y: 0, team, facing, time: 0.4, seed: 3 + team }); g.restore(); };
+  home(62, 520, 0, 1);
+  home(1150, 505, 1, -1);
   ground(-60, 360, 520);
   ground(860, 1260, 505);
   // sea
@@ -122,11 +138,12 @@ function drawOG() {
   block(1000, 505 - 62, 'wood', 0.26, 2.0);
   block(950, 505 - 132, 'wood', 2.1, 0.26, 0.08);
   block(950, 505 - 22, 'stone', 0.7, 0.7);
-  block(915, 505 - 160, 'ice', 0.7, 0.7, 0.3);
+  block(915, 505 - 160, 'leaf', 0.7, 0.7, 0.3);
   block(1150, 505 - 22, 'hive', 0.7, 0.7);
   block(240, 520 - 20, 'mushroom', 0.6, 0.6);
   block(280, 520 - 25, 'stone', 0.8, 0.8);
-  block(330, 520 - 75, 'ice', 0.26, 1.6, -0.1);
+  block(330, 520 - 75, 'log', 0.3, 1.6, -0.1);
+  block(985, 505 - 166, 'crate', 0.76, 0.6, 0.06);
   // flying birds with puff trails
   const trail = (pts) => {
     g.fillStyle = 'rgba(255,255,255,0.85)';

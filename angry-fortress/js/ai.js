@@ -57,14 +57,28 @@ export function planShot(game, me, difficulty) {
     }
   }
 
+  // forest: trunks, webs and stumps block; canopies slow a nut down once
+  const forest = game.forest ? game.forest.aiObstacles() : { solid: [], soft: [] };
+  for (const ob of forest.solid) addOb(ob);
+  const soft = forest.soft;
+
   const r = 0.36;
   const sim = (x, y, vx, vy, rad, maxT, selfCheck) => {
     const steps = Math.round(maxT / H);
+    let entered = 0;
     for (let i = 1; i <= steps; i++) {
       vx += wax * H;
       vy -= GRAV * H;
       x += vx * H;
       y += vy * H;
+      for (let k = 0; k < soft.length; k++) {
+        const c = soft[k];
+        if (!(entered & (1 << k)) && Math.abs(x - c.x) < c.rad + rad && Math.hypot(x - c.x, y - c.y) < c.rad + rad) {
+          entered |= 1 << k;
+          vx *= c.slow;
+          vy *= c.slow;
+        }
+      }
       const t = i * H;
       if (y < WORLD.SEA) return { x, y, t, vx, vy, kind: 'water' };
       if (x < -6 || x > WORLD.W + 6) return { x, y, t, vx, vy, kind: 'out' };

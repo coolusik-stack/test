@@ -291,12 +291,70 @@ export class Terrain {
     const holes = new Path2D();
     const grass = new Path2D();
     const tufts = new Path2D();
-    const flowers = [];
-    const r = rng(this.seed * 7 + this.version * 13 + 1);
+    const fern = new Path2D(), fernHi = new Path2D();
+    const bush = new Path2D(), bushHi = new Path2D();
+    const clover = new Path2D(), needles = new Path2D();
+    const flowers = [], shrooms = [], leaves = [];
     const { stride, cell, scar } = this;
+    const st = this.style;
+    const decor = st.decor || [];
+    // Decor is keyed to fixed world slots so it stays put when craters rebuild the mesh.
+    const seed = this.seed;
+    const hash = (i, k) => {
+      let h = Math.imul(i ^ (seed * 374761393), 668265263) ^ Math.imul(k + 1, 2246822519);
+      h = Math.imul(h ^ (h >>> 13), 1274126177);
+      return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
+    };
+    const SLOT = 0.3;
     const isScar = (x, y) => {
       const i = Math.round(x / cell), j = Math.round(y / cell);
       return scar[j * stride + i] === 1;
+    };
+    const addDecor = (slot, tx, ty) => {
+      const kind = decor[Math.floor(hash(slot, 3) * decor.length)];
+      const s = 0.8 + hash(slot, 4) * 0.5;
+      const y = -ty + 0.03;
+      if (kind === 'fern') {
+        for (let f = -2; f <= 2; f++) {
+          const a = -Math.PI / 2 + f * 0.42;
+          const L = (0.55 - Math.abs(f) * 0.08) * s;
+          const ex = tx + Math.cos(a) * L, ey = y + Math.sin(a) * L;
+          fern.moveTo(tx, y);
+          fern.quadraticCurveTo(tx + Math.cos(a - 0.3) * L * 0.6, y + Math.sin(a - 0.3) * L * 0.6, ex, ey);
+          fern.quadraticCurveTo(tx + Math.cos(a + 0.3) * L * 0.6, y + Math.sin(a + 0.3) * L * 0.6, tx + 0.02, y);
+          if (f <= 0) {
+            fernHi.moveTo(tx, y - 0.02);
+            fernHi.quadraticCurveTo(tx + Math.cos(a - 0.2) * L * 0.5, y + Math.sin(a - 0.2) * L * 0.5, ex * 0.35 + tx * 0.65, ey * 0.35 + y * 0.65);
+            fernHi.lineTo(tx + 0.02, y - 0.02);
+          }
+        }
+      } else if (kind === 'bush') {
+        for (const [dx, dy, rr] of [[-0.22, -0.12, 0.2], [0.2, -0.13, 0.2], [0, -0.26, 0.24]]) {
+          bush.moveTo(tx + dx * s + rr * s, y + dy * s);
+          bush.arc(tx + dx * s, y + dy * s, rr * s, 0, Math.PI * 2);
+          bushHi.moveTo(tx + dx * s - 0.05 * s + rr * s * 0.5, y + dy * s - 0.06 * s);
+          bushHi.arc(tx + dx * s - 0.05 * s, y + dy * s - 0.06 * s, rr * s * 0.5, 0, Math.PI * 2);
+        }
+      } else if (kind === 'clover') {
+        for (const [dx, dy] of [[-0.07, -0.08], [0.07, -0.08], [0, -0.17]]) {
+          clover.moveTo(tx + dx + 0.07, y + dy);
+          clover.arc(tx + dx, y + dy, 0.07, 0, Math.PI * 2);
+        }
+      } else if (kind === 'mushroom' || kind === 'glowshroom') {
+        const cols = st.mushrooms || ['#e5452f'];
+        shrooms.push({ x: tx, y, s: 0.14 * s, c: cols[Math.floor(hash(slot, 5) * cols.length)], glow: kind === 'glowshroom', spots: hash(slot, 6) < 0.6 });
+      } else if (kind === 'leaves') {
+        const cols = st.leaves || ['#e0662a'];
+        for (let q = 0; q < 3; q++) leaves.push({ x: tx + (hash(slot, 7 + q) - 0.5) * 0.5, y: y - 0.02, rot: hash(slot, 10 + q) * 3, c: cols[Math.floor(hash(slot, 13 + q) * cols.length)], s: 0.12 + hash(slot, 16 + q) * 0.06 });
+      } else if (kind === 'needles') {
+        for (let q = 0; q < 5; q++) {
+          const nx = tx + (hash(slot, 20 + q) - 0.5) * 0.6, a = hash(slot, 25 + q) * Math.PI;
+          needles.moveTo(nx - Math.cos(a) * 0.1, y - 0.02 - Math.sin(a) * 0.03);
+          needles.lineTo(nx + Math.cos(a) * 0.1, y - 0.02 + Math.sin(a) * 0.03);
+        }
+      } else if (kind === 'flower' && st.flowers) {
+        flowers.push({ x: tx, y: y - 0.2, c: st.flowers[Math.floor(hash(slot, 8) * st.flowers.length)], s: 0.06 + hash(slot, 9) * 0.04 });
+      }
     };
     for (const l of this.loops) {
       const n = l.length;
@@ -310,7 +368,6 @@ export class Terrain {
       }
       // grass on up-facing, un-scarred segments
       let drawing = false;
-      let acc = 0;
       for (let k = 0; k < n; k += 2) {
         const x0 = l[k], y0 = l[k + 1];
         const x1 = l[(k + 2) % n], y1 = l[(k + 3) % n];
@@ -318,30 +375,26 @@ export class Terrain {
         const len = Math.hypot(dx, dy) || 1;
         const nyUp = -dx / len; // outward (right-hand) normal y component
         const mx = (x0 + x1) / 2, my = (y0 + y1) / 2;
-        const ok = nyUp > 0.42 && !isScar(mx, my) && my > WORLD.SEA - 0.2;
-        if (ok) {
-          if (!drawing) { grass.moveTo(x0, -y0); drawing = true; }
-          grass.lineTo(x1, -y1);
-          // tufts
-          acc += len;
-          while (acc > 0.32) {
-            acc -= 0.32 + r() * 0.2;
-            const t = r();
-            const tx = x0 + dx * t, ty = y0 + dy * t;
-            const hgt = 0.14 + r() * 0.16;
-            const lean = (r() - 0.5) * 0.12;
-            tufts.moveTo(tx - 0.07, -ty + 0.02);
-            tufts.lineTo(tx + lean - 0.03, -ty - hgt);
-            tufts.lineTo(tx, -ty + 0.02);
-            tufts.lineTo(tx + lean + 0.06, -ty - hgt * 0.75);
-            tufts.lineTo(tx + 0.07, -ty + 0.02);
-            tufts.closePath();
-            if (this.style.flowers && r() < 0.07) {
-              flowers.push({ x: tx + (r() - 0.5) * 0.1, y: -ty - 0.16 - r() * 0.1, c: r.pick(this.style.flowers), s: 0.06 + r() * 0.04 });
-            }
-          }
-        } else {
-          drawing = false;
+        const ok = nyUp > 0.42 && !isScar(mx, my) && my > WORLD.SEA0 - 0.2;
+        if (!ok) { drawing = false; continue; }
+        if (!drawing) { grass.moveTo(x0, -y0); drawing = true; }
+        grass.lineTo(x1, -y1);
+        // tufts and decor on fixed slots inside this segment's x-span
+        const lo = Math.min(x0, x1), hi = Math.max(x0, x1);
+        for (let slot = Math.ceil(lo / SLOT); slot * SLOT < hi; slot++) {
+          const tx = slot * SLOT + (hash(slot, 0) - 0.5) * 0.12;
+          const t = (tx - x0) / dx;
+          if (t < 0 || t > 1) continue;
+          const ty = y0 + dy * t;
+          const hgt = 0.14 + hash(slot, 1) * 0.16;
+          const lean = (hash(slot, 2) - 0.5) * 0.12;
+          tufts.moveTo(tx - 0.07, -ty + 0.02);
+          tufts.lineTo(tx + lean - 0.03, -ty - hgt);
+          tufts.lineTo(tx, -ty + 0.02);
+          tufts.lineTo(tx + lean + 0.06, -ty - hgt * 0.75);
+          tufts.lineTo(tx + 0.07, -ty + 0.02);
+          tufts.closePath();
+          if (decor.length && hash(slot, 11) < 0.16) addDecor(slot, tx, ty);
         }
       }
     }
@@ -350,6 +403,7 @@ export class Terrain {
     this.grassPath = grass;
     this.tuftPath = tufts;
     this.flowers = flowers;
+    this.decor = { fern, fernHi, bush, bushHi, clover, needles, shrooms, leaves };
   }
 
   draw(ctx, style, pattern, view) {
@@ -390,6 +444,18 @@ export class Terrain {
     ctx.lineWidth = 0.09;
     ctx.strokeStyle = s.outline;
     ctx.stroke(this.path);
+    // undergrowth rooted on the surface (drawn under the grass band)
+    const d = this.decor;
+    if (d) {
+      ctx.fillStyle = s.grassDark;
+      ctx.fill(d.bush);
+      ctx.fill(d.fern);
+      ctx.fillStyle = s.grass;
+      ctx.globalAlpha = 0.8;
+      ctx.fill(d.bushHi);
+      ctx.fill(d.fernHi);
+      ctx.globalAlpha = 1;
+    }
     // grass band
     ctx.lineWidth = 0.42;
     ctx.strokeStyle = s.grassDark;
@@ -421,7 +487,51 @@ export class Terrain {
       ctx.arc(fl.x, fl.y, fl.s * 0.6, 0, Math.PI * 2);
       ctx.fill();
     }
+    if (d) this._drawSmallDecor(ctx, d, s);
     ctx.restore();
+  }
+
+  _drawSmallDecor(ctx, d, s) {
+    ctx.fillStyle = s.grassLight;
+    ctx.globalAlpha = 0.9;
+    ctx.fill(d.clover);
+    ctx.globalAlpha = 1;
+    ctx.strokeStyle = '#8a5a2e';
+    ctx.lineWidth = 0.025;
+    ctx.stroke(d.needles);
+    for (const lf of d.leaves) {
+      ctx.save();
+      ctx.translate(lf.x, lf.y);
+      ctx.rotate(lf.rot);
+      ctx.fillStyle = lf.c;
+      ctx.beginPath();
+      ctx.ellipse(0, 0, lf.s, lf.s * 0.45, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
+    for (const m of d.shrooms) {
+      if (m.glow) {
+        const g = ctx.createRadialGradient(m.x, m.y - m.s, 0, m.x, m.y - m.s, m.s * 4);
+        g.addColorStop(0, m.c + '88');
+        g.addColorStop(1, m.c + '00');
+        ctx.fillStyle = g;
+        ctx.fillRect(m.x - m.s * 4, m.y - m.s * 5, m.s * 8, m.s * 8);
+      }
+      ctx.fillStyle = '#f2e6cc';
+      ctx.fillRect(m.x - m.s * 0.28, m.y - m.s * 1.1, m.s * 0.56, m.s * 1.1);
+      ctx.fillStyle = m.c;
+      ctx.beginPath();
+      ctx.ellipse(m.x, m.y - m.s * 1.1, m.s, m.s * 0.7, 0, Math.PI, Math.PI * 2);
+      ctx.closePath();
+      ctx.fill();
+      if (m.spots) {
+        ctx.fillStyle = 'rgba(255,255,255,0.85)';
+        ctx.beginPath();
+        ctx.arc(m.x - m.s * 0.35, m.y - m.s * 1.4, m.s * 0.14, 0, Math.PI * 2);
+        ctx.arc(m.x + m.s * 0.3, m.y - m.s * 1.5, m.s * 0.11, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
   }
 }
 
@@ -578,6 +688,47 @@ export function makeDirtPattern(ctx, style, seed) {
       g.ellipse(x + ox - rw * 0.3, y + oy - rh * 0.35, rw * 0.35, rh * 0.25, rot, 0, Math.PI * 2);
       g.fill();
     }
+  }
+  // tree roots winding through the soil
+  if (style.root) {
+    g.globalAlpha = 0.55;
+    g.strokeStyle = style.root;
+    g.lineCap = 'round';
+    for (let n = 0; n < 5; n++) {
+      let x = r() * S, y = r() * S, a = r() * Math.PI * 2, w = 5 + r() * 4;
+      const pts = [[x, y, w]];
+      for (let k = 0; k < 14; k++) {
+        a += (r() - 0.5) * 0.9;
+        x += Math.cos(a) * 12; y += Math.sin(a) * 12;
+        w *= 0.9;
+        pts.push([x, y, w]);
+      }
+      for (const ox of [-S, 0, S]) for (const oy of [-S, 0, S]) {
+        for (let k = 1; k < pts.length; k++) {
+          g.lineWidth = pts[k][2];
+          g.beginPath();
+          g.moveTo(pts[k - 1][0] + ox, pts[k - 1][1] + oy);
+          g.lineTo(pts[k][0] + ox, pts[k][1] + oy);
+          g.stroke();
+        }
+      }
+    }
+    // a few acorns some squirrel buried and forgot
+    g.globalAlpha = 0.9;
+    for (let n = 0; n < 3; n++) {
+      const x = r() * S, y = r() * S, rot = r() * 3;
+      for (const ox of [-S, 0, S]) for (const oy of [-S, 0, S]) {
+        g.save();
+        g.translate(x + ox, y + oy);
+        g.rotate(rot);
+        g.fillStyle = '#b86f33';
+        g.beginPath(); g.ellipse(0, 3, 6, 7.5, 0, 0, Math.PI * 2); g.fill();
+        g.fillStyle = '#5e3818';
+        g.beginPath(); g.ellipse(0, -2.5, 7, 3.8, 0, 0, Math.PI * 2); g.fill();
+        g.restore();
+      }
+    }
+    g.globalAlpha = 1;
   }
   const pat = ctx.createPattern(c, 'repeat');
   try {

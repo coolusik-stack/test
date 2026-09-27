@@ -12,9 +12,11 @@ const $$ = (sel) => [...document.querySelectorAll(sel)];
 
 const canvas = $('#game');
 const settings = Object.assign(
-  { sfx: true, music: true, vibe: true, difficulty: 'normal', wind: 'normal', timer: '0', guide: 'on', theme: 'meadow' },
+  { sfx: true, music: true, vibe: true, difficulty: 'normal', wind: 'normal', timer: '0', guide: 'on', theme: 'oak' },
   storage.get('af.settings', {}),
 );
+// maps from older versions were renamed when the game moved into the forest
+if (settings.theme !== 'random' && !THEMES[settings.theme]) settings.theme = 'oak';
 const record = Object.assign({ wins: 0, losses: 0, pvp: 0 }, storage.get('af.record', {}));
 const seen = storage.get('af.seen', { tutorial: false });
 

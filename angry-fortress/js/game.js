@@ -1,21 +1,24 @@
 // One match: physics world, turn flow, damage rules, input and rendering.
 import { WORLD, Terrain, buildLandscape, makeDirtPattern } from './terrain.js';
-import { THEMES, FORTS, PROPS } from './levels.js';
+import { THEMES, FORTS } from './levels.js';
 import { Scene } from './scene.js';
 import { FX } from './fx.js';
 import { Camera } from './camera.js';
 import * as Art from './art.js';
 import Sound from './audio.js';
 import { planShot } from './ai.js';
+import { Forest } from './obstacles.js';
 import { clamp, rng, vibrate, lerp, dist } from './util.js';
 import {
   GRAV, VMAX, WIND_ACC, MAX_PULL, CART_R, HEAD, HP_MAX, STAMINA, STAMINA_PER_M, MOVE_SPEED,
-  MAT, AMMO, KERNEL, POUND_SPEED, HIVE_BLAST, WIND_LEVELS, TEAM, HIT_K, HIT_CAP, FLOOD_TURN, FLOOD_STEP,
+  MAT, AMMO, KERNEL, POUND_SPEED, HIVE_BLAST, SUPPLY, WIND_LEVELS, TEAM, HIT_K, HIT_CAP, FLOOD_TURN, FLOOD_STEP,
 } from './config.js';
 
 const planck = window.planck;
-const BREAK_SFX = { wood: 'break_wood', stone: 'break_stone', ice: 'break_ice', hive: 'break_wood', mushroom: 'boing' };
-const HIT_SFX = { wood: 'hit_wood', stone: 'hit_stone', ice: 'hit_ice', hive: 'hit_wood', mushroom: 'boing' };
+const BREAK_SFX = { wood: 'break_wood', stone: 'break_stone', leaf: 'rustle', hive: 'break_wood', mushroom: 'boing', crate: 'break_wood', log: 'break_wood', trunk: 'break_wood' };
+const HIT_SFX = { wood: 'hit_wood', stone: 'hit_stone', leaf: 'rustle', hive: 'hit_wood', mushroom: 'boing', crate: 'hit_wood', log: 'hit_wood', trunk: 'hit_wood' };
+const BREAK_FX = { wood: 'wood', stone: 'stone', leaf: 'leaf', hive: 'honey', mushroom: 'dust', crate: 'wood', log: 'wood', trunk: 'wood' };
+const SENSORS = new Set(['canopy', 'web', 'dandelion']);
 const FUR = ['#d9642c', '#8a8580']; // captain fur colours for tufts that fly off on hits
 const V = (x, y) => planck.Vec2(x, y);
 const DT = 1 / 60;
@@ -28,7 +31,7 @@ export class Game {
     this.opts = opts; // {mode:'cpu'|'pvp', difficulty, theme, wind:'off'|'normal'|'strong', timer:0|30, guide:boolean, seed}
     this.emit = emit || (() => {});
     this.seed = opts.seed ?? ((Math.random() * 1e9) | 0);
-    this.theme = THEMES[opts.theme] || THEMES.meadow;
+    this.theme = THEMES[opts.theme] || THEMES.oak;
     this.time = 0;
     this.fx = new FX();
     this.cam = new Camera();
@@ -45,6 +48,7 @@ export class Game {
     this.projectiles = [];
     this.blocks = [];
     this.killQueue = [];
+    this.afterStep = []; // work that must wait until the physics world is unlocked
     this.pendingFalls = [];
     this.blastQueue = [];
     this.dentQueue = [];
@@ -71,6 +75,7 @@ export class Game {
     this.land = land;
     this.terrain = new Terrain({ style: this.theme.ground, seed: this.seed, heights: land.heights, ops: land.ops });
     this.terrain.attach(this.world, planck);
+    this.scene.setLand(land);
     this.pattern = makeDirtPattern(this.ctx, this.theme.ground, this.seed);
 
     // captains
@@ -118,23 +123,17 @@ export class Game {
       this.players[1].name = 'CPU ' + TEAM[1].name;
     }
 
-    // forts (same blueprint mirrored for fairness)
-    const fort = FORTS[r.int(0, FORTS.length - 1)];
+    // forts (same blueprint mirrored for fairness), with a random material twist
+    const base = FORTS[r.int(0, FORTS.length - 1)];
+    const twist = r.pick(['leaf', 'wood', 'leaf', 'mushroom']);
+    const fort = { ...base, blocks: base.blocks.map((b) => (b.swap && r() < 0.5 ? { ...b, m: twist } : b)) };
     for (const p of this.players) {
       const back = p.body.getPosition().x + p.facing * 3.0;
       this._placeStructure(fort, back, p.facing);
     }
-    // neutral props in the middle
-    const nProps = r.int(1, 2);
-    const span0 = land.bases[0] + 9, span1 = land.bases[1] - 9;
-    for (let k = 0; k < nProps; k++) {
-      const prop = PROPS[r.int(0, PROPS.length - 1)];
-      const x = lerp(span0, span1, nProps === 1 ? r.range(0.35, 0.65) : k === 0 ? r.range(0.1, 0.4) : r.range(0.6, 0.9));
-      const gy = this.terrain.surfaceY(x);
-      const gy2 = this.terrain.surfaceY(x + 1.6);
-      if (gy < WORLD.SEA + 0.5 || Math.abs(gy - gy2) > 1.0) continue;
-      this._placeStructure(prop, x, 1);
-    }
+    // trees, webs, dandelions, props and nut baskets across the middle
+    this.forest = new Forest(this, r);
+    this.forest.populate();
 
     this._wireContacts();
     // let everything settle before anyone is watching
@@ -200,10 +199,18 @@ export class Game {
           this.pendingFalls.push({ p, dmg, attacker: attacker === p ? null : attacker });
         }
       }
+      // a beehive cut loose from its branch bursts when it lands
+      for (const [s, o] of [[a, b], [b, a]]) {
+        if (s.kind === 'block' && s.ref.dropped && !s.ref.dead && !SENSORS.has(o.kind)) {
+          s.ref.dropped = false;
+          this._damageBlock(s.ref, 999, true);
+        }
+      }
       for (const [s, o] of [[a, b], [b, a]]) {
         if (s.kind !== 'proj') continue;
         const P = s.ref;
         if (P.dead) continue;
+        if (SENSORS.has(o.kind)) { this.forest.onSensor(P, o); continue; }
         if (o.kind === 'captain' && o.ref === P.owner && P.t < 0.45) continue;
         const vel = P.body.getLinearVelocity();
         const speed = Math.hypot(vel.x, vel.y);
@@ -217,7 +224,7 @@ export class Game {
             this.blastQueue.push({ x: pos.x, y: pos.y, spec: P.spec.blast, owner: P.owner, proj: P, kind: 'kernel' });
           } else if (P.pound) {
             this.blastQueue.push({ x: pos.x, y: pos.y - P.spec.r * 0.5, spec: P.spec.blast, owner: P.owner, proj: P, kind: 'pound' });
-          } else if (P.type === 'burr') {
+          } else if (P.kind === 'nut' && P.type === 'burr') {
             P.fuse = o.kind === 'captain' ? 0.05 : 1.15;
             this._sfx('fuse');
           } else if (o.kind === 'terrain' && speed > 6 && P.spec.dent) {
@@ -248,6 +255,16 @@ export class Game {
 
   // `s` received an impact of magnitude imp from `o`.
   _impact(s, o, imp) {
+    if (s.kind === 'tree') {
+      const mul = o.kind === 'proj' ? (o.ref.spec.mul?.log ?? 1) : 0.6;
+      const dmg = Math.max(0, imp - 2) * 5 * mul;
+      if (dmg > 1) {
+        const from = o.kind === 'proj' ? o.ref.body.getPosition().x : null;
+        this.forest.damageTree(s.ref, dmg, from);
+        if (o.kind === 'proj') this._sfx('tree_shake', { vol: 0.5 });
+      }
+      return;
+    }
     if (s.kind === 'block') {
       const B = s.ref;
       if (B.dead) return;
@@ -289,7 +306,7 @@ export class Game {
     if (B.hp <= 0) {
       B.dead = true;
       this.killQueue.push(B.body);
-      const kind = B.mat === 'hive' ? 'honey' : B.mat;
+      const kind = BREAK_FX[B.mat] || 'wood';
       const n = B.shape === 'circle' ? 10 : Math.round(6 + (B.w + B.h) * 5);
       const jitter = Math.max(B.w || B.r * 2, B.h || B.r * 2) * 0.6;
       this.fx.burst(pos.x, pos.y, kind, n, { speed: 5, jitter });
@@ -299,9 +316,25 @@ export class Game {
       const shooter = this.players[this.turn];
       if (B.lastHitBy >= 0 || fromProj) shooter.stats.blocks++;
       if (B.mat === 'hive') this.blastQueue.push({ x: pos.x, y: pos.y, spec: HIVE_BLAST, owner: shooter, kind: 'hive' });
+      if (B.hanging && B.hanging.hive) { B.hanging.hive.joint = null; B.hanging.hive.released = true; } // joint dies with the body
+      if (B.mat === 'crate' && pos.y > WORLD.SEA) this._reward(shooter, pos);
+    } else if (B.hanging && B.hanging.hive && !B.hanging.hive.released && fromProj) {
+      const tree = B.hanging;
+      this.afterStep.push(() => this.forest._releaseHive(tree));
     } else if (dmg > 6 && B.mat !== 'mushroom') {
       this._sfx(HIT_SFX[B.mat], { vol: clamp(dmg / 40, 0.2, 1) });
     }
+  }
+
+  // Breaking a nut basket hands the shooter a bonus special nut.
+  _reward(p, pos) {
+    const type = SUPPLY[Math.floor(Math.random() * SUPPLY.length)];
+    p.ammo[type] = (p.ammo[type] || 0) + 1;
+    this.fx.burst(pos.x, pos.y, 'nutbit', 8, { speed: 5 });
+    this.fx.burst(pos.x, pos.y, 'star', 6, { speed: 4 });
+    this.fx.text(pos.x, pos.y + 1.2, `+1 ${Art.AMMO_INFO[type].name}!`, '#9ff27a', 0.9, { life: 1.8 });
+    this._sfx('pickup');
+    this.emit('hud');
   }
 
   _hurt(p, dmg, attacker) {
@@ -394,6 +427,7 @@ export class Game {
         p.body.applyLinearImpulse(V((dx / l) * push * 0.14 * k * m, (dy / l) * push * 0.14 * k * m + 1.5 * k * m), p.body.getPosition(), true);
       }
     }
+    this.forest.onExplosion(x, y, r, dmg, owner);
     // blocks
     for (const B of this.blocks) {
       if (B.dead) continue;
@@ -484,6 +518,7 @@ export class Game {
     if (!spec.ability) return false;
     if (P.firstHit && spec.ability !== 'boom') return false;
     P.used = true;
+    if (P.caught > 0) this.forest.release(P);
     const pos = P.body.getPosition();
     const vel = P.body.getLinearVelocity();
     const sp = Math.hypot(vel.x, vel.y) || 1;
@@ -542,7 +577,7 @@ export class Game {
     let flood = null;
     if (this.turnNo > FLOOD_TURN) {
       this.seaTarget += FLOOD_STEP;
-      flood = this.turnNo === FLOOD_TURN + 1 ? (this.theme.sea.lava ? '용암이 차오릅니다!' : '바닷물이 차오릅니다!') : null;
+      flood = this.turnNo === FLOOD_TURN + 1 ? '개울물이 불어납니다!' : null;
     }
     this.lastTickSec = -1;
     const pos = p.body.getPosition();
@@ -772,6 +807,7 @@ export class Game {
     if (steps === 4) this.acc = 0;
     this._updateActors(dt, realDt);
     if (WORLD.SEA < this.seaTarget) WORLD.SEA = Math.min(this.seaTarget, WORLD.SEA + realDt * 0.4);
+    this.forest.update(dt);
     this.scene.update(realDt, this.wind);
     this.fx.update(dt);
     this._updateCamera(realDt);
@@ -783,6 +819,7 @@ export class Game {
     for (const P of this.projectiles) {
       if (P.dead) continue;
       P.t += dt;
+      if (P.caught > 0) { this.forest.holdCaught(P, dt); continue; }
       if (!P.firstHit && this.wind) {
         const m = P.body.getMass();
         P.body.applyForceToCenter(V(this.wind * WIND_ACC * m, 0), true);
@@ -790,6 +827,10 @@ export class Game {
     }
     this.world.step(dt, 8, 3);
     // process deferred actions
+    if (this.afterStep.length) {
+      const jobs = this.afterStep.splice(0);
+      for (const job of jobs) job();
+    }
     if (this.pendingFalls.length) {
       for (const f of this.pendingFalls) this._hurt(f.p, f.dmg, f.attacker);
       this.pendingFalls.length = 0;
@@ -847,15 +888,14 @@ export class Game {
   }
 
   _splash(x, size) {
-    this.fx.burst(x, WORLD.SEA + 0.1, 'splash', Math.round(10 * size), { speed: 4 * size, color: this.theme.sea.lava ? '#ffb347' : '#dff4ff' });
-    if (this.theme.sea.lava) this.fx.burst(x, WORLD.SEA + 0.2, 'spark', 8, { speed: 5 });
-    this._sfx('splash', { vol: clamp(size, 0.4, 1) });
+    this.fx.burst(x, WORLD.SEA + 0.1, 'splash', Math.round(10 * size), { speed: 4 * size, color: '#dff4ff' });
+        this._sfx(size < 1 ? 'splash_small' : 'splash', { vol: clamp(size, 0.4, 1) });
   }
 
   _updateState(dt, realDt) {
     const p = this.players[this.turn];
-    if ((this.players[0].dead || this.players[1].dead) && (this.state === 'aim' || this.state === 'ai-think' || this.state === 'ai-aim')) {
-      // e.g. drove off a cliff: the turn is over
+    if ((this.players[0].dead || this.players[1].dead) && (this.state === 'intro' || this.state === 'aim' || this.state === 'ai-think' || this.state === 'ai-aim')) {
+      // e.g. drove off a cliff, or sank while the turn banner was up: the turn is over
       this.aim = null;
       p.moveDir = 0;
       this._stretch(null);
@@ -1026,8 +1066,8 @@ export class Game {
       if (P.firstHit) {
         P.hitT += dt;
         P.slowT = sp < 0.7 ? P.slowT + dt : 0;
-        const done = P.kind === 'nut' && P.type !== 'burr' && (P.slowT > 0.6 || P.hitT > 4.5);
-        const blackDone = P.type === 'burr' && P.fuse === 0 && P.hitT > 3;
+        const done = (P.kind === 'nut' || P.kind === 'fallnut') && !(P.kind === 'nut' && P.type === 'burr') && (P.slowT > 0.6 || P.hitT > 4.5);
+        const blackDone = P.kind === 'nut' && P.type === 'burr' && P.fuse === 0 && P.hitT > 3;
         if (done || blackDone) this._poof(P);
       } else if (P.t > 14) {
         this._poof(P);
@@ -1090,7 +1130,11 @@ export class Game {
     cam.apply(ctx, dpr, shx, shy);
     const view = cam.view();
     this.scene.drawWater(ctx, view, this.time, false);
+    this.scene.drawBackTrees(ctx, view, this.time);
+    this.forest.drawBehind(ctx);
     this.terrain.draw(ctx, this.theme.ground, this.pattern, view);
+    this.scene.drawShore(ctx, view, this.time);
+    this.forest.drawFront(ctx, view);
 
     const cur = this.players[this.turn];
     // previous shot trail
@@ -1115,8 +1159,12 @@ export class Game {
     for (const B of this.blocks) {
       const pos = B.body.getPosition();
       if (pos.x < view.x0 - 3 || pos.x > view.x1 + 3) continue;
+      if (B.mat === 'trunk' && Art.drawFallenTree) {
+        Art.drawFallenTree(ctx, { x: pos.x, y: -pos.y, angle: -B.body.getAngle(), len: B.w, kind: B.treeKind, seed: B.seed });
+        continue;
+      }
       Art.drawBlock(ctx, {
-        material: B.mat, shape: B.shape, x: pos.x, y: -pos.y, angle: -B.body.getAngle(),
+        material: B.mat === 'trunk' ? 'log' : B.mat, shape: B.shape, x: pos.x, y: -pos.y, angle: -B.body.getAngle(),
         w: B.w, h: B.h, r: B.r, hp01: clamp(B.hp / B.maxHp, 0, 1), seed: B.seed, flash: B.flash,
       });
     }
@@ -1139,9 +1187,9 @@ export class Game {
         angle = -P.body.getAngle();
       }
       const state = P.firstHit ? (P.slowT > 0.2 ? 'dizzy' : 'hurt') : 'fly';
-      Art.drawNut(ctx, P.kind === 'nut' ? P.type : P.kind, pos.x, -pos.y, P.spec.r, angle, {
+      Art.drawNut(ctx, P.kind === 'kernel' ? 'kernel' : P.type, pos.x, -pos.y, P.spec.r, angle, {
         time: this.time, squash: P.squash, flip, state, lookX: flip ? -1 : 1, lookY: 0,
-        fuse: P.type === 'burr' ? (P.fuse > 0 ? clamp(1 - P.fuse / 1.15, 0.2, 1) : P.fuse < 0 ? 1 : 0) : 0,
+        fuse: P.kind === 'nut' && P.type === 'burr' ? (P.fuse > 0 ? clamp(1 - P.fuse / 1.15, 0.2, 1) : P.fuse < 0 ? 1 : 0) : 0,
         pound: !!P.pound,
       });
     }
@@ -1245,6 +1293,7 @@ export class Game {
       const h = 1 / 60;
       let n = 0;
       // stop the guide where it would clip terrain or a nearby block (e.g. your own wall)
+      const solids = this.forest.solidBodies();
       const near = this.blocks.filter((B) => {
         const bp = B.body.getPosition();
         return Math.abs(bp.x - rest.x) < 16 && Math.abs(bp.y - rest.y) < 12;
@@ -1257,6 +1306,15 @@ export class Game {
           for (const [ox, oy] of [[0, 0], [0.3, 0], [-0.3, 0], [0, 0.3], [0, -0.3]]) {
             probe.x = px + ox; probe.y = py + oy;
             if (B.body.getFixtureList().testPoint(probe)) return true;
+          }
+        }
+        for (const body of solids) {
+          for (let f = body.getFixtureList(); f; f = f.getNext()) {
+            if (f.isSensor()) continue;
+            for (const [ox, oy] of [[0, 0], [0.3, 0], [-0.3, 0]]) {
+              probe.x = px + ox; probe.y = py + oy;
+              if (f.testPoint(probe)) return true;
+            }
           }
         }
         return false;
