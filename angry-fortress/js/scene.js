@@ -44,7 +44,14 @@ export class Scene {
       for (let x = x0; x <= x1; x += r.range(1.2, 3.4)) {
         const y = -hAt(x) + 0.2;
         const s = r.range(0.7, 1.25);
-        if (kind === 'tree') {
+        if (kind === 'maple') {
+          // lumpy three-ball canopy on a slim trunk
+          deco.rect(x - 0.09 * s, y - 1.2 * s, 0.18 * s, 1.2 * s);
+          for (const [dx, dy, rr] of [[-0.45, 1.35, 0.55], [0.45, 1.4, 0.55], [0, 1.85, 0.62]]) {
+            deco.moveTo(x + dx * s + rr * s, y - dy * s);
+            deco.arc(x + dx * s, y - dy * s, rr * s, 0, Math.PI * 2);
+          }
+        } else if (kind === 'tree') {
           deco.rect(x - 0.1 * s, y - 1.1 * s, 0.2 * s, 1.1 * s);
           deco.moveTo(x + 0.75 * s, y - 1.3 * s);
           deco.arc(x, y - 1.3 * s, 0.75 * s, 0, Math.PI * 2);
@@ -250,7 +257,8 @@ export class Scene {
         ctx.save();
         ctx.translate(x, y);
         ctx.rotate(Math.sin(m.ph) * 1.2);
-        ctx.fillStyle = 'rgba(120,200,80,0.7)';
+        const leaves = this.t.leaf || ['rgba(120,200,80,0.7)'];
+        ctx.fillStyle = leaves[Math.floor(m.s * 97) % leaves.length];
         ctx.beginPath();
         ctx.ellipse(0, 0, 4 * m.s, 1.8 * m.s, 0, 0, Math.PI * 2);
         ctx.fill();

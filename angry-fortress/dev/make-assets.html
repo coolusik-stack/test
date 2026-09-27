@@ -50,7 +50,7 @@ function drawIcon(maskable) {
   g.scale(k, k);
   Art.drawCommander(g, -0.25, 0.45, { team: 0, facing: 1, time: 0.4, blink: 0, hurt: 0, hp: 1, moving: false, wheelAngle: 0.3, dead: false, pouch: null, aimPower: 0, mood: 'aim' }, (ctx) => {
     const a = Art.slingAnchors(-0.25, 0.45, 1);
-    Art.drawBird(ctx, 'red', a.rest.x, a.rest.y - 0.13, 0.38, 0, { time: 0.2, state: 'fly', lookX: 1, lookY: 0 });
+    Art.drawNut(ctx, 'acorn', a.rest.x, a.rest.y - 0.13, 0.38, 0, { time: 0.2, state: 'fly', lookX: 1, lookY: 0 });
   });
   g.restore();
   return c;
@@ -110,7 +110,7 @@ function drawOG() {
   world(150, 520 - 0.75 * Z, () => {
     Art.drawCommander(g, 0, 0, { team: 0, facing: 1, time: 0.3, hp: 1, mood: 'aim', pouch: null }, (ctx) => {
       const a = Art.slingAnchors(0, 0, 1);
-      Art.drawBird(ctx, 'red', a.rest.x, a.rest.y - 0.13, 0.38, 0, { state: 'fly', lookX: 1 });
+      Art.drawNut(ctx, 'acorn', a.rest.x, a.rest.y - 0.13, 0.38, 0, { state: 'fly', lookX: 1 });
     });
   });
   world(1060, 505 - 0.75 * Z, () => {
@@ -123,7 +123,8 @@ function drawOG() {
   block(950, 505 - 132, 'wood', 2.1, 0.26, 0.08);
   block(950, 505 - 22, 'stone', 0.7, 0.7);
   block(915, 505 - 160, 'ice', 0.7, 0.7, 0.3);
-  block(1150, 505 - 22, 'tnt', 0.7, 0.7);
+  block(1150, 505 - 22, 'hive', 0.7, 0.7);
+  block(240, 520 - 20, 'mushroom', 0.6, 0.6);
   block(280, 520 - 25, 'stone', 0.8, 0.8);
   block(330, 520 - 75, 'ice', 0.26, 1.6, -0.1);
   // flying birds with puff trails
@@ -134,13 +135,12 @@ function drawOG() {
   const arc = [];
   for (let t = 0; t <= 1; t += 0.03) arc.push([230 + t * 620, 420 - Math.sin(t * Math.PI) * 110 - t * 20]);
   trail(arc);
-  world(860, 395, () => Art.drawBird(g, 'black', 0, 0, 0.42, 0.45, { state: 'fly', fuse: 0.8, time: 0.3 }));
-  world(600, 330, () => Art.drawBird(g, 'yellow', 0, 0, 0.36, -0.05, { state: 'fly', time: 0.5 }));
-  world(420, 345, () => Art.drawBird(g, 'blue', 0, 0, 0.3, -0.2, { state: 'fly', time: 0.9 }));
-  world(385, 385, () => Art.drawBird(g, 'mini', 0, 0, 0.22, -0.1, { state: 'fly', time: 0.9 }));
-  world(455, 392, () => Art.drawBird(g, 'mini', 0, 0, 0.22, 0.1, { state: 'fly', time: 0.9 }));
-  world(1090, 205, () => Art.drawBird(g, 'white', 0, 0, 0.4, 0.1, { state: 'fly', time: 0.2, flip: true }));
-  world(1085, 262, () => Art.drawBird(g, 'egg', 0, 0, 0.27, 0.2, { time: 0.2 }));
+  world(860, 395, () => Art.drawNut(g, 'burr', 0, 0, 0.42, 0.45, { state: 'fly', fuse: 0.8, time: 0.3 }));
+  world(600, 330, () => Art.drawNut(g, 'pinenut', 0, 0, 0.36, -0.05, { state: 'fly', time: 0.5 }));
+  world(420, 345, () => Art.drawNut(g, 'kernel', 0, 0, 0.24, -0.2, { state: 'fly', time: 0.9 }));
+  world(385, 385, () => Art.drawNut(g, 'kernel', 0, 0, 0.22, -0.1, { state: 'fly', time: 0.9 }));
+  world(455, 392, () => Art.drawNut(g, 'kernel', 0, 0, 0.22, 0.1, { state: 'fly', time: 0.9 }));
+  world(1085, 215, () => Art.drawNut(g, 'walnut', 0, 0, 0.42, 0, { state: 'fly', time: 0.2, flip: true, pound: true }));
   // logo
   g.save();
   g.translate(W / 2, 150);
@@ -150,9 +150,9 @@ function drawOG() {
   g.lineJoin = 'round';
   g.font = '64px "Black Han Sans"';
   g.lineWidth = 16; g.strokeStyle = '#2b1a12';
-  g.strokeText('엥그리', -150, -70);
+  g.strokeText('도토리', -150, -70);
   g.fillStyle = '#ffd21f';
-  g.fillText('엥그리', -150, -70);
+  g.fillText('도토리', -150, -70);
   g.font = '150px "Black Han Sans"';
   g.lineWidth = 30;
   g.strokeText('포트리스', 0, 40);
@@ -168,7 +168,7 @@ function drawOG() {
   g.restore();
   g.save();
   g.font = '30px Jua';
-  const tag = '새총으로 쏘고, 요새를 무너뜨려라!';
+  const tag = '볼 가득 도토리 장전, 요새를 무너뜨려라!';
   const tw = g.measureText(tag).width + 48;
   g.translate(W / 2, 285);
   g.rotate(0.02);

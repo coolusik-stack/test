@@ -5,7 +5,7 @@ import { buildLandscape, WORLD } from './terrain.js';
 import * as Art from './art.js';
 import Sound from './audio.js';
 import { storage, prefs, clamp } from './util.js';
-import { BIRDS, HP_MAX, STAMINA, TEAM } from './config.js';
+import { AMMO, HP_MAX, STAMINA, TEAM } from './config.js';
 
 const $ = (sel) => document.querySelector(sel);
 const $$ = (sel) => [...document.querySelectorAll(sel)];
@@ -170,7 +170,7 @@ function onGameEvent(evt, data) {
       const p = game.players[data.player];
       renderSlots();
       $('#tip').hidden = true;
-      if (!p.isAI && BIRDS[data.type].ability) hint('날아가는 중 화면을 터치하면 능력 발동!', 2.5);
+      if (!p.isAI && AMMO[data.type].ability) hint('날아가는 중 화면을 터치하면 능력 발동!', 2.5);
       else hint('', 0);
       if (!p.isAI && !seen.tutorial) {
         seen.tutorial = true;
@@ -240,16 +240,16 @@ function setupHud() {
     try { Art.drawCaptainIcon(face, p.team); } catch (e) { /* art not ready */ }
     card.classList.remove('dead');
   }
-  const wrap = $('#birds');
+  const wrap = $('#ammo');
   wrap.innerHTML = '';
-  for (const type of Art.BIRD_TYPES) {
+  for (const type of Art.AMMO_TYPES) {
     const b = document.createElement('button');
     b.className = 'slot';
     b.dataset.type = type;
-    b.setAttribute('aria-label', `${Art.BIRD_INFO[type].name}: ${Art.BIRD_INFO[type].desc}`);
+    b.setAttribute('aria-label', `${Art.AMMO_INFO[type].name}: ${Art.AMMO_INFO[type].desc}`);
     const cv = document.createElement('canvas');
     cv.width = cv.height = 96;
-    try { Art.drawBirdIcon(cv, type); } catch (e) { /* art not ready */ }
+    try { Art.drawAmmoIcon(cv, type); } catch (e) { /* art not ready */ }
     const cnt = document.createElement('span');
     cnt.className = 'cnt';
     b.append(cv, cnt);
@@ -270,7 +270,7 @@ function setupHud() {
 
 function showTip(type) {
   const t = $('#tip');
-  const info = Art.BIRD_INFO[type];
+  const info = Art.AMMO_INFO[type];
   t.innerHTML = `<b>${info.name}</b>${info.desc}`;
   t.hidden = true;
   void t.offsetWidth;
@@ -298,7 +298,7 @@ function syncTurn() {
 function renderSlots() {
   if (!game) return;
   const p = game.players[game.turn];
-  for (const b of $$('#birds .slot')) {
+  for (const b of $$('#ammo .slot')) {
     const type = b.dataset.type;
     const n = p.ammo[type];
     b.querySelector('.cnt').textContent = n === Infinity ? '∞' : n;
@@ -346,7 +346,7 @@ function showResult(r) {
     sub = '둘 다 쓰러졌어요!';
   } else if (cpu) {
     title = r.isAIWin ? '패배…' : '승리!';
-    sub = r.isAIWin ? 'CPU 파랑 부대가 이겼어요. 다시 도전!' : `남은 체력 ${r.players[r.winner].hp}로 승리했어요`;
+    sub = r.isAIWin ? `CPU ${TEAM[1].name}이 창고를 지켰어요. 다시 도전!` : `남은 체력 ${r.players[r.winner].hp}로 도토리 창고를 지켰어요`;
     if (r.isAIWin) record.losses++; else record.wins++;
   } else {
     title = `${r.winner + 1}P 승리!`;
@@ -490,19 +490,19 @@ function drawMapPreview(cv, id) {
 }
 
 function renderHelpBirds() {
-  const wrap = $('#help-birds');
+  const wrap = $('#help-ammo');
   if (wrap.childElementCount) return;
-  for (const type of Art.BIRD_TYPES) {
+  for (const type of Art.AMMO_TYPES) {
     const d = document.createElement('div');
     d.className = 'hb';
     const cv = document.createElement('canvas');
     cv.width = cv.height = 96;
-    try { Art.drawBirdIcon(cv, type); } catch (e) { /* ignore */ }
+    try { Art.drawAmmoIcon(cv, type); } catch (e) { /* ignore */ }
     const b = document.createElement('b');
-    b.textContent = Art.BIRD_INFO[type].name;
+    b.textContent = Art.AMMO_INFO[type].name;
     const s = document.createElement('small');
-    const ammo = BIRDS[type].ammo;
-    s.textContent = `${Art.BIRD_INFO[type].desc} · ${ammo === Infinity ? '무제한' : ammo + '발'}`;
+    const ammo = AMMO[type].ammo;
+    s.textContent = `${Art.AMMO_INFO[type].desc} · ${ammo === Infinity ? '무제한' : ammo + '발'}`;
     d.append(cv, b, s);
     wrap.appendChild(d);
   }
@@ -630,7 +630,7 @@ function bind() {
     else if (e.key === ' ' || e.key === 'Enter') game.activateAbility();
     else if (e.key === 'Escape' || e.key === 'p') pause(true);
     else if (/^[1-5]$/.test(e.key)) {
-      const type = Art.BIRD_TYPES[Number(e.key) - 1];
+      const type = Art.AMMO_TYPES[Number(e.key) - 1];
       if (game.selectBird(type)) { renderSlots(); showTip(type); }
     }
   });

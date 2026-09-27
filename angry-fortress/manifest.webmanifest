@@ -1,7 +1,7 @@
 {
-  "name": "엥그리 포트리스",
-  "short_name": "엥그리포트",
-  "description": "새총으로 쏘고 요새를 무너뜨려라! 귀여운 새들의 턴제 포격 대결",
+  "name": "도토리 포트리스",
+  "short_name": "도토리포트",
+  "description": "볼 가득 도토리를 장전하고 상대 요새를 무너뜨려라! 다람쥐들의 턴제 새총 대결",
   "lang": "ko",
   "start_url": "./index.html",
   "scope": "./",

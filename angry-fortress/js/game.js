@@ -10,10 +10,13 @@ import { planShot } from './ai.js';
 import { clamp, rng, vibrate, lerp, dist } from './util.js';
 import {
   GRAV, VMAX, WIND_ACC, MAX_PULL, CART_R, HEAD, HP_MAX, STAMINA, STAMINA_PER_M, MOVE_SPEED,
-  MAT, BIRDS, MINI, EGG, TNT_BLAST, WIND_LEVELS, TEAM, HIT_K, HIT_CAP, FLOOD_TURN, FLOOD_STEP,
+  MAT, AMMO, KERNEL, POUND_SPEED, HIVE_BLAST, WIND_LEVELS, TEAM, HIT_K, HIT_CAP, FLOOD_TURN, FLOOD_STEP,
 } from './config.js';
 
 const planck = window.planck;
+const BREAK_SFX = { wood: 'break_wood', stone: 'break_stone', ice: 'break_ice', hive: 'break_wood', mushroom: 'boing' };
+const HIT_SFX = { wood: 'hit_wood', stone: 'hit_stone', ice: 'hit_ice', hive: 'hit_wood', mushroom: 'boing' };
+const FUR = ['#d9642c', '#8a8580']; // captain fur colours for tufts that fly off on hits
 const V = (x, y) => planck.Vec2(x, y);
 const DT = 1 / 60;
 const TAU = Math.PI * 2;
@@ -87,8 +90,8 @@ export class Game {
         hp: HP_MAX,
         shownHp: HP_MAX,
         facing: i === 0 ? 1 : -1,
-        ammo: Object.fromEntries(Object.entries(BIRDS).map(([k, v]) => [k, v.ammo])),
-        sel: 'red',
+        ammo: Object.fromEntries(Object.entries(AMMO).map(([k, v]) => [k, v.ammo])),
+        sel: 'acorn',
         stamina: STAMINA,
         moveDir: 0,
         wheel: 0,
@@ -210,9 +213,11 @@ export class Game {
           P.squash = 0.22;
           P.impactSpeed = speed;
           const pos = P.body.getPosition();
-          if (P.kind === 'egg' || P.kind === 'mini') {
-            this.blastQueue.push({ x: pos.x, y: pos.y, spec: P.spec.blast, owner: P.owner, proj: P });
-          } else if (P.type === 'black') {
+          if (P.kind === 'kernel') {
+            this.blastQueue.push({ x: pos.x, y: pos.y, spec: P.spec.blast, owner: P.owner, proj: P, kind: 'kernel' });
+          } else if (P.pound) {
+            this.blastQueue.push({ x: pos.x, y: pos.y - P.spec.r * 0.5, spec: P.spec.blast, owner: P.owner, proj: P, kind: 'pound' });
+          } else if (P.type === 'burr') {
             P.fuse = o.kind === 'captain' ? 0.05 : 1.15;
             this._sfx('fuse');
           } else if (o.kind === 'terrain' && speed > 6 && P.spec.dent) {
@@ -221,7 +226,11 @@ export class Game {
         }
         if (speed > 3) {
           if (o.kind === 'terrain') this._sfx(speed > 9 ? 'thud' : 'bounce', { vol: clamp(speed / 18, 0.25, 1) });
-          if (o.kind === 'captain') { this._sfx('hurt'); }
+          else if (o.kind === 'block') {
+            if (o.ref.mat === 'mushroom') this._sfx('boing', { vol: clamp(speed / 14, 0.3, 1), pitch: 0.9 + Math.random() * 0.3 });
+            else this._sfx('nut_hit', { vol: clamp(speed / 20, 0.25, 0.9), pitch: 1.3 - P.spec.r });
+          }
+          if (o.kind === 'captain') this._sfx('squeak_hurt');
         }
       }
     });
@@ -261,7 +270,7 @@ export class Game {
         if (dmg > 4) {
           p.hurtT = 1;
           const pos = p.body.getPosition();
-          this.fx.burst(pos.x, pos.y + 0.6, 'feather', 8, { color: TEAM[p.team].color, speed: 5 });
+          this.fx.burst(pos.x, pos.y + 0.6, 'fur', 8, { color: FUR[p.team], speed: 5 });
           this.fx.burst(pos.x, pos.y + 1.2, 'star', 5, { speed: 4 });
         }
       } else if (o.kind === 'block') {
@@ -280,16 +289,18 @@ export class Game {
     if (B.hp <= 0) {
       B.dead = true;
       this.killQueue.push(B.body);
-      const kind = B.mat === 'tnt' ? 'wood' : B.mat;
+      const kind = B.mat === 'hive' ? 'honey' : B.mat;
       const n = B.shape === 'circle' ? 10 : Math.round(6 + (B.w + B.h) * 5);
-      this.fx.burst(pos.x, pos.y, kind, n, { speed: 5, jitter: Math.max(B.w || B.r * 2, B.h || B.r * 2) * 0.6 });
+      const jitter = Math.max(B.w || B.r * 2, B.h || B.r * 2) * 0.6;
+      this.fx.burst(pos.x, pos.y, kind, n, { speed: 5, jitter });
       this.fx.burst(pos.x, pos.y, 'dust', 4, { speed: 1.5 });
-      this._sfx('break_' + (kind === 'wood' ? 'wood' : kind), { vol: 0.9 });
+      if (B.mat === 'wood') { this.fx.burst(pos.x, pos.y, 'leaf', 3, { speed: 2.5, jitter }); this._sfx('rustle', { vol: 0.5 }); }
+      this._sfx(BREAK_SFX[B.mat], { vol: 0.9 });
       const shooter = this.players[this.turn];
       if (B.lastHitBy >= 0 || fromProj) shooter.stats.blocks++;
-      if (B.mat === 'tnt') this.blastQueue.push({ x: pos.x, y: pos.y, spec: TNT_BLAST, owner: shooter, tnt: true });
-    } else if (dmg > 6) {
-      this._sfx('hit_' + (B.mat === 'tnt' ? 'wood' : B.mat), { vol: clamp(dmg / 40, 0.2, 1) });
+      if (B.mat === 'hive') this.blastQueue.push({ x: pos.x, y: pos.y, spec: HIVE_BLAST, owner: shooter, kind: 'hive' });
+    } else if (dmg > 6 && B.mat !== 'mushroom') {
+      this._sfx(HIT_SFX[B.mat], { vol: clamp(dmg / 40, 0.2, 1) });
     }
   }
 
@@ -309,6 +320,10 @@ export class Game {
       if (dmg >= 25) this.slowmo(0.35);
       this._vibe(dmg >= 25 ? [30, 40, 60] : 25);
     }
+    if (dmg >= 6) {
+      const pos = p.body.getPosition();
+      this.fx.burst(pos.x, pos.y + HEAD.y + 0.1, 'nutbit', Math.min(6, 1 + Math.round(dmg / 8)), { speed: 5, dir: Math.PI / 2 });
+    }
     p.mood = 'scared';
     p.moodT = 1.5;
     const enemy = this.players[1 - p.id];
@@ -322,8 +337,9 @@ export class Game {
     p.hp = 0;
     p.drowned = drowned;
     const pos = p.body.getPosition();
-    this._sfx(drowned ? 'splash' : 'ko');
-    this.fx.burst(pos.x, pos.y + 0.5, 'feather', 18, { color: TEAM[p.team].color, speed: 7 });
+    this._sfx(drowned ? 'splash' : 'squeak_ko');
+    this.fx.burst(pos.x, pos.y + 0.5, 'fur', 16, { color: FUR[p.team], speed: 7 });
+    this.fx.burst(pos.x, pos.y + 1.0, 'nutbit', 6, { speed: 6, dir: Math.PI / 2 });
     this.fx.burst(pos.x, pos.y + 1.4, 'star', 8, { speed: 5 });
     this.fx.text(pos.x, pos.y + 2.6, drowned ? '풍덩!' : 'K.O.!', '#ffe45c', 1.4, { life: 1.8 });
     this.slowmo(0.8);
@@ -334,13 +350,34 @@ export class Game {
   }
 
   // ------------------------------------------------------------------ explosions
-  _explode(x, y, spec, owner, isTnt) {
+  _explode(x, y, spec, owner, kind = 'nut') {
     const { r, dmg, crater, push } = spec;
     if (crater) this.terrain.carve(x, y, crater);
-    this.fx.explosion(x, y, r * 0.8);
-    this.fx.burst(x, y, 'dirt', Math.round(8 + crater * 6), { speed: 7 + r * 2, color: this.theme.ground.dirtDark });
+    if (kind === 'hive') {
+      // no fireball: a honey splash and an angry swarm
+      this.fx.burst(x, y, 'honey', 16, { speed: 6 });
+      this.fx.swarm(x, y, r);
+      this._sfx('buzz');
+      this._sfx('honey', { vol: 0.8 });
+      this.fx.text(x, y + 1.2, '윙윙!', '#ffd23a', 0.8, { life: 1.1 });
+    } else if (kind === 'pound') {
+      this.fx.add({ x, y, vx: 0, vy: 0, type: 'ring', life: 0.45, size: 0.4, grow: r * 5, color: 'rgba(255,245,220,0.95)', g: 0, drag: 0 });
+      this.fx.burst(x, y, 'dust', 10, { speed: 4, color: 'rgba(230,210,180,0.85)' });
+      this.fx.burst(x, y, 'shell', 8, { speed: 6 });
+      this._sfx('crack');
+      this._sfx('explode_small', { vol: 0.9, pitch: 0.8 });
+    } else {
+      this.fx.explosion(x, y, r * 0.8);
+      if (kind === 'burr') {
+        this.fx.burst(x, y, 'needle', 22, { speed: 11 });
+        this.fx.burst(x, y, 'nutbit', 5, { speed: 7 });
+        this._sfx('spikes');
+      }
+      if (kind === 'kernel') this._sfx('crack', { vol: 0.5, pitch: 1.3 });
+      this._sfx(r > 1.6 ? 'explode_big' : 'explode_small');
+    }
+    if (crater > 0.6) this.fx.burst(x, y, 'dirt', Math.round(8 + crater * 6), { speed: 7 + r * 2, color: this.theme.ground.dirtDark });
     this.fx.shake(0.12 + r * 0.1);
-    this._sfx(isTnt ? 'tnt' : r > 1.6 ? 'explode_big' : 'explode_small');
     this._vibe(r > 1.6 ? [40, 30, 60] : 25);
     if (r > 1.6) this.slowmo(0.18);
     // captains
@@ -396,7 +433,7 @@ export class Game {
   // ------------------------------------------------------------------ projectiles
   _spawnProjectile(kind, type, spec, owner, x, y, vx, vy) {
     const body = this.world.createBody({ type: 'dynamic', position: V(x, y), bullet: true, angularDamping: 0.6, linearDamping: 0 });
-    body.createFixture(planck.Circle(spec.r), { density: spec.density, friction: 0.55, restitution: kind === 'egg' ? 0 : 0.28, filterGroupIndex: -1 });
+    body.createFixture(planck.Circle(spec.r), { density: spec.density, friction: 0.55, restitution: 0.28, filterGroupIndex: -1 });
     body.setLinearVelocity(V(vx, vy));
     const P = { kind, type, spec, owner, body, t: 0, firstHit: false, hitT: 0, squash: 0, used: false, fuse: 0, slowT: 0, dead: false, trailT: 0, blink: 0, dealt: 0 };
     body.setUserData({ kind: 'proj', ref: P });
@@ -411,25 +448,25 @@ export class Game {
     const type = p.sel;
     if (p.ammo[type] <= 0) return;
     p.ammo[type]--;
-    const spec = BIRDS[type];
+    const spec = AMMO[type];
     const rest = this.restPos(p);
     const v = power * VMAX;
     const vx = Math.cos(angle) * v, vy = Math.sin(angle) * v;
     if (Math.abs(vx) > 0.5) p.facing = vx > 0 ? 1 : -1;
-    const P = this._spawnProjectile('bird', type, spec, p, rest.x, rest.y, vx, vy);
+    const P = this._spawnProjectile('nut', type, spec, p, rest.x, rest.y, vx, vy);
     this.lead = P;
     p.stats.shots++;
     this.currentTrail = [];
     this.shotPower = power;
     this._stretch(null);
     this._sfx('launch', { vol: 0.6 + power * 0.5 });
-    this._sfx('squawk_' + type, { vol: 0.8 });
+    this._sfx('chitter', { vol: 0.8, pitch: p.team ? 0.92 : 1.12 });
     this._vibe(15);
-    this.fx.burst(rest.x, rest.y, 'feather', 3, { color: Art.BIRD_INFO[type].color, speed: 2 });
+    this.fx.burst(rest.x, rest.y, 'leaf', 3, { speed: 2 });
     this.aim = null;
     this.setState('flight');
-    // select next available bird automatically if this one ran out
-    if (p.ammo[type] <= 0) p.sel = 'red';
+    // fall back to acorns when this nut ran out
+    if (p.ammo[type] <= 0) p.sel = 'acorn';
     this.emit('fired', { player: p.id, type });
   }
 
@@ -441,7 +478,7 @@ export class Game {
 
   activateAbility(fromAI = false) {
     const P = this.lead;
-    if (!P || P.dead || P.used || P.kind !== 'bird') return false;
+    if (!P || P.dead || P.used || P.kind !== 'nut') return false;
     if (P.owner.isAI !== fromAI) return false; // humans can't fire the CPU's ability (and vice versa)
     const spec = P.spec;
     if (!spec.ability) return false;
@@ -460,27 +497,27 @@ export class Game {
     } else if (spec.ability === 'split') {
       P.dead = true;
       this.killQueue.push(P.body);
+      // the shell cracks open and three kernels fan out
       const base = Math.atan2(vel.y, vel.x);
-      let first = null;
       for (const da of [-0.2, 0, 0.2]) {
-        const m = this._spawnProjectile('mini', 'mini', MINI, P.owner, pos.x, pos.y, Math.cos(base + da) * sp, Math.sin(base + da) * sp);
+        const m = this._spawnProjectile('kernel', 'kernel', KERNEL, P.owner, pos.x, pos.y, Math.cos(base + da) * sp, Math.sin(base + da) * sp);
         m.t = 1;
-        if (!first) first = m;
         if (da === 0) this.lead = m;
       }
-      this._sfx('split');
-      this.fx.burst(pos.x, pos.y, 'star', 6, { speed: 4 });
-      this.fx.burst(pos.x, pos.y, 'feather', 6, { color: '#39a7f0', speed: 3 });
+      this._sfx('crack');
+      this._sfx('split', { vol: 0.6 });
+      this.fx.burst(pos.x, pos.y, 'shell', 8, { speed: 4 });
+      this.fx.burst(pos.x, pos.y, 'star', 4, { speed: 4 });
     } else if (spec.ability === 'boom') {
       P.fuse = 0.001;
-    } else if (spec.ability === 'egg') {
-      const e = this._spawnProjectile('egg', 'egg', EGG, P.owner, pos.x, pos.y - 0.45, vel.x * 0.15, -16);
-      e.t = 1;
-      P.body.setLinearVelocity(V(vel.x * 1.25, Math.max(10, vel.y + 13)));
-      P.egged = true;
-      this.lead = e;
-      this._sfx('egg_drop');
-      this.fx.burst(pos.x, pos.y, 'feather', 8, { color: '#f5f1ea', speed: 4 });
+    } else if (spec.ability === 'pound') {
+      // stop dead in the air, then slam straight down
+      P.pound = true;
+      P.body.setLinearVelocity(V(0, -POUND_SPEED));
+      P.body.setAngularVelocity(0);
+      this._sfx('pound');
+      this.fx.add({ x: pos.x, y: pos.y, vx: 0, vy: 0, type: 'ring', life: 0.3, size: 0.3, grow: 2.5, color: 'rgba(255,255,255,0.9)', g: 0, drag: 0 });
+      this.fx.burst(pos.x, pos.y, 'star', 4, { speed: 3 });
     }
     this._sfx('ability', { vol: 0.5 });
     return true;
@@ -707,7 +744,7 @@ export class Game {
     if (!this.canControl() || p.ammo[type] <= 0) { this._sfx('deny'); return false; }
     p.sel = type;
     this._sfx('select');
-    this._sfx('squawk_' + type, { vol: 0.45 });
+    this._sfx('chitter', { vol: 0.35, pitch: p.team ? 0.95 : 1.15 });
     return true;
   }
 
@@ -775,7 +812,7 @@ export class Game {
         b.proj.dead = true;
         this.killQueue.push(b.proj.body);
       }
-      if (!warmup) this._explode(b.x, b.y, b.spec, b.owner, b.tnt);
+      if (!warmup) this._explode(b.x, b.y, b.spec, b.owner, b.kind);
     }
     if (this.killQueue.length) {
       for (const body of this.killQueue) {
@@ -968,13 +1005,14 @@ export class Game {
       const vel = P.body.getLinearVelocity();
       const sp = Math.hypot(vel.x, vel.y);
       // trail
-      if (P === this.lead || P.kind === 'mini') {
+      if (P === this.lead || P.kind === 'kernel') {
         P.trailT -= dt;
         if (P.trailT <= 0 && !P.firstHit) {
           P.trailT = 0.045;
           if (P === this.lead) {
             this.currentTrail.push({ x: pos.x, y: pos.y, s: this.currentTrail.length % 3 === 0 ? 0.13 : 0.07 });
           }
+          if (P.pound) this.fx.add({ x: pos.x, y: pos.y + 0.3, vx: 0, vy: 0, type: 'trailpuff', life: 0.25, size: 0.16, color: 'rgba(255,255,255,0.85)', g: 0, drag: 0 });
           if (P.dash) this.fx.add({ x: pos.x, y: pos.y, vx: 0, vy: 0, type: 'trailpuff', life: 0.3, size: 0.18, color: 'rgba(255,240,160,0.8)', g: 0, drag: 0 });
         }
       }
@@ -988,13 +1026,12 @@ export class Game {
       if (P.firstHit) {
         P.hitT += dt;
         P.slowT = sp < 0.7 ? P.slowT + dt : 0;
-        const done = P.kind === 'bird' && P.type !== 'black' && (P.slowT > 0.6 || P.hitT > 4.5);
-        const blackDone = P.type === 'black' && P.fuse === 0 && P.hitT > 3;
+        const done = P.kind === 'nut' && P.type !== 'burr' && (P.slowT > 0.6 || P.hitT > 4.5);
+        const blackDone = P.type === 'burr' && P.fuse === 0 && P.hitT > 3;
         if (done || blackDone) this._poof(P);
       } else if (P.t > 14) {
         this._poof(P);
       }
-      if (P.egged && P.t > 6) this._poof(P);
       if (pos.y < WORLD.SEA - 0.3) {
         this._splash(pos.x, 0.7);
         P.dead = true;
@@ -1007,7 +1044,7 @@ export class Game {
     if (this.lead && this.lead.dead) {
       // store trail for the shooter and hand focus to any remaining projectile
       const alive = this.projectiles.filter((q) => !q.dead);
-      this.lead = alive.find((q) => q.kind === 'egg') || alive[0] || null;
+      this.lead = alive[0] || null;
     }
     if (this.state === 'flight' || this.state === 'settle') {
       const p = this.players[this.turn];
@@ -1020,10 +1057,10 @@ export class Game {
     P.dead = true;
     this.killQueue.push(P.body);
     const pos = P.body.getPosition();
-    const color = P.kind === 'mini' ? '#39a7f0' : P.kind === 'egg' ? '#f5f1ea' : Art.BIRD_INFO[P.type]?.color || '#fff';
-    this.fx.burst(pos.x, pos.y, 'feather', 7, { color, speed: 3 });
+    // the spent nut cracks and crumbles away
+    this.fx.burst(pos.x, pos.y, 'shell', 6, { speed: 3 });
     this.fx.burst(pos.x, pos.y, 'dust', 5, { speed: 1.4, color: 'rgba(255,255,255,0.9)' });
-    this._sfx('tap', { vol: 0.35, pitch: 1.4 });
+    this._sfx('crack', { vol: 0.35, pitch: 1.3 });
   }
 
   _updateCamera(realDt) {
@@ -1102,9 +1139,10 @@ export class Game {
         angle = -P.body.getAngle();
       }
       const state = P.firstHit ? (P.slowT > 0.2 ? 'dizzy' : 'hurt') : 'fly';
-      Art.drawBird(ctx, P.kind === 'bird' ? P.type : P.kind, pos.x, -pos.y, P.spec.r, angle, {
+      Art.drawNut(ctx, P.kind === 'nut' ? P.type : P.kind, pos.x, -pos.y, P.spec.r, angle, {
         time: this.time, squash: P.squash, flip, state, lookX: flip ? -1 : 1, lookY: 0,
-        fuse: P.type === 'black' ? (P.fuse > 0 ? clamp(1 - P.fuse / 1.15, 0.2, 1) : P.fuse < 0 ? 1 : 0) : 0,
+        fuse: P.type === 'burr' ? (P.fuse > 0 ? clamp(1 - P.fuse / 1.15, 0.2, 1) : P.fuse < 0 ? 1 : 0) : 0,
+        pound: !!P.pound,
       });
     }
 
@@ -1147,13 +1185,13 @@ export class Game {
     }, showAmmo ? (c) => {
       const a = Art.slingAnchors(x, y, p.facing);
       const px = pouch ? pouch.x : a.rest.x, py = pouch ? pouch.y : a.rest.y;
-      const spec = BIRDS[p.sel];
+      const spec = AMMO[p.sel];
       let ang = 0;
       if (pouch) {
         const a2 = this.aim.angle;
         ang = clamp(p.facing > 0 ? -a2 : Math.atan2(Math.sin(a2), -Math.cos(a2)), -0.9, 0.9);
       }
-      Art.drawBird(c, p.sel, px, py - spec.r * 0.35, spec.r, ang, {
+      Art.drawNut(c, p.sel, px, py - spec.r * 0.35, spec.r, ang, {
         time: this.time, flip: p.facing < 0, state: aiming && this.aim.power > 0.6 ? 'fly' : 'idle',
         lookX: p.facing, lookY: 0, blink: 0, squash: pouch ? -this.aim.power * 0.15 : 0,
       });

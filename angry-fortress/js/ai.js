@@ -1,6 +1,6 @@
 // CPU opponent: brute-force ballistic search over angle × power using the same
 // integrator as the physics engine, then scores each landing per bird type.
-import { GRAV, VMAX, WIND_ACC, BIRDS, EGG, CART_R, HEAD } from './config.js';
+import { GRAV, VMAX, WIND_ACC, AMMO, POUND_SPEED, CART_R, HEAD } from './config.js';
 import { WORLD } from './terrain.js';
 
 const H = 1 / 60;
@@ -91,8 +91,8 @@ export function planShot(game, me, difficulty) {
     return v;
   };
 
-  const types = ['red'];
-  for (const t of ['black', 'white', 'blue']) if (me.ammo[t] > 0) types.push(t);
+  const types = ['acorn'];
+  for (const t of ['burr', 'walnut', 'peanut']) if (me.ammo[t] > 0) types.push(t);
 
   let best = null;
   let closest = null;
@@ -107,30 +107,30 @@ export function planShot(game, me, difficulty) {
     const d = Math.hypot(hit.x - ep.x, hit.y - ep.y);
     if (hit.kind !== 'water' && hit.kind !== 'out' && hit.kind !== 'self' && hit.kind !== 'none') {
       const selfD = Math.hypot(hit.x - mp.x, hit.y - mp.y);
-      if (selfD > 4 && (!closest || d < closest.d)) closest = { d, angle, power: pw, type: 'red', abilityAt: null };
+      if (selfD > 4 && (!closest || d < closest.d)) closest = { d, angle, power: pw, type: 'acorn', abilityAt: null };
     }
     let top = -Infinity;
     for (const type of types) {
       let dmg = 0;
       let abilityAt = null;
       if (hit.kind === 'self') dmg = -40;
-      else if (type === 'red') {
+      else if (type === 'acorn') {
         if (hit.kind === 'enemy') dmg = 28;
         else if (hit.kind === 'terrain' || hit.kind === 'block') dmg = d < 1.8 ? 12 * (1 - d / 1.8) : 0;
-      } else if (type === 'black') {
-        if (hit.kind === 'enemy') dmg = BIRDS.black.blast.dmg + 6;
+      } else if (type === 'burr') {
+        if (hit.kind === 'enemy') dmg = AMMO.burr.blast.dmg + 6;
         else if (hit.kind === 'terrain' || hit.kind === 'block') {
-          dmg = blastDmg(hit.x, hit.y, BIRDS.black.blast);
+          dmg = blastDmg(hit.x, hit.y, AMMO.burr.blast);
           abilityAt = Math.max(0.1, hit.t - H * 2);
         }
         dmg -= 8; // save bombs for when they matter
-      } else if (type === 'blue') {
+      } else if (type === 'peanut') {
         if (hit.kind === 'enemy') dmg = 22;
         else if (hit.kind === 'terrain' || hit.kind === 'block') dmg = d < 2.2 ? 20 * (1 - d / 2.2) : 0;
         abilityAt = hit.t * 0.62;
         dmg -= 4;
-      } else if (type === 'white') {
-        // find the moment we pass above the enemy and simulate the egg from there
+      } else if (type === 'walnut') {
+        // find the moment we pass above the enemy, then slam straight down from there
         let x = rest.x, y = rest.y, vx = vx0, vy = vy0, tc = -1;
         let px = x;
         for (let i = 1; i * H < hit.t; i++) {
@@ -139,11 +139,11 @@ export function planShot(game, me, difficulty) {
           px = x;
         }
         if (tc > 0) {
-          const e = sim(x, y - 0.45, vx * 0.15, -16, EGG.r, 4, false);
-          if (e.kind === 'enemy') dmg = EGG.blast.dmg;
-          else if (e.kind !== 'water' && e.kind !== 'out') dmg = blastDmg(e.x, e.y, EGG.blast);
+          const e = sim(x, y, 0, -POUND_SPEED, AMMO.walnut.r, 4, false);
+          if (e.kind === 'enemy') dmg = AMMO.walnut.blast.dmg + 4;
+          else if (e.kind !== 'water' && e.kind !== 'out') dmg = blastDmg(e.x, e.y, AMMO.walnut.blast);
           abilityAt = tc;
-        } else if (hit.kind === 'enemy') dmg = 25;
+        } else if (hit.kind === 'enemy') dmg = 26;
         dmg -= 6;
       }
       if (dmg > 0 && hit.kind === 'block' && d < 4) dmg += 2;
@@ -175,13 +175,13 @@ export function planShot(game, me, difficulty) {
     }
   }
 
-  let plan = best && best.dmg > 2 ? best : closest || { angle: dir > 0 ? 0.8 : Math.PI - 0.8, power: 0.75, type: 'red', abilityAt: null };
+  let plan = best && best.dmg > 2 ? best : closest || { angle: dir > 0 ? 0.8 : Math.PI - 0.8, power: 0.75, type: 'acorn', abilityAt: null };
   // if we are just chipping at the fort, a bomb helps clear it
-  if ((!best || best.dmg <= 2) && me.ammo.black > 0 && Math.random() < prof.special) {
-    plan = { ...plan, type: 'black', abilityAt: null };
+  if ((!best || best.dmg <= 2) && me.ammo.burr > 0 && Math.random() < prof.special) {
+    plan = { ...plan, type: 'burr', abilityAt: null };
   }
   // less skilled CPUs don't always use specials
-  if (plan.type !== 'red' && Math.random() > prof.special) plan = { ...plan, type: 'red', abilityAt: null };
+  if (plan.type !== 'acorn' && Math.random() > prof.special) plan = { ...plan, type: 'acorn', abilityAt: null };
 
   // human-like error that shrinks as the CPU "learns" the range
   const learn = Math.max(prof.learn, 1.35 - 0.15 * me.stats.shots);

@@ -3,8 +3,8 @@
 export const THEMES = {
   meadow: {
     id: 'meadow',
-    name: '초록 섬',
-    desc: '완만한 언덕과 하늘섬',
+    name: '도토리 숲',
+    desc: '참나무 언덕과 하늘섬',
     layout: { mid: 'hill', baseMin: 9, baseMax: 11.5, midMin: 13, midMax: 16, rough: 1.1, island: true },
     sky: ['#58b7f5', '#9fdcff', '#e6f8ff'],
     sun: { x: 0.8, y: 0.2, color: '#fff6c9', glow: 'rgba(255,245,200,0.55)' },
@@ -14,6 +14,7 @@ export const THEMES = {
     near: '#5aa86a',
     decor: 'tree',
     ambient: 'leaf',
+    leaf: ['rgba(120,200,80,0.7)', 'rgba(240,170,60,0.7)'],
     sea: { top: 'rgba(64,170,235,0.78)', bottom: 'rgba(22,92,170,0.95)', foam: '#e8f8ff', lava: false },
     ground: {
       dirt: '#9a6334', dirtLight: '#bd8249', dirtDark: '#6a3f1f',
@@ -26,17 +27,18 @@ export const THEMES = {
   },
   desert: {
     id: 'desert',
-    name: '모래 협곡',
+    name: '단풍 협곡',
     desc: '쌍둥이 봉우리와 바위 아치',
     layout: { mid: 'twin', baseMin: 8.5, baseMax: 12, midMin: 14, midMax: 17, rough: 0.8, arch: true },
     sky: ['#f59d52', '#ffcf8a', '#fff0d2'],
     sun: { x: 0.25, y: 0.24, color: '#fff3d0', glow: 'rgba(255,214,140,0.6)' },
     cloud: 'rgba(255,244,228,0.9)',
     cloudShade: 'rgba(255,212,170,0.85)',
-    far: ['#e7a877', '#d58c5e'],
+    far: ['#e7a877', '#d0764a'],
     near: '#c47a4b',
-    decor: 'cactus',
-    ambient: 'dust',
+    decor: 'maple',
+    ambient: 'leaf',
+    leaf: ['rgba(230,110,40,0.8)', 'rgba(245,170,50,0.8)', 'rgba(200,60,40,0.75)'],
     sea: { top: 'rgba(56,196,196,0.8)', bottom: 'rgba(18,110,130,0.95)', foam: '#e9fffb', lava: false },
     ground: {
       dirt: '#dc9b55', dirtLight: '#efbb77', dirtDark: '#b06a33',
@@ -69,7 +71,7 @@ export const THEMES = {
   volcano: {
     id: 'volcano',
     name: '용암 섬',
-    desc: '용암 바다 위의 결투',
+    desc: '용암 바다 위의 밤송이 전쟁',
     layout: { mid: 'valley', baseMin: 11, baseMax: 13.5, midMin: 6.5, midMax: 8, rough: 1.0, caves: 1, spire: true },
     sky: ['#2b1d45', '#6b2f5a', '#e0664a'],
     sun: { x: 0.5, y: 0.16, color: '#ffd9b0', glow: 'rgba(255,120,60,0.35)', moon: true },
@@ -126,8 +128,8 @@ export const FORTS = [
       { m: 'wood', x: 1.05, y: 0.7, w: P, h: 1.4 },
       { m: 'wood', x: 1.95, y: 0.7, w: P, h: 1.4 },
       { m: 'stone', x: 1.05, y: 1.4 + P / 2, w: 2.4, h: P },
-      { m: 'tnt', x: 0.6, y: 0.35, w: 0.7, h: 0.7 },
-      { m: 'ice', x: 1.05, y: 1.4 + P + 0.3, w: 0.6, h: 0.6 },
+      { m: 'hive', x: 0.6, y: 0.35, w: 0.7, h: 0.7 },
+      { m: 'mushroom', x: 1.05, y: 1.4 + P + 0.3, w: 0.7, h: 0.6 },
     ],
   },
   {
@@ -137,7 +139,7 @@ export const FORTS = [
       { m: 'wood', x: 1.3, y: 0.4, w: 0.8, h: 0.8 },
       { m: 'stone', x: 0.85, y: 0.8 + 0.4, w: 0.8, h: 0.8 },
       { m: 'ice', x: 0.85, y: 1.6 + 0.35, w: 0.7, h: 0.7 },
-      { m: 'wood', x: 1.75, y: 0.3, s: 'circle', r: 0.3 },
+      { m: 'mushroom', x: 1.75, y: 0.3, w: 0.6, h: 0.6 },
     ],
   },
 ];
@@ -145,9 +147,9 @@ export const FORTS = [
 // Neutral props for the middle of the map.
 export const PROPS = [
   {
-    name: 'tnt-pile',
+    name: 'hive-pile',
     blocks: [
-      { m: 'tnt', x: 0.4, y: 0.35, w: 0.7, h: 0.7 },
+      { m: 'hive', x: 0.4, y: 0.35, w: 0.7, h: 0.7 },
       { m: 'wood', x: 0.4, y: 0.7 + P / 2, w: 1.4, h: P },
       { m: 'ice', x: 0.4, y: 0.7 + P + 0.3, w: 0.6, h: 0.6 },
     ],
@@ -158,14 +160,14 @@ export const PROPS = [
       { m: 'stone', x: 0.2, y: 0.9, w: 0.34, h: 1.8 },
       { m: 'stone', x: 1.6, y: 0.9, w: 0.34, h: 1.8 },
       { m: 'wood', x: 0.9, y: 1.8 + P / 2, w: 2.0, h: P },
-      { m: 'tnt', x: 0.9, y: 1.8 + P + 0.33, w: 0.66, h: 0.66 },
+      { m: 'hive', x: 0.9, y: 1.8 + P + 0.33, w: 0.66, h: 0.66 },
     ],
   },
   {
     name: 'boulders',
     blocks: [
       { m: 'stone', x: 0.4, y: 0.45, s: 'circle', r: 0.45 },
-      { m: 'wood', x: 1.35, y: 0.35, s: 'circle', r: 0.35 },
+      { m: 'mushroom', x: 1.35, y: 0.35, w: 0.7, h: 0.7 },
     ],
   },
 ];

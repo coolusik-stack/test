@@ -13,27 +13,31 @@ export const STAMINA_PER_M = 12;
 export const MOVE_SPEED = 2.4;
 
 export const MAT = {
-  wood: { density: 0.7, friction: 0.7, restitution: 0.05, hp: 45, resist: 1.0 },
-  stone: { density: 2.2, friction: 0.85, restitution: 0.02, hp: 120, resist: 0.4 },
-  ice: { density: 0.8, friction: 0.15, restitution: 0.05, hp: 22, resist: 1.8 },
-  tnt: { density: 0.7, friction: 0.7, restitution: 0.05, hp: 14, resist: 1.0 },
+  wood: { density: 0.7, friction: 0.7, restitution: 0.05, hp: 45, resist: 1.0 }, // twig planks
+  stone: { density: 2.2, friction: 0.85, restitution: 0.02, hp: 120, resist: 0.4 }, // river pebbles
+  ice: { density: 0.8, friction: 0.15, restitution: 0.05, hp: 22, resist: 1.8 }, // icicles
+  hive: { density: 0.7, friction: 0.7, restitution: 0.05, hp: 14, resist: 1.0 }, // beehive: bursts into a bee swarm
+  mushroom: { density: 0.5, friction: 0.6, restitution: 0.85, hp: 70, resist: 0.5 }, // bouncy
 };
 
-// Ammo birds. mul = damage multiplier against block materials. hit = direct-hit multiplier
+// Nut ammo. mul = damage multiplier against block materials. hit = direct-hit multiplier
 // against captains. dent = small crater when slamming into the ground.
-export const BIRDS = {
-  red: { r: 0.38, density: 4.2, ammo: Infinity, mul: { wood: 1.3, stone: 1.1, ice: 1.1, tnt: 1 }, hit: 1.0, dent: 0.75 },
-  yellow: { r: 0.34, density: 3.4, ammo: 3, mul: { wood: 2.6, stone: 0.7, ice: 1.3, tnt: 1 }, hit: 0.95, dent: 0.65, ability: 'dash' },
-  blue: { r: 0.3, density: 3.2, ammo: 3, mul: { wood: 0.8, stone: 0.5, ice: 3, tnt: 1 }, hit: 0.7, dent: 0.5, ability: 'split' },
-  black: { r: 0.4, density: 4.0, ammo: 2, mul: { wood: 1, stone: 1.2, ice: 1, tnt: 1 }, hit: 0.3, ability: 'boom', blast: { r: 2.6, dmg: 38, crater: 2.2, push: 26 } },
-  white: { r: 0.4, density: 3.0, ammo: 2, mul: { wood: 1, stone: 1, ice: 1, tnt: 1 }, hit: 0.75, dent: 0.5, ability: 'egg' },
+export const AMMO = {
+  acorn: { r: 0.38, density: 4.2, ammo: Infinity, mul: { wood: 1.3, stone: 1.1, ice: 1.1, hive: 1, mushroom: 1 }, hit: 1.0, dent: 0.75 },
+  pinenut: { r: 0.34, density: 3.4, ammo: 3, mul: { wood: 2.6, stone: 0.7, ice: 1.3, hive: 1, mushroom: 1 }, hit: 0.95, dent: 0.65, ability: 'dash' },
+  peanut: { r: 0.34, density: 3.2, ammo: 3, mul: { wood: 0.8, stone: 0.5, ice: 3, hive: 1, mushroom: 0.8 }, hit: 0.7, dent: 0.5, ability: 'split' },
+  burr: { r: 0.4, density: 4.0, ammo: 2, mul: { wood: 1, stone: 1.2, ice: 1, hive: 1, mushroom: 1 }, hit: 0.3, ability: 'boom', blast: { r: 2.6, dmg: 38, crater: 2.2, push: 26 } },
+  walnut: { r: 0.4, density: 5.2, ammo: 2, mul: { wood: 1.2, stone: 1.3, ice: 1, hive: 1, mushroom: 1 }, hit: 0.75, dent: 0.6, ability: 'pound', blast: { r: 2.0, dmg: 30, crater: 1.8, push: 18 } },
 };
 
-export const MINI = { r: 0.22, density: 3.6, mul: { wood: 0.9, stone: 0.5, ice: 3.2, tnt: 1 }, hit: 0.6, blast: { r: 1.1, dmg: 9, crater: 0.9, push: 5 } };
-export const EGG = { r: 0.27, density: 5, blast: { r: 2.0, dmg: 30, crater: 1.8, push: 18 } };
-export const TNT_BLAST = { r: 2.3, dmg: 26, crater: 1.5, push: 22 };
+// Peanut kernels after the shell splits.
+export const KERNEL = { r: 0.22, density: 3.6, mul: { wood: 0.9, stone: 0.5, ice: 3.2, hive: 1, mushroom: 0.8 }, hit: 0.6, blast: { r: 1.1, dmg: 9, crater: 0.9, push: 5 } };
+// Walnut ground-pound: speed it slams down at after the tap.
+export const POUND_SPEED = 24;
+// Broken beehive: a bee swarm stings everything nearby (no big crater).
+export const HIVE_BLAST = { r: 2.4, dmg: 24, crater: 0.5, push: 12 };
 
-// Direct bird-on-captain hits: damage = (impulse - 1.5) * HIT_K * bird.hit, capped per bird.
+// Direct nut-on-captain hits: damage = (impulse - 1.5) * HIT_K * bird.hit, capped per bird.
 export const HIT_K = 0.95;
 export const HIT_CAP = 30;
 
@@ -44,6 +48,6 @@ export const FLOOD_STEP = 0.55;
 export const WIND_LEVELS = { off: 0, normal: 5, strong: 9 };
 
 export const TEAM = [
-  { name: '빨강 부대', color: '#f0572f', dark: '#b8321a' },
-  { name: '파랑 부대', color: '#2f9be8', dark: '#1a6db0' },
+  { name: '참나무단', captain: '토리', color: '#f0572f', dark: '#b8321a' },
+  { name: '솔숲단', captain: '솔이', color: '#2f9be8', dark: '#1a6db0' },
 ];

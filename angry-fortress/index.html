@@ -3,15 +3,15 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
-<title>엥그리 포트리스</title>
-<meta name="description" content="새총으로 쏘고 요새를 무너뜨려라! 귀여운 새들의 턴제 포격 대결 — 혼자서 CPU와, 또는 친구와 한 폰으로.">
+<title>도토리 포트리스</title>
+<meta name="description" content="볼 가득 도토리를 장전하고 상대 요새를 무너뜨려라! 다람쥐들의 턴제 새총 포격 대결 — 혼자서 CPU와, 또는 친구와 한 폰으로.">
 <meta name="theme-color" content="#2a78c9">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="엥그리 포트리스">
-<meta property="og:title" content="엥그리 포트리스">
-<meta property="og:description" content="새총으로 쏘고 요새를 무너뜨려라! 귀여운 새들의 턴제 포격 대결">
+<meta name="apple-mobile-web-app-title" content="도토리 포트리스">
+<meta property="og:title" content="도토리 포트리스">
+<meta property="og:description" content="볼 가득 도토리를 장전하고 상대 요새를 무너뜨려라! 다람쥐들의 턴제 새총 대결">
 <meta property="og:type" content="website">
 <meta property="og:image" content="assets/og.jpg">
 <link rel="manifest" href="manifest.webmanifest">
@@ -37,6 +37,7 @@
   <symbol id="i-help" viewBox="0 0 24 24"><path d="M9 9.3a3.1 3.1 0 1 1 4.4 2.8c-.9.4-1.4 1.2-1.4 2.1v.6" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/><circle cx="12" cy="18.6" r="1.6"/></symbol>
   <symbol id="i-gear" viewBox="0 0 24 24"><path d="M12 8.2a3.8 3.8 0 1 0 0 7.6 3.8 3.8 0 0 0 0-7.6zm8.3 5.4-1.9.5a6.8 6.8 0 0 1-.7 1.6l1 1.7-1.9 1.9-1.7-1a6.8 6.8 0 0 1-1.6.7l-.5 1.9h-2.7l-.5-1.9a6.8 6.8 0 0 1-1.6-.7l-1.7 1-1.9-1.9 1-1.7a6.8 6.8 0 0 1-.7-1.6l-1.9-.5v-2.7l1.9-.5a6.8 6.8 0 0 1 .7-1.6l-1-1.7 1.9-1.9 1.7 1a6.8 6.8 0 0 1 1.6-.7l.5-1.9h2.7l.5 1.9a6.8 6.8 0 0 1 1.6.7l1.7-1 1.9 1.9-1 1.7a6.8 6.8 0 0 1 .7 1.6l1.9.5z"/></symbol>
   <symbol id="i-rotate" viewBox="0 0 24 24"><rect x="3" y="8" width="18" height="10" rx="2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M6.5 5.5A8 8 0 0 1 17 4.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M17.8 2v4h-4z"/></symbol>
+  <symbol id="i-acorn" viewBox="0 0 48 56"><path d="M24 2c1.6 0 2.6 1 2.6 2.6V9" fill="none" stroke="#2b1a12" stroke-width="4" stroke-linecap="round"/><path d="M8 26c0 14 7 26 16 28 9-2 16-14 16-28z" fill="#d88a3e" stroke="#2b1a12" stroke-width="4" stroke-linejoin="round"/><path d="M14 30c0 8 3 14 7 17" fill="none" stroke="#f3b76a" stroke-width="4" stroke-linecap="round"/><path d="M3 24c0-8 9-15 21-15s21 7 21 15c0 3-2 5-5 5H8c-3 0-5-2-5-5z" fill="#7a4a22" stroke="#2b1a12" stroke-width="4" stroke-linejoin="round"/><path d="M12 16l6 10M22 12l4 14M32 14l-2 12M40 20l-6 7" stroke="#5a3416" stroke-width="2.5" stroke-linecap="round"/></symbol>
   <symbol id="i-wind" viewBox="0 0 24 24"><path d="M3 9h11a3 3 0 1 0-3-3M3 14h15a3 3 0 1 1-3 3M3 11.5h8" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></symbol>
 </svg>
 
@@ -45,10 +46,10 @@
 <!-- ============ TITLE ============ -->
 <section id="title" class="screen">
   <div class="title-wrap">
-    <div class="logo" aria-label="엥그리 포트리스">
-      <span class="logo-top">엥그리</span>
+    <div class="logo" aria-label="도토리 포트리스">
+      <span class="logo-top"><svg class="logo-acorn" aria-hidden="true"><use href="#i-acorn"/></svg>도토리</span>
       <span class="logo-main"><span class="lm-back" aria-hidden="true">포트리스</span><span class="lm-front">포트리스</span></span>
-      <span class="logo-tag">새총으로 쏘고, 요새를 무너뜨려라!</span>
+      <span class="logo-tag">볼 가득 도토리 장전, 요새를 무너뜨려라!</span>
     </div>
     <div class="menu">
       <button class="btn btn-red btn-big" id="btn-solo"><span class="btn-kicker">혼자 하기</span>CPU와 대결</button>
@@ -142,7 +143,7 @@
       <button class="mbtn" id="mv-right" aria-label="오른쪽으로 이동"><svg><use href="#i-right"/></svg></button>
     </div>
     <div class="hint" id="hint"></div>
-    <div class="birds" id="birds"></div>
+    <div class="ammo" id="ammo"></div>
   </div>
   <div class="banner" id="banner" hidden><strong id="banner-text"></strong><span id="banner-sub"></span></div>
   <div class="tip" id="tip" hidden></div>
@@ -184,12 +185,12 @@
     <button class="btn btn-cream btn-icon btn-sm panel-x" id="help-x" aria-label="닫기"><svg><use href="#i-play"/></svg></button>
     <h2>게임 방법</h2>
     <ol class="steps">
-      <li><b>당기고 놓기</b><span>내 새총 근처를 터치한 채 뒤로 당겼다 놓으면 발사! 더 멀리 당길수록 세게 날아가요.</span></li>
+      <li><b>당기고 놓기</b><span>내 새총 근처를 터치한 채 뒤로 당겼다 놓으면 발사! 더 멀리 당길수록 세게 날아가요. 조준선의 빨간 X는 내 요새에 걸린다는 뜻이에요.</span></li>
       <li><b>바람을 읽기</b><span>위쪽 바람 표시를 보세요. 높이 쏠수록 바람에 많이 밀려요. 흰 점선은 지난 발사 궤적이에요.</span></li>
-      <li><b>특수 새 쓰기</b><span>날아가는 중 화면을 터치하면 능력 발동! 돌진, 분열, 대폭발, 알 폭탄.</span></li>
-      <li><b>이동과 지형</b><span>◀ ▶ 버튼으로 수레를 옮겨요. 폭발은 땅을 파고, 바다에 빠지면 즉시 패배!</span></li>
+      <li><b>특수 견과 쓰기</b><span>날아가는 중 화면을 터치하면 능력 발동! 잣은 돌진, 땅콩은 분열, 밤송이는 가시 대폭발, 호두는 수직으로 쿵.</span></li>
+      <li><b>요새와 지형</b><span>◀ ▶ 버튼으로 수레를 옮겨요. 벌집을 깨면 벌떼가 쏟아지고, 버섯은 통통 튕겨요. 물에 빠지면 즉시 패배!</span></li>
     </ol>
-    <div class="help-birds" id="help-birds"></div>
+    <div class="help-ammo" id="help-ammo"></div>
     <button class="btn btn-yellow" id="help-close">알겠어요!</button>
   </div>
 </section>

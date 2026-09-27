@@ -285,6 +285,24 @@ class Voice {
     this.nodes.push(w);
     return w;
   }
+  /** Stereo panner inside a voice (falls back to a plain gain where StereoPanner is missing). */
+  panner(pan) {
+    if (!this.c.createStereoPanner) return this.gain(1);
+    const p = this.c.createStereoPanner();
+    p.pan.value = clamp(pan, -1, 1);
+    this.nodes.push(p);
+    return p;
+  }
+  /** Sine LFO added to any AudioParam from rel time t for dur (rate scales with pitch). */
+  lfo(param, rate, depth, t, dur, type = 'sine') {
+    const l = this.c.createOscillator();
+    l.type = type;
+    l.frequency.value = rate * this.p;
+    const lg = this.gain(depth);
+    l.connect(lg);
+    lg.connect(param);
+    this.src(l, t, t + dur + 0.01);
+  }
   /** Reverb send from this voice's output. */
   send(amount) {
     if (!this.ch.revIn || amount <= 0) return;
@@ -904,6 +922,158 @@ def('wind', 1.3, 2, 0.03, 2, (v) => {
   v.noise({ k: 'p', a: 0.35, h: 0.2, d: 0.55, g: 0.45, ft: 'bandpass', f: 420, pts: [[0.4, 1100], [1.1, 560]], Q: 1.1 });
   v.noise({ k: 'w', a: 0.4, h: 0.1, d: 0.5, g: 0.05, ft: 'bandpass', f: 1700, pts: [[0.5, 2500], [1.1, 1400]], Q: 10 });
   v.noise({ k: 'b', a: 0.3, h: 0.2, d: 0.5, g: 0.12, ft: 'lowpass', f: 500 });
+});
+
+/* ---- Squirrels & nuts theme ---- */
+def('chitter', 1.3, 2, 0.03, 3, (v) => {
+  // 4-6 rapid squeaky chirps with tongue clicks and a little rasp; last one flicks up
+  const n = 4 + Math.floor(Math.random() * 3);
+  let t = 0;
+  for (let i = 0; i < n; i++) {
+    const f = rnd(2300, 2800) * (i === n - 1 ? 1.12 : 1);
+    const acc = i === 0 ? 1 : rnd(0.6, 0.9);
+    v.tone({ t, type: 'triangle', f: f * 0.8, pts: [[0.012, f * 1.25], [0.04, f * 0.9]], a: 0.003, h: 0.012, d: 0.03, g: 0.3 * acc });
+    v.tone({ t, f: f * 1.6, pts: [[0.012, f * 2], [0.04, f * 1.5]], a: 0.002, d: 0.025, g: 0.06 * acc });
+    v.noise({ t, k: 'w', a: 0.0005, d: 0.008, g: 0.22 * acc, ft: 'bandpass', f: 4200, Q: 2.5 });
+    v.noise({ t, k: 'w', a: 0.002, d: 0.02, g: 0.08 * acc, ft: 'bandpass', f: 1500, Q: 3 });
+    t += rnd(0.048, 0.068);
+  }
+});
+def('squeak_hurt', 0.3, 2, 0.03, 3, (v) => {
+  // "eek!": soft triangle squeal, energy kept around 1.3 kHz so it's cute rather than shrill
+  v.noise({ k: 'w', a: 0.004, d: 0.03, g: 0.08, ft: 'bandpass', f: 3000, Q: 1.5 });
+  bird(v, {
+    type: 'triangle',
+    pts: [[0, 900], [0.035, 1380], [0.16, 1300], [0.29, 980]],
+    a: 0.012, h: 0.14, d: 0.13, g: 0.7,
+    vib: { r: 13, d: 30 },
+    drive: 1.6,
+    form: [
+      { f: 1300, pts: [[0.16, 1250], [0.29, 1000]], Q: 3, g: 1.6 },
+      { f: 2700, pts: [[0.16, 2600], [0.29, 2100]], Q: 6, g: 0.7 },
+    ],
+    body: [1100, 0.4],
+  });
+});
+def('squeak_ko', 0.25, 3, 0, 2, (v) => {
+  // long falling "eeeek..." with a growing dizzy wobble, then a soft bonk
+  bird(v, {
+    type: 'triangle',
+    pts: [[0, 1150], [0.07, 1500], [0.25, 1250], [0.68, 520]],
+    a: 0.015, h: 0.5, d: 0.18, g: 0.7,
+    vib: { r: 9, d: 20, d1: 70, t1: 0.68 },
+    drive: 1.6,
+    form: [
+      { f: 1400, pts: [[0.25, 1300], [0.68, 700]], Q: 2.5, g: 1.6 },
+      { f: 2800, pts: [[0.68, 1600]], Q: 5, g: 0.6 },
+    ],
+    body: [1000, 0.45],
+  });
+  knock(v, 0.72, 280, 0.35, 0.14);
+  v.tone({ t: 0.72, f: 300, f1: 160, glide: 0.1, a: 0.002, d: 0.16, g: 0.3 });
+});
+def('nut_hit', 2.0, 1, 0.04, 5, (v) => {
+  // small hollow "tock" (higher and drier than hit_wood); size via opts.pitch
+  v.tone({ f: 900, f1: 780, glide: 0.015, a: 0.0006, d: 0.07, g: 0.45 });
+  v.tone({ f: 2150, a: 0.0005, d: 0.022, g: 0.14 });
+  v.tone({ type: 'triangle', f: 430, f1: 380, glide: 0.03, a: 0.0008, d: 0.05, g: 0.16 });
+  v.noise({ k: 'w', a: 0.0004, d: 0.012, g: 0.3, ft: 'bandpass', f: 2600, Q: 2 });
+  v.noise({ k: 'p', a: 0.0005, d: 0.05, g: 0.12, ft: 'bandpass', f: 1000, Q: 8 });
+});
+def('crack', 2.2, 2, 0.04, 3, (v) => {
+  // crisp double snap + shell ping, then a fine crumbly tail
+  v.noise({ k: 'w', a: 0.0003, d: 0.008, g: 0.6, ft: 'highpass', f: 1500 });
+  v.noise({ t: 0.018, k: 'w', a: 0.0003, d: 0.006, g: 0.3, ft: 'highpass', f: 2000 });
+  v.noise({ k: 'w', a: 0.0004, d: 0.025, g: 0.35, ft: 'bandpass', f: 3200, Q: 1.4 });
+  v.tone({ f: 1850, f1: 1500, glide: 0.02, a: 0.0004, d: 0.025, g: 0.14 });
+  v.tone({ type: 'triangle', f: 620, f1: 400, glide: 0.03, a: 0.0005, d: 0.035, g: 0.14 });
+  v.noise({ t: 0.012, k: 'c', a: 0.003, h: 0.03, d: 0.16, g: 1.4, ft: 'bandpass', f: 2800, Q: 1.2, rate: 1.4 });
+  v.noise({ t: 0.03, k: 'c', a: 0.005, d: 0.12, g: 0.8, ft: 'bandpass', f: 1400, Q: 1.5, rate: 0.9 });
+});
+def(
+  'pound',
+  1.0, 3, 0.02, 2,
+  (v) => {
+    // rising "shwip"...
+    v.noise({ k: 'p', a: 0.08, d: 0.05, g: 0.4, ft: 'bandpass', f: 700, f1: 4200, glide: 0.12, Q: 1.8 });
+    v.tone({ f: 380, f1: 1500, glide: 0.12, a: 0.06, d: 0.05, g: 0.06 });
+    // ...then a heavy woody slam with low punch
+    const T = 0.13;
+    v.noise({ t: T, k: 'w', a: 0.0006, d: 0.03, g: 0.45, ft: 'bandpass', f: 1600, Q: 0.8 });
+    knock(v, T, 250, 0.55, 0.16);
+    v.tone({ t: T, f: 150, f1: 42, glide: 0.22, a: 0.002, h: 0.02, d: 0.38, g: 0.8 });
+    const sh = v.shaper(3);
+    const lp = v.filter('lowpass', 1800, 0.5);
+    const sg = v.gain(0.35);
+    sh.connect(lp);
+    lp.connect(sg);
+    sg.connect(v.out);
+    v.tone({ t: T, type: 'triangle', f: 300, f1: 80, glide: 0.18, a: 0.002, d: 0.26, g: 1, out: sh });
+    v.noise({ t: T, k: 'b', a: 0.003, h: 0.04, d: 0.35, g: 0.55, ft: 'lowpass', f: 650 });
+    v.noise({ t: T + 0.02, k: 'c', a: 0.01, d: 0.25, g: 0.35, ft: 'bandpass', f: 1800, Q: 0.8, rate: 0.8 });
+    v.send(0.15);
+  },
+  { duck: [0.3, 0.35] }
+);
+def('spikes', 2.4, 3, 0.02, 2, (v) => {
+  // dense needle ticks
+  v.noise({ k: 'c', a: 0.004, h: 0.08, d: 0.3, g: 1.2, ft: 'highpass', f: 3500, rate: 2.2 });
+  v.noise({ t: 0.02, k: 'c', a: 0.01, h: 0.06, d: 0.28, g: 0.8, ft: 'bandpass', f: 6500, Q: 1.5, rate: 1.7 });
+  // little whooshes flying out in different directions
+  [[0, -0.7, 2600], [0.03, 0.6, 3400], [0.07, -0.2, 3000], [0.11, 0.85, 3900], [0.15, -0.9, 2800]].forEach(([t, pan, f]) => {
+    const pn = v.panner(pan);
+    pn.connect(v.out);
+    v.noise({ t, k: 'w', a: 0.015, d: 0.12, g: 0.3, ft: 'bandpass', f, f1: f * 2.2, glide: 0.12, Q: 2.5, out: pn });
+  });
+  // tiny metallic glints
+  for (let i = 0; i < 7; i++) v.tone({ t: rnd(0, 0.3), f: rnd(5500, 8500), a: 0.0005, d: rnd(0.015, 0.03), g: 0.08 });
+});
+def('buzz', 0.9, 2, 0.03, 2, (v) => {
+  // detuned saw "bees", each drifting in pitch and across the stereo field; swells then fades (~1.6 s)
+  const dur = 1.6;
+  const mix = v.gain(1);
+  const lp = v.filter('lowpass', 3200, 0.7);
+  const pk = v.filter('peaking', 950, 1.2);
+  pk.gain.value = 6;
+  mix.connect(lp);
+  lp.connect(pk);
+  pk.connect(v.out);
+  [[205, -0.6, 0.9], [219, 0.5, 1.3], [233, -0.1, 0.7], [248, 0.8, 1.1], [262, -0.9, 1.5]].forEach(([f, pan, rate]) => {
+    const pn = v.panner(pan);
+    pn.connect(mix);
+    if (pn.pan) v.lfo(pn.pan, rate, 0.35, 0, dur);
+    const a = rnd(0.35, 0.55);
+    const h = rnd(0.2, 0.4);
+    v.tone({ type: 'sawtooth', f: f * rnd(0.98, 1.02), a, h, d: dur - a - h, g: 0.09, out: pn, vib: { r: rnd(8, 13), d: f * 0.03 } });
+  });
+});
+def('honey', 1.1, 2, 0.05, 3, (v) => {
+  // gloopy resonant sweep + wobbly low goo, a "blop" and a sticky release tick
+  v.noise({ k: 'b', a: 0.02, h: 0.08, d: 0.18, g: 1.4, ft: 'bandpass', f: 260, pts: [[0.09, 1100], [0.24, 380]], Q: 5 });
+  const lp = v.filter('lowpass', 900, 3);
+  lp.connect(v.out);
+  v.tone({ type: 'sawtooth', f: 110, pts: [[0.1, 230], [0.26, 140]], a: 0.02, h: 0.1, d: 0.15, g: 0.18, out: lp, vib: { r: 23, d: 18 } });
+  v.tone({ t: 0.17, f: 260, f1: 720, glide: 0.04, a: 0.002, d: 0.07, g: 0.3 });
+  v.noise({ t: 0.26, k: 'w', a: 0.0005, d: 0.01, g: 0.12, ft: 'bandpass', f: 2200, Q: 2 });
+});
+def('boing', 0.8, 1, 0.03, 4, (v) => {
+  // springy mushroom: soft cap thump, then a pitch-bent "boi-oi-oing" with a decaying spring wobble
+  v.tone({ f: 150, f1: 80, glide: 0.06, a: 0.002, d: 0.08, g: 0.3 });
+  v.noise({ k: 'b', a: 0.002, d: 0.05, g: 0.2, ft: 'lowpass', f: 700 });
+  const vib = { r: 15, d: 80, d1: 5, t1: 0.34 };
+  v.tone({ type: 'triangle', f: 170, pts: [[0.035, 520], [0.34, 390]], a: 0.004, h: 0.05, d: 0.3, g: 0.38, vib });
+  v.tone({ f: 340, pts: [[0.035, 1040], [0.3, 780]], a: 0.003, d: 0.18, g: 0.08, vib: { r: 15, d: 160, d1: 10, t1: 0.3 } });
+  const bp = v.filter('bandpass', 1500, 4);
+  v.sweep(bp.frequency, 0, 1500, 800, 0.3);
+  bp.connect(v.out);
+  v.tone({ type: 'sawtooth', f: 170, pts: [[0.035, 520], [0.34, 390]], a: 0.004, h: 0.03, d: 0.25, g: 0.12, out: bp, vib });
+});
+def('rustle', 2.4, 1, 0.04, 3, (v) => {
+  // crisp leaf grains in two bands + a soft swish and a few lower twiggy grains
+  v.noise({ k: 'c', a: 0.06, h: 0.15, d: 0.3, g: 0.9, ft: 'bandpass', f: 3200, Q: 0.8, rate: 1.0 });
+  v.noise({ t: 0.03, k: 'c', a: 0.05, h: 0.1, d: 0.3, g: 0.6, ft: 'bandpass', f: 5500, Q: 1.2, rate: 1.4 });
+  v.noise({ k: 'p', a: 0.08, h: 0.12, d: 0.3, g: 0.25, ft: 'bandpass', f: 2200, pts: [[0.2, 3200], [0.5, 1800]], Q: 0.9 });
+  v.noise({ t: 0.05, k: 'c', a: 0.04, d: 0.3, g: 0.4, ft: 'bandpass', f: 1600, Q: 1, rate: 0.6 });
 });
 
 /* ------------------------------------------------------------------------ */

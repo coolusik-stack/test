@@ -46,6 +46,20 @@ export class FX {
       else if (kind === 'spark') this.add({ ...base, type: 'spark', life: 0.3 + Math.random() * 0.35, size: 0.06, color: Math.random() < 0.5 ? '#fff3a0' : '#ffb13b', g: 0.5, drag: 1.2 });
       else if (kind === 'splash') this.add({ ...base, vx: base.vx * 0.5, vy: Math.abs(base.vy) + 2, type: 'drop', life: 0.8 + Math.random() * 0.4, size: 0.08 + Math.random() * 0.1, color: opts.color || '#dff4ff', g: 1.1, drag: 0.3 });
       else if (kind === 'star') this.add({ ...base, type: 'star', life: 0.7 + Math.random() * 0.4, size: 0.14 + Math.random() * 0.12, color: '#ffe45c', g: 0.4, drag: 1.5, rot: Math.random() * TAU, vr: (Math.random() - 0.5) * 10 });
+      else if (kind === 'leaf') this.add({ ...base, vx: base.vx * 0.6, vy: Math.abs(base.vy) * 0.6 + 1, type: 'leaf', life: 1.6 + Math.random(), size: 0.14 + Math.random() * 0.1, color: Math.random() < 0.5 ? '#7cc443' : Math.random() < 0.5 ? '#f0a23a' : '#d9602c', g: 0.15, drag: 2.2, rot: Math.random() * TAU, vr: (Math.random() - 0.5) * 7 });
+      else if (kind === 'fur') this.add({ ...base, type: 'feather', life: 1.2 + Math.random() * 0.8, size: 0.12 + Math.random() * 0.1, color: opts.color || '#d9642c', g: 0.2, drag: 2.6, rot: Math.random() * TAU, vr: (Math.random() - 0.5) * 8 });
+      else if (kind === 'nutbit') this.add({ ...base, type: 'acornbit', life: 1.1 + Math.random() * 0.5, size: 0.1 + Math.random() * 0.05, g: 1, drag: 0.5, rot: Math.random() * TAU, vr: (Math.random() - 0.5) * 12 });
+      else if (kind === 'shell') this.add({ ...base, type: 'rock', life: 0.8 + Math.random() * 0.5, size: 0.06 + Math.random() * 0.09, color: Math.random() < 0.5 ? '#a8733f' : '#e2c08a', rot: Math.random() * TAU, vr: (Math.random() - 0.5) * 14 });
+      else if (kind === 'needle') this.add({ ...base, type: 'needle', life: 0.5 + Math.random() * 0.35, size: 0.2 + Math.random() * 0.14, color: Math.random() < 0.5 ? '#8bc34a' : '#c5e17a', g: 0.35, drag: 1.2 });
+      else if (kind === 'honey') this.add({ ...base, type: 'drop', life: 0.9 + Math.random() * 0.5, size: 0.08 + Math.random() * 0.1, color: Math.random() < 0.6 ? '#f6b21b' : '#ffd45a', g: 0.9, drag: 0.6 });
+    }
+  }
+
+  // A buzzing swarm that circles the spot, then scatters.
+  swarm(x, y, r) {
+    const n = Math.round(8 + r * 4);
+    for (let i = 0; i < n; i++) {
+      this.add({ x, y, vx: 0, vy: 0, type: 'bee', life: 1.6 + Math.random() * 0.9, size: 0.13, g: 0, drag: 0, cx: x, cy: y, rad: r * (0.35 + Math.random() * 0.7), ph: Math.random() * TAU, spd: (Math.random() < 0.5 ? -1 : 1) * (5 + Math.random() * 4) });
     }
   }
 
@@ -74,7 +88,15 @@ export class FX {
       p.vy -= 12 * p.g * dt;
       const d = Math.exp(-p.drag * dt);
       p.vx *= d; p.vy *= d;
-      if (p.type === 'feather') p.vx += Math.sin(p.life * 6 + p.size * 40) * 3 * dt;
+      if (p.type === 'feather' || p.type === 'leaf') p.vx += Math.sin(p.life * 6 + p.size * 40) * 3 * dt;
+      if (p.type === 'bee') {
+        // orbit for a while, then fly off
+        p.ph += p.spd * dt;
+        const k = p.life / p.max;
+        const out = k < 0.35 ? (0.35 - k) * 18 : 0;
+        const tx = p.cx + Math.cos(p.ph) * (p.rad + out) , ty = p.cy + Math.sin(p.ph * 1.3) * p.rad * 0.6 + 0.4 + out * 0.3;
+        p.vx = (tx - p.x) * 8; p.vy = (ty - p.y) * 8;
+      }
       p.x += p.vx * dt;
       p.y += p.vy * dt;
       p.rot += p.vr * dt;
@@ -203,6 +225,79 @@ export class FX {
           ctx.globalAlpha = Math.min(1, k * 2);
           ctx.fillStyle = p.color;
           starPath(ctx, p.size);
+          ctx.fill();
+          ctx.restore();
+          break;
+        }
+        case 'leaf': {
+          ctx.save();
+          ctx.translate(x, y);
+          ctx.rotate(p.rot);
+          ctx.globalAlpha = Math.min(1, k * 2);
+          ctx.fillStyle = p.color;
+          ctx.beginPath();
+          ctx.moveTo(-p.size, 0);
+          ctx.quadraticCurveTo(0, -p.size * 0.7, p.size, 0);
+          ctx.quadraticCurveTo(0, p.size * 0.7, -p.size, 0);
+          ctx.fill();
+          ctx.strokeStyle = 'rgba(0,0,0,0.25)';
+          ctx.lineWidth = 0.015;
+          ctx.beginPath();
+          ctx.moveTo(-p.size, 0);
+          ctx.lineTo(p.size, 0);
+          ctx.stroke();
+          ctx.restore();
+          break;
+        }
+        case 'acornbit': {
+          // a tiny acorn popping out of stuffed cheeks
+          ctx.save();
+          ctx.translate(x, y);
+          ctx.rotate(p.rot);
+          ctx.globalAlpha = Math.min(1, k * 3);
+          ctx.fillStyle = '#c47a35';
+          ctx.beginPath();
+          ctx.ellipse(0, p.size * 0.2, p.size * 0.8, p.size, 0, 0, TAU);
+          ctx.fill();
+          ctx.fillStyle = '#7a4a22';
+          ctx.beginPath();
+          ctx.ellipse(0, -p.size * 0.55, p.size * 0.95, p.size * 0.45, 0, 0, TAU);
+          ctx.fill();
+          ctx.restore();
+          break;
+        }
+        case 'needle': {
+          ctx.globalAlpha = Math.min(1, k * 2.5);
+          ctx.strokeStyle = p.color;
+          ctx.lineWidth = 0.045;
+          ctx.lineCap = 'round';
+          const l = Math.hypot(p.vx, p.vy) || 1;
+          ctx.beginPath();
+          ctx.moveTo(x, y);
+          ctx.lineTo(x - (p.vx / l) * p.size, y + (p.vy / l) * p.size);
+          ctx.stroke();
+          break;
+        }
+        case 'bee': {
+          const dir = p.vx >= 0 ? 1 : -1;
+          ctx.save();
+          ctx.translate(x, y);
+          ctx.globalAlpha = Math.min(1, k * 3);
+          // wings (flutter)
+          const flap = Math.abs(Math.sin(p.life * 60)) * 0.6 + 0.4;
+          ctx.fillStyle = 'rgba(255,255,255,0.85)';
+          ctx.beginPath();
+          ctx.ellipse(-0.02 * dir, -p.size * 0.75, p.size * 0.45, p.size * 0.7 * flap, -0.3 * dir, 0, TAU);
+          ctx.fill();
+          ctx.fillStyle = '#ffc928';
+          ctx.beginPath();
+          ctx.ellipse(0, 0, p.size, p.size * 0.72, 0, 0, TAU);
+          ctx.fill();
+          ctx.fillStyle = '#2b1a12';
+          ctx.fillRect(-p.size * 0.25, -p.size * 0.7, p.size * 0.22, p.size * 1.4);
+          ctx.fillRect(p.size * 0.2 * -dir - p.size * 0.1, -p.size * 0.66, p.size * 0.2, p.size * 1.32);
+          ctx.beginPath();
+          ctx.arc(p.size * 0.72 * dir, -p.size * 0.1, p.size * 0.14, 0, TAU);
           ctx.fill();
           ctx.restore();
           break;
