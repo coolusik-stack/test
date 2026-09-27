@@ -9,8 +9,8 @@ export const THEMES = {
   oak: {
     id: 'oak',
     name: '도토리 숲',
-    desc: '참나무 언덕과 다람쥐 굴',
-    layout: { mid: 'hill', baseMin: 9, baseMax: 11.5, midMin: 13, midMax: 15.5, rough: 1.0, caves: 1 },
+    desc: '거대 참나무 고원과 관통 굴',
+    layout: { mid: 'mesa', baseMin: 9, baseMax: 10.5, midMin: 17, midMax: 18, rough: 0.9, tunnel: true },
     sky: ['#5fb6ea', '#a8dcf5', '#e9f8e8'],
     sun: { x: 0.78, y: 0.16, color: '#fff7cf', glow: 'rgba(255,246,200,0.6)' },
     rays: 'rgba(255,250,215,0.10)',
@@ -38,8 +38,8 @@ export const THEMES = {
   maple: {
     id: 'maple',
     name: '단풍 협곡',
-    desc: '쌍둥이 봉우리와 바위 아치',
-    layout: { mid: 'twin', baseMin: 8.5, baseMax: 12, midMin: 14, midMax: 17, rough: 0.8, arch: true },
+    desc: '통나무 다리가 걸린 깊은 협곡',
+    layout: { mid: 'gorge', baseMin: 9, baseMax: 11.5, midMin: 11, midMax: 12.5, rough: 0.8 },
     sky: ['#f39b5c', '#ffcf94', '#fff1d6'],
     sun: { x: 0.24, y: 0.22, color: '#fff3d0', glow: 'rgba(255,214,140,0.6)' },
     rays: 'rgba(255,225,170,0.12)',
@@ -68,8 +68,8 @@ export const THEMES = {
   pine: {
     id: 'pine',
     name: '소나무 언덕',
-    desc: '안개 낀 높은 언덕과 굴',
-    layout: { mid: 'hill', baseMin: 10, baseMax: 12.5, midMin: 16, midMax: 18.5, rough: 1.2, caves: 2 },
+    desc: '능선 위에 아슬아슬한 바위',
+    layout: { mid: 'hill', baseMin: 10, baseMax: 12, midMin: 17, midMax: 18.5, rough: 1.0, ledges: 3.6 },
     sky: ['#86b4cf', '#c3dde6', '#eef6ef'],
     sun: { x: 0.7, y: 0.2, color: '#fffbe8', glow: 'rgba(255,250,230,0.5)' },
     rays: 'rgba(255,255,240,0.09)',
@@ -97,8 +97,8 @@ export const THEMES = {
   night: {
     id: 'night',
     name: '반딧불 밤숲',
-    desc: '달빛 아래 골짜기와 바위 기둥',
-    layout: { mid: 'valley', baseMin: 11, baseMax: 13.5, midMin: 6.5, midMax: 8, rough: 1.0, caves: 1, spire: true },
+    desc: '떠 있는 섬과 통통 버섯',
+    layout: { mid: 'valley', baseMin: 11, baseMax: 13, midMin: 6.5, midMax: 7.5, rough: 1.0, spire: true, islands: 8 },
     sky: ['#101a3c', '#233a6b', '#3e5f8a'],
     sun: { x: 0.62, y: 0.16, color: '#fff4d6', glow: 'rgba(200,220,255,0.28)', moon: true },
     rays: null,

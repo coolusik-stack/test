@@ -15,7 +15,7 @@ const $$ = (sel) => [...document.querySelectorAll(sel)];
 
 const canvas = $('#game');
 const settings = Object.assign(
-  { sfx: true, music: true, vibe: true, difficulty: 'normal', wind: 'normal', timer: '0', guide: 'on', theme: 'oak' },
+  { sfx: true, music: true, vibe: true, difficulty: 'normal', wind: 'normal', timer: '0', guide: 'on', theme: 'oak', bo: '3' },
   storage.get('af.settings', {}),
 );
 // maps from older versions were renamed when the game moved into the forest
@@ -34,6 +34,8 @@ let demoRestartT = null;
 let releaseKeys = () => {};
 let rotatePaused = false;
 let online = null; // link to a friend's phone (friend matches)
+let series = null; // best-of-3 on this phone (vs CPU / one phone): { bo, wins: [a, b], round }
+let nextRound = null; // the series state for the next round, once this one is decided
 let hostTries = 0;
 let emoteT = 0;
 const EMOTES = ['😆', '😤', '😱', '👍', '🔥', '😭'];
@@ -68,7 +70,74 @@ function updateRotateHint() {
 
 // ---------------------------------------------------------------- screens
 function show(id) {
-  for (const s of ['title', 'lobby', 'setup', 'pause', 'settings', 'help', 'result']) $('#' + s).hidden = s !== id;
+  for (const s of ['title', 'lobby', 'setup', 'pause', 'settings', 'help', 'result', 'pickmap']) $('#' + s).hidden = s !== id;
+}
+
+// ---------------------------------------------------------------- best of 3
+const curSeries = () => (lastOpts && lastOpts.mode === 'online' ? online && online.match && online.match.series : series);
+const needWins = (S) => Math.floor(S.bo / 2) + 1;
+const randomTheme = () => THEME_ORDER[Math.floor(Math.random() * THEME_ORDER.length)];
+
+function roundBanner() {
+  const S = curSeries();
+  if (!S || S.bo < 2) return;
+  const need = needWins(S);
+  const mp = S.wins.map((w) => w === need - 1);
+  banner(`${S.round}판`, mp[0] && mp[1] ? '결승 판! 이기면 우승' : mp[0] || mp[1] ? '매치 포인트!' : `${S.bo}판 ${need}선승`, '#ffd21f');
+}
+
+function renderPips() {
+  const S = curSeries();
+  for (const i of [0, 1]) {
+    const el = $('#pcard-' + i + ' .pwins');
+    if (!S || S.bo < 2) { el.innerHTML = ''; continue; }
+    el.innerHTML = Array.from({ length: needWins(S) }, (_, k) => `<i class="${k < S.wins[i] ? 'on' : ''}"></i>`).join('');
+  }
+}
+
+// the loser picks the next battlefield (and shoots first)
+function pickMap(title, sub, cb) {
+  show('pickmap');
+  $('#pick-title').textContent = title;
+  $('#pick-sub').textContent = sub;
+  const wrap = $('#pick-maps');
+  wrap.innerHTML = '';
+  for (const id of [...THEME_ORDER, 'random']) {
+    const b = document.createElement('button');
+    b.className = 'map';
+    const cv = document.createElement('canvas');
+    cv.width = 192;
+    cv.height = 108;
+    drawMapPreview(cv, id);
+    const name = document.createElement('span');
+    name.textContent = id === 'random' ? '랜덤' : THEMES[id].name;
+    b.append(cv, name);
+    b.addEventListener('click', () => {
+      Sound.unlock();
+      Sound.play('tap');
+      Haptics.tap();
+      cb(id === 'random' ? randomTheme() : id);
+    });
+    wrap.appendChild(b);
+  }
+}
+
+function startNextLocal(theme) {
+  series = nextRound;
+  nextRound = null;
+  const loser = series.lastWinner < 0 ? 1 - lastOpts.firstTurn : 1 - series.lastWinner;
+  startBattle({ ...lastOpts, theme, firstTurn: loser, seed: undefined });
+}
+
+// online host: start the next round once the loser's pick (or a draw) is known
+function tryStartNextOnline() {
+  if (!online || online.role !== 'host' || !online.pendingNext || !online.paired) return;
+  const theme = online.pickedTheme || (online.lastWinner < 0 ? randomTheme() : null);
+  if (!theme) return;
+  const next = online.pendingNext;
+  online.pendingNext = null;
+  online.pickedTheme = null;
+  online.hostStart({ ...lobbySettings(), theme }, next);
 }
 
 function goTitle() {
@@ -130,7 +199,10 @@ function startBattle(opts) {
     if (g === game) onGameEvent(evt, data); // ignore late events from a replaced match
   }, size);
   game = g;
+  renderPips();
+  roundBanner();
   $('#btn-emote').hidden = !g.online;
+  $('#forecast').hidden = true;
   $('#emote-pop').hidden = true;
   $('#btn-restart').hidden = !!g.online;
   setupHud();
@@ -174,7 +246,9 @@ function onGameEvent(evt, data) {
     case 'turn': {
       const p = game.players[data.player];
       const team = TEAM[p.team];
-      banner(turnLabel(p, true), data.flood || windText(data.wind), team.color);
+      const ev = data.ev || {};
+      banner(turnLabel(p, true), data.flood || (ev.starting ? `${ev.name}! ${ev.desc}` : ev.next ? `다음 턴 예보: ${ev.name}` : windText(data.wind)), team.color);
+      renderForecast(ev);
       syncTurn();
       renderSlots();
       if (p.remote) hint('친구가 조준하고 있어요…', 0);
@@ -219,6 +293,21 @@ function turnLabel(p, shout) {
   if (game.online) return p.remote ? '친구 차례' : shout ? '내 차례!' : '내 차례';
   if (game.opts.mode === 'cpu') return p.isAI ? 'CPU 차례' : shout ? '내 차례!' : '내 차례';
   return `${p.id + 1}P 차례${shout ? '!' : ''}`;
+}
+
+// the forest forecast chip under the wind gauge: what's on now, or what's coming next turn
+function renderForecast(ev) {
+  const el = $('#forecast');
+  const kind = ev && (ev.now || ev.next);
+  if (!kind) { el.hidden = true; return; }
+  el.hidden = false;
+  el.classList.toggle('next', !ev.now);
+  const cv = el.querySelector('canvas');
+  if (cv._kind !== kind) {
+    cv._kind = kind;
+    try { Art.drawEventIcon(cv, kind); } catch (e) { /* art not ready */ }
+  }
+  el.querySelector('span').textContent = ev.now ? `${ev.name}${ev.left > 1 ? ` · ${ev.left}턴` : ' · 마지막 턴'}` : `다음 턴: ${ev.name}`;
 }
 
 function windText(w) {
@@ -378,25 +467,55 @@ function showResult(r) {
   $('#rematch-note').hidden = true;
   $('#again-label').textContent = '한 판 더';
   $('#btn-again').disabled = false;
+  // best of 3: where the series stands after this round
+  const S = curSeries();
+  let done = true, wins = null;
+  if (S && S.bo > 1) {
+    wins = S.wins.slice();
+    if (r.winner >= 0) wins[r.winner]++;
+    done = wins.some((w) => w >= needWins(S));
+    const next = done ? null : { bo: S.bo, wins, round: S.round + 1, lastWinner: r.winner };
+    if (friend && online) { online.pendingNext = next; online.lastWinner = r.winner; }
+    else nextRound = next;
+  } else if (friend && online) { online.pendingNext = null; online.lastWinner = r.winner; }
+  const sw = wins && done ? wins.findIndex((w) => w >= needWins(S)) : r.winner; // who won it all
+  const pre = wins ? (done ? '최종 ' : `${S.round}판 `) : '';
   if (r.winner < 0) {
-    title = '무승부';
+    title = `${pre}무승부`;
     sub = '둘 다 쓰러졌어요!';
   } else if (friend) {
     const won = r.winner === me;
-    title = won ? '승리!' : '패배…';
-    sub = won ? `친구를 이겼어요! 남은 체력 ${r.players[me].hp}` : '친구가 이겼어요. 복수전 한 판?';
-    if (won) record.fw++; else record.fl++;
-    if (online) online.lastWinner = r.winner;
+    title = pre + (won ? '승리!' : '패배…');
+    sub = won ? `친구를 이겼어요! 남은 체력 ${r.players[me].hp}` : done ? '친구가 이겼어요. 복수전 한 판?' : '아직 끝나지 않았어요!';
+    if (done) { if (sw === me) record.fw++; else record.fl++; }
   } else if (cpu) {
-    title = r.isAIWin ? '패배…' : '승리!';
+    title = pre + (r.isAIWin ? '패배…' : '승리!');
     sub = r.isAIWin ? `CPU ${TEAM[1].name}이 창고를 지켰어요. 다시 도전!` : `남은 체력 ${r.players[r.winner].hp}로 도토리 창고를 지켰어요`;
-    if (r.isAIWin) record.losses++; else record.wins++;
+    if (done) { if (sw === 1) record.losses++; else record.wins++; }
   } else {
-    title = `${r.winner + 1}P 승리!`;
+    title = `${pre}${r.winner + 1}P 승리!`;
     sub = `${TEAM[r.winner].name} · 남은 체력 ${r.players[r.winner].hp}`;
-    record.pvp++;
+    if (done) record.pvp++;
   }
   storage.set('af.record', record);
+  const sc = $('#series-score');
+  sc.hidden = !wins;
+  if (wins) { sc.querySelector('.t0').textContent = wins[0]; sc.querySelector('.t1').textContent = wins[1]; }
+  // what the big button does next
+  const loser = r.winner < 0 ? -1 : 1 - r.winner;
+  if (!done) {
+    if (friend) {
+      if (loser === me) $('#again-label').textContent = '다음 판 · 전장 고르기';
+      else { $('#again-label').textContent = r.winner < 0 ? '곧 다음 판…' : '친구가 전장 고르는 중…'; $('#btn-again').disabled = true; }
+      tryStartNextOnline();
+      if (online && online.role === 'host' && loser >= 0 && loser !== me) {
+        // a guest who never picks shouldn't stall the series
+        const m = online.match && online.match.id;
+        setTimeout(() => { if (online && online.match && online.match.id === m && online.pendingNext && !online.pickedTheme) { online.pickedTheme = randomTheme(); tryStartNextOnline(); } }, 30000);
+      }
+    } else if (cpu && loser === 1) $('#again-label').textContent = '다음 판';
+    else $('#again-label').textContent = loser < 0 ? '다음 판' : cpu ? '다음 판 · 전장 고르기' : `다음 판 · ${loser + 1}P가 전장 고르기`;
+  } else if (wins) $('#again-label').textContent = '새 대결';
   const iWon = r.winner >= 0 && (friend ? r.winner === me : cpu ? !r.isAIWin : true);
   if (iWon) Haptics.win(); else Haptics.lose();
   $('#result-title').textContent = title;
@@ -575,7 +694,7 @@ function setPane(p) {
 }
 
 function lobbySettings() {
-  return { theme: settings.theme, wind: settings.wind, timer: Number(settings.timer) || 0 };
+  return { theme: settings.theme, wind: settings.wind, timer: Number(settings.timer) || 0, bo: Number(settings.bo) || 1 };
 }
 
 function describe(ls) {
@@ -583,7 +702,8 @@ function describe(ls) {
   const map = ls.theme === 'random' ? '랜덤 전장' : THEMES[ls.theme] ? THEMES[ls.theme].name : '';
   const wind = { off: '바람 없음', normal: '바람 보통', strong: '강풍' }[ls.wind] || '';
   const timer = ls.timer ? `턴 ${ls.timer}초` : '턴 제한 없음';
-  return [map, wind, timer].filter(Boolean).join(' · ');
+  const bo = ls.bo > 1 ? `${ls.bo}판 ${Math.floor(ls.bo / 2) + 1}선승` : '단판';
+  return [map, wind, timer, bo].filter(Boolean).join(' · ');
 }
 
 function saveSession() {
@@ -715,10 +835,15 @@ function onOnline(evt, data) {
         Sound.play('select');
       }
       break;
+    case 'pick':
+      online.pickedTheme = THEMES[data] ? data : randomTheme();
+      tryStartNextOnline();
+      break;
     case 'rematch-go': {
       const ls = lobbySettings();
       let theme = ls.theme;
       if (theme === 'random') theme = THEME_ORDER[Math.floor(Math.random() * THEME_ORDER.length)];
+      online.pendingNext = null;
       online.hostStart({ ...ls, theme });
       break;
     }
@@ -886,6 +1011,8 @@ function bind() {
       return;
     }
     tryFullscreen();
+    series = Number(settings.bo) === 3 ? { bo: 3, wins: [0, 0], round: 1 } : null;
+    nextRound = null;
     startBattle(buildOpts());
   });
   for (const seg of $$('.seg')) {
@@ -916,12 +1043,33 @@ function bind() {
   click('#btn-home', () => { Sound.play('back'); leaveOnline(); goTitle(); });
   click('#btn-again', () => {
     Sound.play('tap');
-    if (lastOpts.mode !== 'online') { startBattle(lastOpts); return; }
+    if (lastOpts.mode !== 'online') {
+      if (nextRound) {
+        const loser = nextRound.lastWinner < 0 ? -1 : 1 - nextRound.lastWinner;
+        if (loser < 0 || (lastOpts.mode === 'cpu' && loser === 1)) startNextLocal(randomTheme()); // draws and the CPU pick at random
+        else pickMap(`${lastOpts.mode === 'cpu' ? '' : `${loser + 1}P, `}다음 전장 고르기`, '진 쪽이 전장을 고르고 먼저 쏴요', (theme) => startNextLocal(theme));
+        return;
+      }
+      series = Number(settings.bo) === 3 ? { bo: 3, wins: [0, 0], round: 1 } : null;
+      startBattle({ ...lastOpts, seed: undefined, firstTurn: 0 });
+      return;
+    }
     if (!online || !online.paired) { toast('친구와 연결이 끊겼어요'); return; }
+    if (online.pendingNext) {
+      // I lost this round: I choose where we fight next
+      pickMap('다음 전장 고르기', '진 쪽이 전장을 고르고 먼저 쏴요', (theme) => {
+        show('result');
+        $('#again-label').textContent = '곧 시작해요…';
+        $('#btn-again').disabled = true;
+        if (online.role === 'host') { online.pickedTheme = theme; tryStartNextOnline(); } else online.sendPick(theme);
+      });
+      return;
+    }
     online.requestRematch();
     $('#again-label').textContent = '친구 기다리는 중…';
     $('#btn-again').disabled = true;
   });
+  click('#pick-x', () => { Sound.play('back'); show('result'); });
   click('#btn-menu', () => { Sound.play('back'); leaveOnline(); goTitle(); });
   click('#btn-overview', () => {
     if (!game) return;

@@ -928,3 +928,45 @@ svg { width: 1em; height: 1em; fill: currentColor; flex: none; }
 .pause-note { margin: -8px 0 0; text-align: center; font-size: 15px; color: var(--ink-soft); }
 /* iOS WebKit won't let you type into a field whose ancestors disable selection */
 .code-input { -webkit-user-select: text; user-select: text; -webkit-touch-callout: default; }
+
+/* forest forecast chip under the wind gauge */
+.forecast {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 5px;
+  padding: 2px 10px 2px 3px;
+  border-radius: 999px;
+  background: rgba(255, 210, 31, 0.92);
+  border: 2px solid var(--ink);
+  color: var(--ink);
+  font-size: 13px;
+  line-height: 1.1;
+  box-shadow: 0 2px 0 var(--ink);
+  animation: tip-in 0.3s cubic-bezier(0.3, 1.6, 0.5, 1) both;
+  white-space: nowrap;
+}
+.forecast.next { background: rgba(255, 250, 235, 0.92); }
+.forecast canvas { width: 24px; height: 24px; }
+
+/* best of 3: round pips on the HUD cards, the score on the result, the next-map pick */
+.pinfo .pname { display: inline; }
+.pwins { display: inline-flex; gap: 3px; margin-left: 6px; vertical-align: 1px; }
+.pwins i { width: 9px; height: 9px; border-radius: 50%; border: 2px solid rgba(255, 255, 255, 0.75); }
+.pwins i.on { background: #ffd21f; border-color: #ffd21f; box-shadow: 0 0 6px rgba(255, 210, 31, 0.8); }
+.series-score {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-family: var(--display);
+  font-size: 30px;
+  line-height: 1;
+  margin-bottom: 2px;
+}
+.series-score b { font-weight: 400; -webkit-text-stroke: 4px var(--ink); paint-order: stroke fill; }
+.series-score .t0 { color: var(--red); }
+.series-score .t1 { color: var(--blue); }
+.series-score span { color: var(--ink); }
+.pick-panel { max-width: 640px; display: flex; flex-direction: column; gap: 8px; }
+.pick-sub { margin: -6px 0 4px; text-align: center; font-size: 15px; }
+#pick-maps { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 8px; }

@@ -25,7 +25,7 @@ window.__errors = [];
 window.addEventListener('error', e => window.__errors.push(String(e.message)));
 
 const params = new URLSearchParams(location.search);
-const W = 1900, H = 6280;
+const W = 1900, H = 7560;
 const dpr = window.devicePixelRatio || 1;
 const cv = document.getElementById('c');
 cv.width = W * dpr; cv.height = H * dpr;
@@ -296,6 +296,46 @@ function drawAll(time) {
     A.drawNut(ctx, 'pinenut', 12, 5.2, 0.34, 0.2, { time, state: 'fly', lookX: 1 });
     A.drawNut(ctx, 'walnut', 20.5, 3.5, 0.4, 0, { time, state: 'fly', pound: true, lookX: 1 });
   });
+  y0 += 690;
+
+  title('Gameplay events — boar: run phases (run 1) → / ←, standing, hit .4 / .9 (60 px/m)', y0);
+  const phases = [0, 0.05, 0.1, 0.15, 0.2];
+  phases.forEach((dt, i) => {
+    at(110 + i * 180, y0 + 150, 60, () => { ctx.fillStyle = 'rgba(100,170,60,0.5)'; ctx.fillRect(-1.4, 0, 2.8, 0.06); A.drawBoar(ctx, { x: 0, y: 0, facing: 1, time: time + dt, run: 1, hit: 0 }); });
+    at(110 + i * 180, y0 + 300, 60, () => { ctx.fillStyle = 'rgba(100,170,60,0.5)'; ctx.fillRect(-1.4, 0, 2.8, 0.06); A.drawBoar(ctx, { x: 0, y: 0, facing: -1, time: time + dt, run: 1, hit: 0 }); });
+  });
+  [['standing', { run: 0 }], ['trot .5', { run: 0.5 }], ['hit .4', { run: 0.6, hit: 0.4 }], ['hit .9', { run: 0, hit: 0.9 }]].forEach(([n, st], i) => {
+    label(n, 1060 + i * 205, y0 + 40);
+    at(1060 + i * 205, y0 + 150, 60, () => { ctx.fillStyle = 'rgba(100,170,60,0.5)'; ctx.fillRect(-1.4, 0, 2.8, 0.06); A.drawBoar(ctx, Object.assign({ x: 0, y: 0, facing: 1, time }, st)); });
+  });
+  label('26 px/m (phone):', 1080, y0 + 250, 13, '#10324f', 'left');
+  [[1, 1, 0], [-1, 1, 0], [1, 0, 0.8]].forEach(([f, run, hit], i) => at(1300 + i * 110, y0 + 300, 26, () => A.drawBoar(ctx, { x: 0, y: 0, facing: f, time, run, hit })));
+  y0 += 340;
+
+  title('Supply drops — nuts / heal × sway -1 / 0 / +1, landed (60 px/m) · 26 px/m on the right', y0);
+  let sx = 110;
+  for (const kind of ['nuts', 'heal']) {
+    for (const sw of [-1, 0, 1]) { at(sx, y0 + 230, 60, () => A.drawSupplyDrop(ctx, { x: 0, y: 0, time, kind, sway: sw, landed: false })); sx += 190; }
+    at(sx, y0 + 230, 60, () => { ctx.fillStyle = 'rgba(100,170,60,0.5)'; ctx.fillRect(-1.4, 0.36, 2.8, 0.06); A.drawSupplyDrop(ctx, { x: 0, y: 0, time, kind, landed: true }); });
+    sx += 190;
+  }
+  at(1680, y0 + 230, 26, () => A.drawSupplyDrop(ctx, { x: 0, y: 0, time, kind: 'nuts', sway: 0.4 }));
+  at(1790, y0 + 230, 26, () => { ctx.fillStyle = 'rgba(100,170,60,0.5)'; ctx.fillRect(-1.4, 0.36, 2.8, 0.06); A.drawSupplyDrop(ctx, { x: 0, y: 0, time, kind: 'heal', landed: true }); });
+  y0 += 300;
+
+  title('Events in a phone-zoom mock scene (26 px/m)', y0);
+  at(0, y0 + 20, 26, () => {
+    const gy = 9.5;
+    ctx.fillStyle = '#5aa83a'; ctx.fillRect(0, gy, 74, 0.35); ctx.fillStyle = '#8b5e34'; ctx.fillRect(0, gy + 0.35, 74, 1.2);
+    A.drawTree(ctx, { x: 30, y: gy, h: 4.2, canopyR: 2.2, kind: 'oak', nuts: 3, time, seed: 2 });
+    A.drawCommander(ctx, 6, gy - 0.75, { team: 0, facing: 1, time }, null);
+    A.drawCommander(ctx, 68, gy - 0.75, { team: 1, facing: -1, time }, null);
+    A.drawBoar(ctx, { x: 20, y: gy, facing: 1, time, run: 1 });
+    A.drawBoar(ctx, { x: 47, y: gy, facing: -1, time: time + 0.1, run: 0.2, hit: 0.7 });
+    A.drawSupplyDrop(ctx, { x: 38, y: 4.2, time, kind: 'nuts', sway: 0.3 });
+    A.drawSupplyDrop(ctx, { x: 56, y: gy - 0.36, time, kind: 'heal', landed: true });
+    A.drawBlock(ctx, { material: 'crate', shape: 'box', x: 60, y: gy - 0.3, w: 0.75, h: 0.6, seed: 1 });
+  });
 }
 
 const icons = document.getElementById('icons');
@@ -312,6 +352,14 @@ addIcon('토리 (0)', c => A.drawCaptainIcon(c, 0));
 addIcon('솔이 (1)', c => A.drawCaptainIcon(c, 1));
 addIcon('토리 (0)', c => A.drawCaptainIcon(c, 0), true);
 addIcon('솔이 (1)', c => A.drawCaptainIcon(c, 1), true);
+const EVENTS = ['gust', 'rain', 'acornrain', 'boar', 'supply'];
+for (const k of EVENTS) addIcon(k, c => A.drawEventIcon(c, k));
+for (const k of EVENTS) {
+  const d = document.createElement('div'); d.className = 'ic';
+  const c = document.createElement('canvas'); c.width = 32 * dpr; c.height = 32 * dpr; c.style.width = '32px'; c.style.height = '32px'; c.style.borderRadius = '8px';
+  d.appendChild(c); const t = document.createElement('span'); t.textContent = k + ' 32'; d.appendChild(t);
+  icons.appendChild(d); A.drawEventIcon(c, k);
+}
 
 // state-leak check: transform/alpha/styles must be unchanged after each call
 function leakCheck() {
@@ -335,11 +383,16 @@ function leakCheck() {
   A.drawWeb(c2, { x: 0, y: 0, r: 1, anchors: [{ x: 1, y: 1 }], broken: 0.5, wobble: 1, time: 2, seed: 1 });
   A.drawDandelion(c2, { x: 0, y: 0, blown: 0.5, time: 1 });
   A.drawHomeTree(c2, { x: 0, y: 0, team: 0, facing: 1, time: 1 }); A.drawHomeTree(c2, { x: 0, y: 0, team: 1, facing: -1, time: 1 });
+  for (const f of [1, -1]) for (const run of [0, 0.5, 1]) A.drawBoar(c2, { x: 0, y: 0, facing: f, time: 1.2, run, hit: run * 0.9 });
+  A.drawBoar(c2, {});
+  for (const kind of ['nuts', 'heal', 'bogus']) { A.drawSupplyDrop(c2, { x: 0, y: 0, time: 1, kind, sway: 0.7 }); A.drawSupplyDrop(c2, { x: 0, y: 0, time: 1, kind, landed: true }); }
+  A.drawSupplyDrop(c2, {});
+  for (const k of ['gust', 'rain', 'acornrain', 'boar', 'supply', 'bogus']) A.drawEventIcon(c2.canvas, k);
   const after = snap();
   if (before !== after) window.__errors.push('STATE LEAK: ' + before + ' vs ' + after);
   if (inner !== before) window.__errors.push('drawAmmo state mismatch: ' + inner);
   const exp = Object.keys(A).sort().join(',');
-  if (exp !== 'AMMO_INFO,AMMO_TYPES,CART,drawAmmoIcon,drawBlock,drawCaptainIcon,drawCommander,drawDandelion,drawFallenTree,drawHomeTree,drawNut,drawStump,drawTree,drawWeb,slingAnchors,treeAnchors') window.__errors.push('EXPORTS: ' + exp);
+  if (exp !== 'AMMO_INFO,AMMO_TYPES,CART,drawAmmoIcon,drawBlock,drawBoar,drawCaptainIcon,drawCommander,drawDandelion,drawEventIcon,drawFallenTree,drawHomeTree,drawNut,drawStump,drawSupplyDrop,drawTree,drawWeb,slingAnchors,treeAnchors') window.__errors.push('EXPORTS: ' + exp);
 }
 leakCheck();
 
@@ -367,6 +420,13 @@ window.__perf = () => {
   res.blocks40 = time(() => { for (const b of blocks) A.drawBlock(x, b); });
   res.nuts6 = time((f) => { for (let k = 0; k < 6; k++) A.drawNut(x, A.AMMO_TYPES[k % 5], 3 + k * 2, 3, 0.38, f * 0.05, { time: f / 60, state: 'fly', fuse: 0.5 }); });
   res.forest = time((f) => { for (let k = 0; k < 3; k++) A.drawTree(x, { x: 5 + k * 8, y: 15, h: 4, canopyR: 2.2, kind: ['oak', 'pine', 'maple'][k], nuts: 4, shake: 0.3, time: f / 60, seed: k }); A.drawWeb(x, { x: 12, y: 12, r: 1, anchors: [{ x: 11, y: 11 }, { x: 13, y: 11 }], time: f / 60 }); A.drawDandelion(x, { x: 20, y: 15, time: f / 60 }); A.drawHomeTree(x, { x: 2, y: 16, team: 0, facing: 1, time: f / 60 }); A.drawHomeTree(x, { x: 30, y: 16, team: 1, facing: -1, time: f / 60 }); });
+  x.setTransform(26, 0, 0, 26, 0, 0);
+  const t2 = (fn) => { const N = 300; for (let f = 0; f < 20; f++) fn(f); x.getImageData(0, 0, 1, 1); const t = performance.now(); for (let f = 0; f < N; f++) fn(f); x.getImageData(0, 0, 1, 1); return +((performance.now() - t) / N).toFixed(3); };
+  res.boarRun26 = t2((f) => A.drawBoar(x, { x: 20, y: 20, facing: f & 1 ? -1 : 1, time: f / 60, run: 1 }));
+  res.boarStand26 = t2((f) => A.drawBoar(x, { x: 20, y: 20, facing: 1, time: f / 60, run: 0 }));
+  res.dropFall26 = t2((f) => A.drawSupplyDrop(x, { x: 30, y: 12, time: f / 60, kind: f & 1 ? 'heal' : 'nuts', sway: 0.3 }));
+  res.dropLanded26 = t2((f) => A.drawSupplyDrop(x, { x: 30, y: 12, time: f / 60, kind: 'nuts', landed: true }));
+  x.setTransform(40, 0, 0, 40, 0, 0);
   res.commanders2 = time((f) => { A.drawCommander(x, 3, 9, { team: 0, facing: 1, time: f / 60 }, null); A.drawCommander(x, 28, 9, { team: 1, facing: -1, time: f / 60 }, null); });
   return res;
 };

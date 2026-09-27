@@ -2882,6 +2882,400 @@ export function drawHomeTree(ctx, h) {
 }
 
 // ---------------------------------------------------------------------
+//  Gameplay events: charging boar, supply drop, HUD event icons
+//  (same flat chibi style as the captains: flat fills, one shade tone, one chunky outline)
+// ---------------------------------------------------------------------
+const EV_INK = '#2b1a12';
+const EV_LW = 0.055;
+
+// --- wild boar (local metres: feet on y = 0, facing +x)
+const BOAR = {
+  body: '#8e5a34', shade: '#6c4024', mane: '#3e2416', leg: '#5e3a22', legFar: '#472a18',
+  snout: '#f0b7a0', nostril: '#8a4a3a', tusk: '#fffbea', earIn: '#e89a88',
+};
+function boarBodyPath(p) {
+  p.moveTo(-0.98, -0.62);
+  p.bezierCurveTo(-1.0, -1.0, -0.56, -1.16, -0.02, -1.18);
+  p.bezierCurveTo(0.42, -1.2, 0.66, -1.08, 0.72, -0.88);
+  p.bezierCurveTo(0.78, -0.62, 0.66, -0.36, 0.44, -0.32);
+  p.quadraticCurveTo(-0.2, -0.25, -0.66, -0.3);
+  p.bezierCurveTo(-0.9, -0.34, -0.98, -0.46, -0.98, -0.62);
+  p.closePath();
+}
+function boarManePath(p) {
+  const pts = [[0.62, -1.06], [0.5, -1.38], [0.32, -1.14], [0.18, -1.37], [0.02, -1.14], [-0.14, -1.34], [-0.3, -1.12], [-0.46, -1.28], [-0.58, -1.06], [-0.76, -1.12], [-0.8, -0.94]];
+  p.moveTo(pts[0][0], pts[0][1]);
+  for (let i = 1; i < pts.length; i++) p.lineTo(pts[i][0], pts[i][1]);
+  p.lineTo(-0.2, -0.9);
+  p.closePath();
+}
+function boarHeadPath(p) { p.moveTo(1.2, -0.76); p.ellipse(0.84, -0.76, 0.36, 0.33, -0.12, 0, TAU); p.closePath(); }
+function boarEarsPath(p) {
+  p.moveTo(0.54, -0.96); p.lineTo(0.5, -1.24); p.lineTo(0.74, -1.04); p.closePath();
+  p.moveTo(0.8, -1.04); p.lineTo(0.9, -1.28); p.lineTo(0.98, -1.02); p.closePath();
+}
+function boarEarsInPath(p) { p.moveTo(0.57, -1.0); p.lineTo(0.55, -1.16); p.lineTo(0.68, -1.05); p.closePath(); }
+function boarSnoutPath(p) { p.moveTo(1.29, -0.63); p.ellipse(1.15, -0.63, 0.14, 0.13, 0, 0, TAU); p.closePath(); }
+function boarTusksPath(p) {
+  p.moveTo(0.99, -0.44); p.quadraticCurveTo(1.1, -0.47, 1.08, -0.7); p.quadraticCurveTo(1.03, -0.57, 0.94, -0.51); p.closePath();
+  p.moveTo(1.24, -0.46); p.quadraticCurveTo(1.35, -0.5, 1.34, -0.7); p.quadraticCurveTo(1.28, -0.58, 1.2, -0.52); p.closePath();
+}
+function boarTailPath(p) { p.moveTo(-0.96, -0.74); p.quadraticCurveTo(-1.14, -0.76, -1.14, -0.9); p.quadraticCurveTo(-1.13, -1.0, -1.04, -0.96); }
+
+// head (ears, head, snout, tusks, face) — shared by drawBoar and the HUD icon
+const BOAR_HEAD_K = 1.2, BOAR_HC = [0.84, -0.8];
+function drawBoarHead(ctx, P, lr, hit, lw) {
+  ctx.save();
+  ctx.translate(BOAR_HC[0], BOAR_HC[1]); ctx.scale(BOAR_HEAD_K, BOAR_HEAD_K); ctx.translate(-BOAR_HC[0], -BOAR_HC[1]);
+  lw /= BOAR_HEAD_K;
+  const ears = P2('boar:ears', boarEarsPath);
+  ctx.fillStyle = P.shade; ctx.fill(ears);
+  ctx.fillStyle = BOAR.earIn; ctx.fill(P2('boar:earsIn', boarEarsInPath));
+  ctx.strokeStyle = EV_INK; ctx.lineWidth = lw; ctx.stroke(ears);
+  const head = P2('boar:head', boarHeadPath);
+  ctx.fillStyle = P.body; ctx.fill(head);
+  const hs = shadeCrescent('boar:headShade' + lr, head, lr === 'r' ? LIGHT_X : -LIGHT_X, LIGHT_Y, 0.84, -0.76, 0.1, 0.88);
+  if (hs) { ctx.fillStyle = P.shade; ctx.fill(hs, 'evenodd'); }
+  ctx.stroke(head);
+  const snout = P2('boar:snout', boarSnoutPath);
+  ctx.fillStyle = P.snout; ctx.fill(snout); ctx.stroke(snout);
+  const tusks = P2('boar:tusks', boarTusksPath);
+  ctx.fillStyle = BOAR.tusk; ctx.fill(tusks); ctx.lineWidth = lw * 0.8; ctx.stroke(tusks);
+  // nostrils + eyes (one ink fill)
+  ctx.beginPath();
+  ctx.moveTo(1.13, -0.63); ctx.ellipse(1.1, -0.63, 0.03, 0.045, 0, 0, TAU);
+  ctx.moveTo(1.23, -0.63); ctx.ellipse(1.2, -0.63, 0.03, 0.045, 0, 0, TAU);
+  const shut = hit > 0.35;
+  if (!shut) {
+    ctx.moveTo(0.83, -0.82); ctx.ellipse(0.76, -0.82, 0.07, 0.095, 0, 0, TAU);
+    ctx.moveTo(1.01, -0.85); ctx.ellipse(0.96, -0.85, 0.055, 0.085, 0, 0, TAU);
+  }
+  ctx.fillStyle = EV_INK; ctx.fill();
+  if (!shut) {
+    ctx.beginPath();
+    ctx.moveTo(0.77, -0.85); ctx.arc(0.745, -0.85, 0.028, 0, TAU);
+    ctx.moveTo(0.97, -0.88); ctx.arc(0.95, -0.88, 0.022, 0, TAU);
+    ctx.fillStyle = '#ffffff'; ctx.fill();
+  }
+  // brows in a fierce V (+ squeezed >< eyes when hit)
+  ctx.beginPath();
+  ctx.moveTo(0.62, -1.0); ctx.lineTo(0.86, -0.92);
+  ctx.moveTo(0.9, -0.94); ctx.lineTo(1.06, -1.02);
+  if (shut) {
+    ctx.moveTo(0.68, -0.89); ctx.lineTo(0.8, -0.82); ctx.lineTo(0.68, -0.75);
+    ctx.moveTo(1.02, -0.91); ctx.lineTo(0.92, -0.84); ctx.lineTo(1.02, -0.77);
+  }
+  ctx.strokeStyle = EV_INK; ctx.lineWidth = 0.06; ctx.lineCap = 'round'; ctx.stroke();
+  ctx.restore();
+}
+
+function boarPal(hit) {
+  if (hit <= 0.02) return BOAR;
+  const t = hit * 0.4;
+  return { body: mix(BOAR.body, '#ffffff', t), shade: mix(BOAR.shade, '#ffffff', t), mane: mix(BOAR.mane, '#ffffff', t * 0.6), leg: mix(BOAR.leg, '#ffffff', t), legFar: mix(BOAR.legFar, '#ffffff', t), snout: mix(BOAR.snout, '#ffffff', t) };
+}
+
+export function drawBoar(ctx, b) {
+  if (!b) return;
+  const f = b.facing < 0 ? -1 : 1, time = +b.time || 0;
+  const run = clamp(+b.run || 0, 0, 1), hit = clamp(+b.hit || 0, 0, 1);
+  const P = boarPal(hit), lw = EV_LW, lr = f > 0 ? 'r' : 'l';
+  const ph = time * 15;
+  const bob = -Math.abs(Math.sin(ph)) * 0.07 * run;
+  const x = +b.x || 0, y = +b.y || 0;
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.scale(f, 1);
+  ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+  // dust kicked up behind the feet
+  if (run > 0.3) {
+    ctx.beginPath();
+    for (let i = 0; i < 3; i++) {
+      const q = frac(time * 2.6 + i / 3), r = 0.1 + q * 0.14;
+      const dx = -0.78 - q * 0.7 - i * 0.12, dy = -0.1 - q * 0.22;
+      ctx.moveTo(dx + r, dy); ctx.arc(dx, dy, r, 0, TAU);
+    }
+    ctx.globalAlpha = 0.6 * run;
+    ctx.fillStyle = '#e2d2b0'; ctx.fill();
+    ctx.globalAlpha = 1;
+  }
+  // squash on impact (anchored at the feet)
+  if (hit > 0.02) ctx.scale(1 + 0.16 * hit, 1 - 0.16 * hit);
+  // legs: [hipX, phase, far?]
+  const LEGS = [[0.3, PI, 1], [-0.7, 0, 1], [0.48, 0, 0], [-0.52, PI, 0]];
+  for (let pass = 1; pass >= 0; pass--) {
+    ctx.beginPath();
+    for (const L of LEGS) {
+      if (L[2] !== pass) continue;
+      const a = Math.sin(ph + L[1]) * 0.6 * run, hy = -0.4 + bob;
+      ctx.moveTo(L[0], hy); ctx.lineTo(L[0] + Math.sin(a) * 0.34, hy + Math.cos(a) * 0.34);
+    }
+    ctx.strokeStyle = EV_INK; ctx.lineWidth = 0.2 + lw * 2; ctx.stroke();
+    ctx.strokeStyle = pass ? P.legFar : P.leg; ctx.lineWidth = 0.2; ctx.stroke();
+    if (pass === 1) {
+      // body (drawn between far and near legs), mane first so the body covers its base
+      ctx.save(); ctx.translate(0, bob);
+      const tail = P2('boar:tail', boarTailPath);
+      ctx.strokeStyle = EV_INK; ctx.lineWidth = 0.05; ctx.stroke(tail);
+      const mane = P2('boar:mane', boarManePath);
+      ctx.fillStyle = P.mane; ctx.fill(mane); ctx.lineWidth = lw; ctx.stroke(mane);
+      const body = P2('boar:body', boarBodyPath);
+      ctx.fillStyle = P.body; ctx.fill(body);
+      const bs = shadeCrescent('boar:bodyShade' + lr, body, LIGHT_X * f, LIGHT_Y, -0.12, -0.74, 0.12, 0.9);
+      if (bs) { ctx.fillStyle = P.shade; ctx.fill(bs, 'evenodd'); }
+      ctx.stroke(body);
+      ctx.restore();
+    }
+  }
+  ctx.save(); ctx.translate(0, bob);
+  drawBoarHead(ctx, P, lr, hit, lw);
+  ctx.restore();
+  if (hit > 0.2) {
+    ctx.beginPath();
+    starPath(ctx, 1.62, -1.02, 0.17 * hit, 0.065 * hit, 4, 0);
+    starPath(ctx, 1.55, -0.34, 0.13 * hit, 0.05 * hit, 4, 0.4);
+    ctx.fillStyle = '#ffe34a'; ctx.fill();
+    ctx.lineWidth = 0.03; ctx.strokeStyle = EV_INK; ctx.stroke();
+  }
+  ctx.restore();
+}
+
+// --- supply drop (local metres: origin = basket centre)
+const DROP = { leaf: '#f5892c', leafD: '#d2621a', vein: '#ffd9a4', stem: '#8a5a2a', basket: '#d9a05c', basketD: '#b67a3c', rim: '#a86e38', badge: '#fff6e4', string: '#6a5040' };
+const CANOPY_Y = -2.3, CANOPY_W = 1.4;
+const CANOPY_BASE = CANOPY_Y + 0.24;
+function canopyTip(i) { const t = PI - i * PI / 4; return [Math.cos(t) * (CANOPY_W + 0.06), CANOPY_BASE - Math.sin(t) * 1.0]; }
+function canopySinus(i) { const t = PI - (i + 0.5) * PI / 4; return [Math.cos(t) * 1.06, CANOPY_BASE - Math.sin(t) * 0.62]; }
+function canopyPath(p) {
+  // maple-like: 5 pointed lobe tips on an arch, rounded sinuses between, concave underside
+  let q = canopyTip(0);
+  p.moveTo(q[0], q[1]);
+  for (let i = 0; i < 4; i++) {
+    const a = canopyTip(i), sn = canopySinus(i), b = canopyTip(i + 1);
+    const ma = [(a[0] + sn[0]) / 2, (a[1] + sn[1]) / 2], mb = [(sn[0] + b[0]) / 2, (sn[1] + b[1]) / 2];
+    const la = Math.hypot(ma[0], ma[1] - CANOPY_BASE) || 1, lb = Math.hypot(mb[0], mb[1] - CANOPY_BASE) || 1;
+    p.quadraticCurveTo(ma[0] + ma[0] / la * 0.1, ma[1] + (ma[1] - CANOPY_BASE) / la * 0.1, sn[0], sn[1]);
+    p.quadraticCurveTo(mb[0] + mb[0] / lb * 0.1, mb[1] + (mb[1] - CANOPY_BASE) / lb * 0.1, b[0], b[1]);
+  }
+  q = canopyTip(0);
+  p.quadraticCurveTo(0, CANOPY_Y - 0.1, q[0], q[1]);
+  p.closePath();
+}
+// right half (shade side, light comes from the upper left): centre vein -> tips 2..4 -> half of the underside
+function canopyHalfPath(p) {
+  const t2 = canopyTip(2);
+  p.moveTo(0, CANOPY_Y + 0.02); p.lineTo(t2[0], t2[1]);
+  for (let i = 2; i < 4; i++) {
+    const a = canopyTip(i), sn = canopySinus(i), b = canopyTip(i + 1);
+    const ma = [(a[0] + sn[0]) / 2, (a[1] + sn[1]) / 2], mb = [(sn[0] + b[0]) / 2, (sn[1] + b[1]) / 2];
+    const la = Math.hypot(ma[0], ma[1] - CANOPY_BASE) || 1, lb = Math.hypot(mb[0], mb[1] - CANOPY_BASE) || 1;
+    p.quadraticCurveTo(ma[0] + ma[0] / la * 0.1, ma[1] + (ma[1] - CANOPY_BASE) / la * 0.1, sn[0], sn[1]);
+    p.quadraticCurveTo(mb[0] + mb[0] / lb * 0.1, mb[1] + (mb[1] - CANOPY_BASE) / lb * 0.1, b[0], b[1]);
+  }
+  const t4 = canopyTip(4), cx = 0, cyy = CANOPY_Y - 0.1;
+  p.quadraticCurveTo((t4[0] + cx) / 2, (t4[1] + cyy) / 2, 0, 0.5 * CANOPY_BASE + 0.5 * cyy);
+  p.closePath();
+}
+function canopyVeinsPath(p) {
+  const sx = 0, sy = CANOPY_Y + 0.02;
+  for (let i = 0; i < 5; i++) {
+    const t = canopyTip(i), k = i === 0 || i === 4 ? 0.9 : 0.86;
+    p.moveTo(sx, sy); p.lineTo(sx + (t[0] - sx) * k, sy + (t[1] - sy) * k);
+  }
+}
+const STRING_TOP = [[-1.18, -2.13], [-0.46, -2.3], [0.46, -2.3], [1.18, -2.13]];
+const STRING_BOT = [[-0.42, -0.36], [-0.14, -0.38], [0.14, -0.38], [0.42, -0.36]];
+function stringsPath(p) { for (let i = 0; i < 4; i++) { p.moveTo(STRING_TOP[i][0], STRING_TOP[i][1]); p.lineTo(STRING_BOT[i][0], STRING_BOT[i][1]); } }
+function basketPath(p) {
+  p.moveTo(-0.45, -0.34); p.lineTo(0.45, -0.34); p.lineTo(0.38, 0.28);
+  p.quadraticCurveTo(0.37, 0.36, 0.28, 0.36); p.lineTo(-0.28, 0.36);
+  p.quadraticCurveTo(-0.37, 0.36, -0.38, 0.28); p.closePath();
+}
+function basketShadePath(p) {
+  p.moveTo(-0.4, 0.12); p.lineTo(0.4, 0.12); p.lineTo(0.38, 0.28);
+  p.quadraticCurveTo(0.37, 0.36, 0.28, 0.36); p.lineTo(-0.28, 0.36);
+  p.quadraticCurveTo(-0.37, 0.36, -0.38, 0.28); p.closePath();
+}
+function basketRimPath(p) { roundRectPath(p, -0.5, -0.44, 1.0, 0.14, 0.07); }
+function basketLinesPath(p) {
+  p.moveTo(0.45, -0.3); p.lineTo(0.38, 0.28); p.quadraticCurveTo(0.37, 0.36, 0.28, 0.36); p.lineTo(-0.28, 0.36);
+  p.quadraticCurveTo(-0.37, 0.36, -0.38, 0.28); p.lineTo(-0.45, -0.3);
+  p.moveTo(-0.42, -0.06); p.lineTo(-0.26, -0.06); p.moveTo(0.26, -0.06); p.lineTo(0.42, -0.06);
+  p.moveTo(-0.4, 0.14); p.lineTo(-0.26, 0.14); p.moveTo(0.26, 0.14); p.lineTo(0.4, 0.14);
+  basketRimPath(p);
+}
+function heartPath(p, cx, cy, s) {
+  p.moveTo(cx, cy + s * 0.9);
+  p.bezierCurveTo(cx - s * 1.2, cy + 0.05 * s, cx - s * 1.0, cy - s * 0.95, cx, cy - s * 0.35);
+  p.bezierCurveTo(cx + s * 1.0, cy - s * 0.95, cx + s * 1.2, cy + 0.05 * s, cx, cy + s * 0.9);
+  p.closePath();
+}
+function burrBadgePath(p) {
+  const cx = -0.07, cy = 0.02, r = 0.085;
+  for (let i = 0; i < 10; i++) {
+    const a = i * TAU / 10;
+    p.moveTo(cx + Math.cos(a) * r * 0.9, cy + Math.sin(a) * r * 0.9); p.lineTo(cx + Math.cos(a) * r * 1.55, cy + Math.sin(a) * r * 1.55);
+  }
+}
+function drawBadge(ctx, kind, lw) {
+  ctx.beginPath(); ctx.arc(0, 0.02, 0.23, 0, TAU);
+  ctx.fillStyle = DROP.badge; ctx.fill();
+  ctx.strokeStyle = EV_INK; ctx.lineWidth = lw * 0.8; ctx.stroke();
+  if (kind === 'heal') {
+    const h = P2('drop:heart', (p) => heartPath(p, 0, 0.03, 0.16));
+    ctx.fillStyle = '#ef3b4e'; ctx.fill(h); ctx.stroke(h);
+    ctx.beginPath(); ctx.ellipse(-0.07, -0.02, 0.035, 0.025, -0.6, 0, TAU); ctx.fillStyle = 'rgba(255,255,255,0.8)'; ctx.fill();
+  } else {
+    // spiky burr + walnut
+    const sp = P2('drop:burrSpikes', burrBadgePath);
+    ctx.strokeStyle = '#3e6e18'; ctx.lineWidth = 0.035; ctx.stroke(sp);
+    ctx.beginPath(); ctx.arc(-0.07, 0.02, 0.085, 0, TAU);
+    ctx.fillStyle = '#86c04a'; ctx.fill(); ctx.strokeStyle = EV_INK; ctx.lineWidth = lw * 0.6; ctx.stroke();
+    ctx.beginPath(); ctx.arc(0.08, 0.07, 0.08, 0, TAU);
+    ctx.fillStyle = '#a8784a'; ctx.fill(); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0.07, -0.005); ctx.quadraticCurveTo(0.045, 0.07, 0.07, 0.145); ctx.stroke();
+  }
+}
+function drawBasket(ctx, kind, lw, time) {
+  // soft reward glow
+  ctx.fillStyle = cgrad(ctx, 'dropglow', () => {
+    const g = ctx.createRadialGradient(0, 0, 0.1, 0, 0, 0.95);
+    g.addColorStop(0, 'rgba(255,240,150,0.55)'); g.addColorStop(1, 'rgba(255,230,120,0)');
+    return g;
+  });
+  ctx.beginPath(); ctx.arc(0, 0, 0.95, 0, TAU); ctx.fill();
+  ctx.fillStyle = DROP.basket; ctx.fill(P2('drop:basket', basketPath));
+  ctx.fillStyle = DROP.basketD; ctx.fill(P2('drop:basketShade', basketShadePath));
+  ctx.fillStyle = DROP.rim; ctx.fill(P2('drop:rim', basketRimPath));
+  ctx.strokeStyle = EV_INK; ctx.lineWidth = lw; ctx.stroke(P2('drop:basketLines', basketLinesPath));
+  drawBadge(ctx, kind, lw);
+  // twinkles
+  const tw = 0.5 + 0.5 * Math.sin(time * 5);
+  ctx.beginPath();
+  starPath(ctx, -0.6, -0.5, 0.1 + 0.07 * tw, 0.03, 4, 0);
+  starPath(ctx, 0.62, -0.2, 0.08 + 0.06 * (1 - tw), 0.025, 4, 0.3);
+  ctx.fillStyle = '#fffbd2'; ctx.fill();
+}
+function drawCanopy(ctx, lw, lr) {
+  const c = P2('drop:canopy', canopyPath);
+  ctx.fillStyle = DROP.leaf; ctx.fill(c);
+  ctx.fillStyle = DROP.leafD; ctx.fill(P2('drop:canopyHalf', canopyHalfPath));
+  ctx.strokeStyle = DROP.vein; ctx.lineWidth = 0.055; ctx.stroke(P2('drop:veins', canopyVeinsPath));
+  ctx.strokeStyle = EV_INK; ctx.lineWidth = lw; ctx.stroke(c);
+  // stem hanging from the centre of the leaf
+  ctx.beginPath(); ctx.moveTo(0, CANOPY_Y + 0.02); ctx.quadraticCurveTo(0.04, CANOPY_Y + 0.22, -0.02, CANOPY_Y + 0.4);
+  ctx.strokeStyle = EV_INK; ctx.lineWidth = 0.1 + lw; ctx.stroke();
+  ctx.strokeStyle = DROP.stem; ctx.lineWidth = 0.1; ctx.stroke();
+}
+
+export function drawSupplyDrop(ctx, d) {
+  if (!d) return;
+  const time = +d.time || 0, kind = d.kind === 'heal' ? 'heal' : 'nuts', lw = EV_LW;
+  ctx.save();
+  ctx.translate(+d.x || 0, +d.y || 0);
+  ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+  if (d.landed) {
+    // leaf lying folded behind the basket (basket bottom = ground)
+    ctx.save();
+    ctx.translate(-0.25, 0.34); ctx.rotate(-0.1); ctx.scale(0.62, 0.5); ctx.translate(0, -(CANOPY_Y + 0.24));
+    drawCanopy(ctx, lw / 0.56, 'r');
+    ctx.restore();
+    drawBasket(ctx, kind, lw, time);
+  } else {
+    const rot = clamp(+d.sway || 0, -1, 1) * 0.22 + Math.sin(time * 1.7) * 0.05;
+    ctx.rotate(rot);
+    ctx.strokeStyle = DROP.string; ctx.lineWidth = 0.035; ctx.stroke(P2('drop:strings', stringsPath));
+    ctx.save();
+    const fl = 1 + Math.sin(time * 3.1) * 0.03;
+    ctx.translate(0, CANOPY_Y); ctx.scale(1, fl); ctx.translate(0, -CANOPY_Y);
+    drawCanopy(ctx, lw, 'r');
+    ctx.restore();
+    drawBasket(ctx, kind, lw, time);
+  }
+  ctx.restore();
+}
+
+// --- HUD event icons (unit space, centre of the canvas, radius ~1.15)
+function cloudPath(p) {
+  p.moveTo(-0.44 + 0.36, -0.2); p.arc(-0.44, -0.2, 0.36, 0, TAU);
+  p.moveTo(0.06 + 0.46, -0.38); p.arc(0.06, -0.38, 0.46, 0, TAU);
+  p.moveTo(0.52 + 0.34, -0.16); p.arc(0.52, -0.16, 0.34, 0, TAU);
+  roundRectPath(p, -0.8, -0.3, 1.66, 0.42, 0.2);
+}
+function drawIconCloud(ctx, lw) {
+  const c = P2('icon:cloud', cloudPath);
+  ctx.strokeStyle = EV_INK; ctx.lineWidth = lw * 2; ctx.stroke(c);
+  ctx.fillStyle = '#f4f8fc'; ctx.fill(c);
+  ctx.beginPath(); ctx.ellipse(0.02, 0.02, 0.72, 0.09, 0, 0, TAU);
+  ctx.fillStyle = '#d4dfeb'; ctx.fill();
+}
+function drawIconAcorn(ctx, x, y, s, rot, lw) {
+  ctx.save();
+  ctx.translate(x, y); ctx.rotate(rot); ctx.scale(s, s);
+  const l = lw / s;
+  ctx.beginPath(); ctx.moveTo(0.02, -0.82); ctx.quadraticCurveTo(0.04, -1.12, 0.24, -1.24);
+  ctx.strokeStyle = EV_INK; ctx.lineWidth = 0.2; ctx.stroke();
+  const body = P2('nut:acorn', acornBodyPath), cap = P2('nut:acorncap', acornCapPath);
+  ctx.fillStyle = '#cf8644'; ctx.fill(body); ctx.strokeStyle = EV_INK; ctx.lineWidth = l; ctx.stroke(body);
+  ctx.fillStyle = '#8e6036'; ctx.fill(cap); ctx.stroke(cap);
+  ctx.restore();
+}
+export function drawEventIcon(canvas, kind) {
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const w = canvas.width, h = canvas.height, m = Math.min(w, h);
+  ctx.save();
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.clearRect(0, 0, w, h);
+  let k = m / 2.5, cx = w / 2, cy = h / 2;
+  const lw = 0.09;
+  ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+  if (kind === 'boar') {
+    // scaled head spans about x 0.41..1.45, y -1.38..-0.42 in boar space
+    k = m / 1.22;
+    ctx.setTransform(k, 0, 0, k, cx - 0.93 * k, cy + 0.9 * k);
+    drawBoarHead(ctx, BOAR, 'r', 0, 0.045);
+  } else if (kind === 'supply') {
+    k = m / 3.6;
+    ctx.setTransform(k, 0, 0, k, cx - 0.08 * k, cy + 1.25 * k);
+    ctx.strokeStyle = DROP.string; ctx.lineWidth = 0.06; ctx.stroke(P2('drop:strings', stringsPath));
+    drawCanopy(ctx, 0.08, 'r');
+    drawBasket(ctx, 'nuts', 0.08, 0.3);
+  } else {
+    ctx.setTransform(k, 0, 0, k, cx, cy);
+    if (kind === 'rain' || kind === 'acornrain') {
+      ctx.translate(0, -0.22);
+      if (kind === 'rain') {
+        ctx.beginPath();
+        for (const d of [[-0.46, 0.46], [0.06, 0.66], [0.52, 0.44]]) {
+          ctx.moveTo(d[0], d[1] - 0.2); ctx.quadraticCurveTo(d[0] + 0.12, d[1] - 0.02, d[0] + 0.12, d[1] + 0.04);
+          ctx.arc(d[0], d[1] + 0.04, 0.12, 0, PI); ctx.quadraticCurveTo(d[0] - 0.12, d[1] - 0.02, d[0], d[1] - 0.2); ctx.closePath();
+        }
+        ctx.fillStyle = '#3fa2f2'; ctx.fill();
+        ctx.strokeStyle = EV_INK; ctx.lineWidth = lw * 0.8; ctx.stroke();
+      } else {
+        drawIconAcorn(ctx, -0.46, 0.62, 0.22, -0.3, lw * 0.8);
+        drawIconAcorn(ctx, 0.08, 0.86, 0.24, 0.2, lw * 0.8);
+        drawIconAcorn(ctx, 0.56, 0.58, 0.2, 0.4, lw * 0.8);
+      }
+      drawIconCloud(ctx, lw);
+    } else { // gust
+      ctx.beginPath();
+      ctx.moveTo(-1.0, -0.36); ctx.lineTo(0.3, -0.36); ctx.bezierCurveTo(0.72, -0.36, 0.74, -0.86, 0.42, -0.86); ctx.quadraticCurveTo(0.22, -0.84, 0.26, -0.64);
+      ctx.moveTo(-0.86, 0.08); ctx.lineTo(0.6, 0.08); ctx.bezierCurveTo(1.02, 0.08, 1.02, 0.56, 0.72, 0.56); ctx.quadraticCurveTo(0.54, 0.55, 0.56, 0.38);
+      ctx.moveTo(-1.0, 0.5); ctx.lineTo(-0.02, 0.5); ctx.bezierCurveTo(0.26, 0.5, 0.3, 0.84, 0.06, 0.86);
+      ctx.strokeStyle = EV_INK; ctx.lineWidth = 0.26; ctx.stroke();
+      ctx.strokeStyle = '#e4f4ff'; ctx.lineWidth = 0.14; ctx.stroke();
+      ctx.beginPath(); leafShapeAt(ctx, -0.46, -0.72, 0.26, 0.13, -0.5);
+      ctx.fillStyle = '#6cbc3c'; ctx.fill(); ctx.strokeStyle = EV_INK; ctx.lineWidth = lw * 0.8; ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(-0.66, -0.6); ctx.lineTo(-0.26, -0.84);
+      ctx.strokeStyle = '#c8f09a'; ctx.lineWidth = 0.035; ctx.stroke();
+    }
+  }
+  ctx.restore();
+}
+
+// ---------------------------------------------------------------------
 //  UI icons
 // ---------------------------------------------------------------------
 export function drawAmmoIcon(canvas, type) {

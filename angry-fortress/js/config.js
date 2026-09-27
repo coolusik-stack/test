@@ -57,6 +57,27 @@ export const FLOOD_STEP = 0.55;
 
 export const WIND_LEVELS = { off: 0, normal: 5, strong: 9 };
 
+// Forest forecast: from EVENT_FIRST, a two-turn event (one shot each) every EVENT_EVERY turns,
+// announced one turn ahead so it becomes something to plan around, not bad luck.
+export const EVENT_FIRST = 5;
+export const EVENT_EVERY = 5;
+export const EVENT_LEN = 2;
+export const EVENT_INFO = {
+  gust: { name: '돌풍', desc: '바람이 두 배로 세져요' },
+  rain: { name: '소나기', desc: '땅이 미끄러워 맞으면 멀리 밀려나요' },
+  acornrain: { name: '도토리 비', desc: '쏠 때마다 하늘에서 도토리가 쏟아져요' },
+  boar: { name: '멧돼지 돌진', desc: '멧돼지가 전장을 가로질러 달려요' },
+};
+export const RAINNUT = { r: 0.26, density: 4, mul: {}, hit: 1.5 };
+export const BOAR = { speed: 15, dmg: 10, blockDmg: 30 };
+
+// Supply drop: a leaf parachute with a basket drifts down over the middle a bit every turn.
+// Whoever's nut touches it first gets what's inside (shown on the basket).
+export const DROP_FIRST = 3;
+export const DROP_EVERY = 6;
+export const DROP_STEP = 3.4; // metres it sinks per turn
+export const DROP_HEAL = 20;
+
 export const TEAM = [
   { name: '참나무단', captain: '토리', color: '#f0572f', dark: '#b8321a' },
   { name: '솔숲단', captain: '솔이', color: '#2f9be8', dark: '#1a6db0' },

@@ -1201,6 +1201,40 @@ def('rope_snap', 2.0, 2, 0.03, 2, (v) => {
   // whip of the loose end
   v.noise({ t: 0.01, k: 'p', a: 0.01, d: 0.06, g: 0.3, ft: 'bandpass', f: 1200, f1: 3000, glide: 0.06, Q: 1.5 });
 });
+def('sigh', 1.0, 3, 0.02, 2, (v) => {
+  // "아까비~": a falling, wobbling two-note groan from the crowd of squirrels
+  const lp = v.filter('lowpass', 1600, 0.8);
+  lp.connect(v.out);
+  v.tone({ type: 'triangle', f: 520, pts: [[0.12, 560], [0.55, 300]], a: 0.03, h: 0.2, d: 0.35, g: 0.34, vib: { r: 6, d: 14, delay: 0.1 } });
+  v.tone({ type: 'sawtooth', f: 390, pts: [[0.12, 420], [0.55, 225]], a: 0.04, h: 0.2, d: 0.35, g: 0.08, out: lp, vib: { r: 6, d: 10, delay: 0.1 } });
+  v.noise({ k: 'p', a: 0.05, h: 0.1, d: 0.3, g: 0.06, ft: 'bandpass', f: 900, Q: 0.8 });
+});
+def('heartbeat', 1.6, 2, 0, 2, (v) => {
+  // lub-dub: two muffled low thumps
+  [[0, 62, 0.55], [0.17, 52, 0.4]].forEach(([t, f, g]) => {
+    v.tone({ t, f: f * 1.6, f1: f, glide: 0.05, a: 0.004, d: 0.14, g });
+    v.noise({ t, k: 'b', a: 0.003, d: 0.06, g: g * 0.25, ft: 'lowpass', f: 180 });
+  });
+});
+def('whoosh', 1.1, 2, 0.03, 2, (v) => {
+  // time slows down: a deep swept air rush
+  v.noise({ k: 'p', a: 0.05, h: 0.1, d: 0.5, g: 0.35, ft: 'bandpass', f: 1400, pts: [[0.3, 380], [0.7, 220]], Q: 1.1 });
+  v.tone({ f: 180, f1: 70, glide: 0.6, a: 0.04, d: 0.5, g: 0.18 });
+});
+def('alert', 0.85, 3, 0, 2, (v) => {
+  // forest forecast: a little wooden-horn call
+  [[0, 523.25], [0.16, 659.25], [0.32, 523.25]].forEach(([t, f]) => {
+    v.tone({ t, type: 'triangle', f, a: 0.01, h: 0.08, d: 0.1, g: 0.3 });
+    v.tone({ t, type: 'square', f: f / 2, a: 0.01, h: 0.06, d: 0.08, g: 0.05 });
+  });
+  v.send(0.2);
+});
+def('boar', 1.4, 3, 0.03, 2, (v) => {
+  // an angry snort-grunt with a rumbling gallop underneath
+  v.noise({ k: 'p', a: 0.01, h: 0.05, d: 0.12, g: 0.4, ft: 'bandpass', f: 700, Q: 2 });
+  v.tone({ type: 'sawtooth', f: 140, pts: [[0.05, 190], [0.25, 110]], a: 0.01, h: 0.1, d: 0.15, g: 0.18 });
+  for (let i = 0; i < 6; i++) v.noise({ t: 0.25 + i * 0.13, k: 'b', a: 0.003, d: 0.05, g: 0.35, ft: 'lowpass', f: 260 });
+});
 def('pickup', 1.0, 3, 0, 2, (v) => {
   // bright rising G-C-E-G arpeggio, last note held with shimmer
   const lp = v.filter('lowpass', 5000, 0.7);

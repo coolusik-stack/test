@@ -1,5 +1,5 @@
 // Offline cache for the game shell. Bump VERSION when files change.
-const VERSION = 'af-v4';
+const VERSION = 'af-v5';
 const SHELL = [
   './',
   './index.html',
@@ -20,6 +20,7 @@ const SHELL = [
   './js/net.js',
   './js/online.js',
   './js/haptics.js',
+  './js/events.js',
   './js/config.js',
   './js/util.js',
   './manifest.webmanifest',

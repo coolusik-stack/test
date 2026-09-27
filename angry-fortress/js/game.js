@@ -9,6 +9,7 @@ import Sound from './audio.js';
 import { planShot } from './ai.js';
 import { Forest } from './obstacles.js';
 import { Haptics } from './haptics.js';
+import { ForestEvents } from './events.js';
 import { clamp, rng, lerp, dist } from './util.js';
 import {
   GRAV, VMAX, WIND_ACC, MAX_PULL, CART_R, HEAD, HP_MAX, STAMINA, STAMINA_PER_M, MOVE_SPEED,
@@ -19,7 +20,7 @@ const planck = window.planck;
 const BREAK_SFX = { wood: 'break_wood', stone: 'break_stone', leaf: 'rustle', hive: 'break_wood', mushroom: 'boing', crate: 'break_wood', log: 'break_wood', trunk: 'break_wood' };
 const HIT_SFX = { wood: 'hit_wood', stone: 'hit_stone', leaf: 'rustle', hive: 'hit_wood', mushroom: 'boing', crate: 'hit_wood', log: 'hit_wood', trunk: 'hit_wood' };
 const BREAK_FX = { wood: 'wood', stone: 'stone', leaf: 'leaf', hive: 'honey', mushroom: 'dust', crate: 'wood', log: 'wood', trunk: 'wood' };
-const SENSORS = new Set(['canopy', 'web', 'dandelion']);
+const SENSORS = new Set(['canopy', 'web', 'dandelion', 'drop']);
 const FUR = ['#d9642c', '#8a8580']; // captain fur colours for tufts that fly off on hits
 const V = (x, y) => planck.Vec2(x, y);
 const DT = 1 / 60;
@@ -85,6 +86,11 @@ export class Game {
     this.hold = false; // online: wait in the intro until the friend's state has arrived
     this.lastKind = 'start'; // what the last snapshot hand-over was: start | shot | end | turn
     this.emotes = [];
+    this.event = null; // forest event on this turn (gust | rain | acornrain | boar)
+    this.killcam = null;
+    this.dangerT = 0;
+    this.beatT = 0;
+    this.slowScale = 0.3;
     if (size) this.resize(size.w, size.h, size.dpr);
     this._build();
   }
@@ -157,6 +163,7 @@ export class Game {
     this.forest = new Forest(this, r);
     this.forest.populate();
     this.forest.r = this.lrng;
+    this.events = new ForestEvents(this);
     this.baseBlockCount = this.nextBlockId;
 
     this._wireContacts();
@@ -240,11 +247,15 @@ export class Game {
         if (s.kind !== 'proj') continue;
         const P = s.ref;
         if (P.dead) continue;
-        if (SENSORS.has(o.kind)) { this.forest.onSensor(P, o); continue; }
+        if (SENSORS.has(o.kind)) {
+          if (o.kind === 'drop') this.events.onDropHit(P);
+          else this.forest.onSensor(P, o);
+          continue;
+        }
         if (o.kind === 'captain' && o.ref === P.owner && P.t < 0.45) continue;
         const vel = P.body.getLinearVelocity();
         const speed = Math.hypot(vel.x, vel.y);
-        if (!P.firstHit) {
+        if (!P.firstHit && o.kind !== 'bumper') { // a toadstool bounce keeps the nut "in flight"
           P.firstHit = true;
           P.hitT = 0;
           P.squash = 0.22;
@@ -263,6 +274,11 @@ export class Game {
         }
         if (speed > 3) {
           if (o.kind === 'terrain') this._sfx(speed > 9 ? 'thud' : 'bounce', { vol: clamp(speed / 18, 0.25, 1) });
+          else if (o.kind === 'bumper') {
+            o.ref.flash = 1;
+            this._sfx('boing', { vol: clamp(speed / 12, 0.4, 1), pitch: 0.8 });
+            this._hap('block', 'mushroom');
+          }
           else if (o.kind === 'block') {
             if (o.ref.mat === 'mushroom') this._sfx('boing', { vol: clamp(speed / 14, 0.3, 1), pitch: 0.9 + Math.random() * 0.3 });
             else this._sfx('nut_hit', { vol: clamp(speed / 20, 0.25, 0.9), pitch: 1.3 - P.spec.r });
@@ -410,8 +426,9 @@ export class Game {
     this._hap('ko', this.isMine(p));
   }
 
-  slowmo(sec) {
+  slowmo(sec, scale = 0.3) {
     this.slowT = Math.max(this.slowT, sec);
+    this.slowScale = Math.min(this.slowT > sec ? this.slowScale : 1, scale);
   }
 
   // ------------------------------------------------------------------ explosions
@@ -456,7 +473,8 @@ export class Game {
         const dx = pos.x - x, dy = pos.y - y + 0.6;
         const l = Math.hypot(dx, dy) || 1;
         const m = p.body.getMass();
-        p.body.applyLinearImpulse(V((dx / l) * push * 0.14 * k * m, (dy / l) * push * 0.14 * k * m + 1.5 * k * m), p.body.getPosition(), true);
+        const kb = this.event === 'rain' ? 0.3 : 0.14; // wet ground: carts slide much further
+        p.body.applyLinearImpulse(V((dx / l) * push * kb * k * m, (dy / l) * push * kb * k * m + 1.5 * k * m), p.body.getPosition(), true);
       }
     }
     this.forest.onExplosion(x, y, r, dmg, owner);
@@ -532,6 +550,13 @@ export class Game {
     if (Math.abs(vx) > 0.5) p.facing = vx > 0 ? 1 : -1;
     const P = this._spawnProjectile('nut', type, spec, p, rest.x, rest.y, vx, vy);
     this.lead = P;
+    this.events.onLaunch();
+    const target = this.players[1 - this.turn];
+    this.shotTargetHp = target.hp;
+    this.shotMinD = 99;
+    this.nearMissShown = false;
+    this.killcam = null;
+    this.killcamUsed = false;
     p.stats.shots++;
     this.currentTrail = [];
     this.shotPower = power;
@@ -617,6 +642,8 @@ export class Game {
     const r = rng((this.seed + Math.imul(this.turnNo, 7919)) >>> 0); // both phones roll the same wind
     const prev = this.wind;
     this.wind = this.windMax ? Math.round((r() * 2 - 1) * this.windMax) : 0;
+    this.event = this.events.kindFor(this.turnNo);
+    const eventFirst = this.events.onTurnStart(this.turnNo); // gust, wet carts, the drop; true = the boar runs now
     if (Math.abs(this.wind - prev) >= 3) this._sfx('wind', { vol: 0.6 });
     p.stamina = STAMINA;
     p.moveDir = 0;
@@ -632,9 +659,11 @@ export class Game {
     this.cam.focus(pos.x + p.facing * 5, pos.y + 2.2, this.cam.baseZoom, 3);
     this.lead = null;
     this.netGate = this.netAb = this.netEnd = this.netLive = null;
-    this.setState(p.isAI ? 'ai-think' : p.remote ? 'remote' : 'aim');
-    this._sfx('turn');
-    this.emit('turn', { player: p.id, name: p.name, isAI: p.isAI, remote: p.remote, wind: this.wind, turnNo: this.turnNo, flood });
+    this.setState(eventFirst ? 'event' : p.isAI ? 'ai-think' : p.remote ? 'remote' : 'aim');
+    const ev = this.events.info(this.turnNo);
+    if (ev.starting || ev.next) this._sfx('alert');
+    else this._sfx('turn');
+    this.emit('turn', { player: p.id, name: p.name, isAI: p.isAI, remote: p.remote, wind: this.wind, turnNo: this.turnNo, flood, ev });
     if (p.isAI) {
       this.aiPlan = null;
     }
@@ -790,13 +819,14 @@ export class Game {
     return {
       q: this.snapSeq + 1, n: this.turnNo, tu: this.turn, w: this.wind,
       sea: [q4(WORLD.SEA), q4(this.seaTarget)], nb: this.nextBlockId,
-      p: P, b: B, s: S, f: this.forest.state(), o,
+      p: P, b: B, s: S, f: this.forest.state(), ev: this.events.state(), o,
     };
   }
 
   // Tear the physics world down and rebuild it from a snapshot. Both phones do this at every
   // hand-over, so they start each shot from identical bodies (same order, no stale contacts).
   loadSnapshot(s) {
+    this.event = this.events ? this.events.kindFor(s.n) : null;
     const log = this.terrain.opLog;
     const base = s.o[0], n = (s.o.length - 1) / 3;
     let same = log.length === base + n;
@@ -849,6 +879,7 @@ export class Game {
     }
     this.nextBlockId = Math.max(this.nextBlockId, s.nb);
     this.forest.load(s.f, new Map(this.blocks.map((b) => [b.id, b])));
+    if (this.events) this.events.load(s.ev);
     // nothing transient survives a hand-over
     this.projectiles = [];
     this.lead = null;
@@ -868,7 +899,7 @@ export class Game {
 
   _captainBody(p, x, y, awake = true) {
     // heavy cart: direct hits hurt but shouldn't shove the captain off the island
-    const body = this.world.createBody({ type: 'dynamic', position: V(x, y), fixedRotation: true, linearDamping: 0.35, awake });
+    const body = this.world.createBody({ type: 'dynamic', position: V(x, y), fixedRotation: true, linearDamping: this.event === 'rain' ? 0.08 : 0.35, awake });
     body.createFixture(planck.Circle(CART_R), { density: 5.0, friction: 1.2, restitution: 0.02 });
     body.createFixture(planck.Circle(V(0, HEAD.y), HEAD.r), { density: 0.6, friction: 0.6, restitution: 0.05 });
     body.setUserData({ kind: 'captain', ref: p });
@@ -1111,10 +1142,12 @@ export class Game {
   update(realDt) {
     if (this.paused) return;
     realDt = Math.min(realDt, 0.05);
+    this._frameDt = realDt;
     if (this.slowT > 0) {
       this.slowT -= realDt;
-      this.timeScale = lerp(this.timeScale, 0.3, 0.3);
+      this.timeScale = lerp(this.timeScale, this.slowScale, 0.3);
     } else {
+      this.slowScale = 0.3;
       this.timeScale = lerp(this.timeScale, 1, 0.15);
     }
     const dt = realDt * this.timeScale;
@@ -1212,6 +1245,7 @@ export class Game {
     }
     if (warmup) return;
     this._tickProjectiles(dt);
+    this.events.tick(dt);
     this.shotTick++;
     this.simT += dt;
     if (WORLD.SEA < this.seaTarget) WORLD.SEA = Math.min(this.seaTarget, WORLD.SEA + dt * 0.4);
@@ -1293,7 +1327,7 @@ export class Game {
       this._netFinish();
       return;
     }
-    if (!p.remote && (this.players[0].dead || this.players[1].dead) && (this.state === 'intro' || this.state === 'aim' || this.state === 'ai-think' || this.state === 'ai-aim')) {
+    if (!p.remote && (this.players[0].dead || this.players[1].dead) && (this.state === 'intro' || this.state === 'aim' || this.state === 'ai-think' || this.state === 'ai-aim' || this.state === 'event')) {
       // e.g. drove off a cliff, or sank while the turn banner was up: the turn is over
       this.aim = null;
       p.moveDir = 0;
@@ -1310,11 +1344,20 @@ export class Game {
         if (this.stateT > 2.4 && !this.hold) this.startTurn();
         break;
       }
+      case 'event': {
+        // the boar is charging across; everyone waits and watches
+        if (!this.events.boar) this.setState(p.isAI ? 'ai-think' : p.remote ? 'remote' : 'aim');
+        break;
+      }
       case 'aim': {
         if (this.turnTimer > 0) {
           this.turnTimer -= realDt;
           const sec = Math.ceil(this.turnTimer);
-          if (sec <= 5 && sec !== this.lastTickSec && sec > 0) { this.lastTickSec = sec; this._sfx('tick'); }
+          if (sec <= 5 && sec !== this.lastTickSec && sec > 0) {
+            this.lastTickSec = sec;
+            this._sfx('tick');
+            this._hap('heartbeat', 0.45 + (5 - sec) * 0.12); // the clock runs out: the heart speeds up
+          }
           if (this.turnTimer <= 0) this.skipTurn();
         }
         break;
@@ -1353,7 +1396,10 @@ export class Game {
           this.aiAbilityAt = null;
           this.activateAbility(true);
         }
-        if (this.projectiles.length === 0 && this.blastQueue.length === 0) this.setState('settle');
+        if (this.projectiles.length === 0 && this.blastQueue.length === 0) {
+          this._checkNearMiss(true);
+          this.setState('settle');
+        }
         break;
       }
       case 'over': {
@@ -1436,6 +1482,78 @@ export class Game {
       const p = this.players[this.turn];
       if (this.currentTrail.length) p.lastTrail = this.currentTrail;
     }
+    this._tension(realDt);
+  }
+
+  // The make-or-break moments: a nut closing in on the other captain slows time (and zooms in when
+  // it could finish them), a close miss gets an "아깝다!", and a low-HP captain feels its heart
+  // pound while a nut is incoming. Presentation only: none of this touches the simulation.
+  _tension(realDt) {
+    const target = this.players[1 - this.turn];
+    let danger = false;
+    if (this.state === 'flight' && !target.dead && !this.silent) {
+      const tp = target.body.getPosition();
+      const tx = tp.x, ty = tp.y + HEAD.y * 0.5;
+      for (const P of this.projectiles) {
+        if (P.dead || (P.kind !== 'nut' && P.kind !== 'kernel')) continue;
+        const pos = P.body.getPosition(), vel = P.body.getLinearVelocity();
+        const dx = tx - pos.x, dy = ty - pos.y, d = Math.hypot(dx, dy);
+        const closing = dx * vel.x + dy * vel.y > 0;
+        this.shotMinD = Math.min(this.shotMinD ?? 99, d);
+        if (closing && d < 14 && target.hp <= 30) danger = true;
+        const sp = Math.hypot(vel.x, vel.y) || 1;
+        const aimed = (dx * vel.x + dy * vel.y) / (d * sp) > 0.82; // really heading at them
+        if (closing && !P.firstHit && !P.caught) {
+          const potential = (P.kind === 'kernel' ? 12 : HIT_CAP) + (P.spec.blast ? P.spec.blast.dmg : 0);
+          if (!this.killcamUsed && d < 3.6 && aimed && target.hp <= potential) {
+            // this one could end it (once per shot, however many kernels)
+            this.killcamUsed = true;
+            P.tense = true;
+            this.slowmo(0.9, 0.2);
+            this.killcam = { p: target, t: 1.1 };
+            this._sfx('whoosh');
+            this._hap('heartbeat', 1);
+          } else if (!P.tense && d < 3) {
+            P.tense = true;
+            this.slowmo(0.35, 0.5);
+          }
+        }
+      }
+      this._checkNearMiss(false);
+    }
+    // heart pounding while a nut flies at a captain on its last legs
+    this.dangerT = clamp(this.dangerT + (danger ? realDt * 3 : -realDt * 2), 0, 1);
+    if (danger) {
+      this.beatT -= realDt;
+      if (this.beatT <= 0) {
+        this.beatT = 0.62;
+        if (this.isMine(target) || this.opts.mode === 'pvp') {
+          this._sfx('heartbeat', { vol: 0.8 });
+          this._hap('heartbeat', 0.85);
+        }
+      }
+    } else this.beatT = 0;
+    if (this.killcam && (this.killcam.t -= realDt) <= 0) this.killcam = null;
+  }
+
+  // It came within a whisker and did no harm. `landed`: the shot is over (all nuts gone).
+  _checkNearMiss(landed) {
+    if (this.nearMissShown || this.silent || (this.shotMinD ?? 99) > 1.7) return;
+    const target = this.players[1 - this.turn];
+    if (target.dead || target.hp < (this.shotTargetHp ?? 0) - 0.5) return;
+    if (!landed) {
+      const lead = this.lead;
+      if (!lead || lead.dead) return;
+      const tp = target.body.getPosition(), pos = lead.body.getPosition();
+      if (Math.hypot(tp.x - pos.x, tp.y + 0.4 - pos.y) < this.shotMinD + 1.4) return; // not past it yet
+    }
+    this.nearMissShown = true;
+    const tp = target.body.getPosition();
+    this.fx.text(tp.x, tp.y + 2.9, '아깝다!', '#ffffff', 1.1, { life: 1.5 });
+    this._sfx('sigh');
+    this._hap('nearMiss');
+    target.mood = 'scared';
+    target.moodT = 1.2;
   }
 
   _poof(P) {
@@ -1450,6 +1568,17 @@ export class Game {
   }
 
   _updateCamera(realDt) {
+    if (this.state === 'event' && this.events.boar) {
+      const b = this.events.boar;
+      this.cam.focus(b.x + b.dir * 3, b.y + 2.5, this.cam.baseZoom * 0.95, 5);
+      return;
+    }
+    if (this.killcam && this.lead && !this.lead.dead) {
+      // lean in on the moment of truth
+      const tp = this.killcam.p.body.getPosition(), pos = this.lead.body.getPosition();
+      this.cam.focus((tp.x + pos.x) / 2, (tp.y + pos.y) / 2 + 1, this.cam.baseZoom * 1.45, 6);
+      return;
+    }
     if (this.cam.manual > 0 && this.state !== 'flight') return;
     if (this.state === 'flight' && this.lead && !this.lead.dead) {
       if (this.cam.manual > 0) this.cam.manual = 0;
@@ -1515,6 +1644,8 @@ export class Game {
       });
     }
 
+    this.events.drawWorld(ctx, this.time, this._frameDt || 0.016);
+
     // captains
     for (const p of this.players) this._drawCaptain(ctx, p);
 
@@ -1553,6 +1684,17 @@ export class Game {
 
     // screen-space overlays
     this.scene.drawAmbient(ctx, W, H, dpr, this.time);
+    this.events.drawScreen(ctx, W, H, dpr, this.time, this._frameDt || 0.016);
+    if (this.dangerT > 0.01) {
+      // red pulse at the edges while a low-HP captain is in danger
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      const pulse = 0.75 + 0.25 * Math.sin(this.time * 10);
+      const gr = ctx.createRadialGradient(W / 2, H / 2, Math.min(W, H) * 0.35, W / 2, H / 2, Math.max(W, H) * 0.7);
+      gr.addColorStop(0, 'rgba(200,20,20,0)');
+      gr.addColorStop(1, `rgba(200,20,20,${0.42 * this.dangerT * pulse})`);
+      ctx.fillStyle = gr;
+      ctx.fillRect(0, 0, W, H);
+    }
     if (!this.silent) this._drawOffscreen(ctx, dpr);
     if (this.fx.flash > 0.01) {
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -1781,6 +1923,8 @@ export class Game {
       const pos = this.lead.body.getPosition();
       mark(pos.x, pos.y, '#fff', '●');
     }
+    const drop = this.events.drop;
+    if (drop) mark(drop.x, drop.showY ?? drop.y, '#ffd21f', '🎁');
   }
 
   // Short label for a captain: 나 / CPU / 친구 / 1P / 2P

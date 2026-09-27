@@ -616,19 +616,46 @@ export function buildLandscape(layout, seed) {
     [bases[0] - 3, baseH[0]],
     [bases[0] + 7, baseH[0]],
   ];
-  if (layout.mid === 'twin') {
-    cps.push([mid - 8, midH], [mid - 1.5, lerp(baseH[0], baseH[1], 0.5) - 2.5], [mid + 1.5, lerp(baseH[0], baseH[1], 0.5) - 2.5], [mid + 8, midH]);
-  } else if (layout.mid === 'valley') {
-    cps.push([mid - 7, lerp(baseH[0], midH, 0.5)], [mid, midH], [mid + 7, lerp(baseH[1], midH, 0.5)]);
-  } else {
-    cps.push([mid - 7, lerp(baseH[0], midH, 0.55)], [mid, midH], [mid + 7, lerp(baseH[1], midH, 0.55)]);
-  }
-  cps.push([bases[1] - 7, baseH[1]], [bases[1] + 3, baseH[1]], [W - 5.5, baseH[1] - 1.5], [W - 2.2, SEA - 1.5], [W + 1, -2]);
-  cps.sort((a, b) => a[0] - b[0]);
+  const features = {};
   const plateaus = [
     [bases[0] - 3, bases[0] + 7, baseH[0]],
     [bases[1] - 7, bases[1] + 3, baseH[1]],
   ];
+  if (layout.mid === 'twin') {
+    cps.push([mid - 8, midH], [mid - 1.5, lerp(baseH[0], baseH[1], 0.5) - 2.5], [mid + 1.5, lerp(baseH[0], baseH[1], 0.5) - 2.5], [mid + 8, midH]);
+  } else if (layout.mid === 'gorge') {
+    // a deep canyon down to the stream, flat rims on both sides for a log bridge
+    const rim = midH, gap = 2.6, lip = 1.9;
+    cps.push(
+      [mid - 10, lerp(baseH[0], rim, 0.5)], [mid - gap - lip, rim], [mid - gap, rim], [mid - gap + 1.0, SEA - 3],
+      [mid + gap - 1.0, SEA - 3], [mid + gap, rim], [mid + gap + lip, rim], [mid + 10, lerp(baseH[1], rim, 0.5)],
+    );
+    plateaus.push([mid - gap - lip, mid - gap, rim], [mid + gap, mid + gap + lip, rim]);
+    features.bridge = { x: mid, y: rim, span: (gap + lip * 0.55) * 2 };
+  } else if (layout.mid === 'mesa') {
+    // a steep, flat-topped hill: room on top for a landmark, thick enough to tunnel through
+    const top = midH;
+    cps.push([mid - 8.6, lerp(baseH[0], top, 0.22)], [mid - 6, top], [mid + 6, top], [mid + 8.6, lerp(baseH[1], top, 0.22)]);
+    plateaus.push([mid - 6, mid + 6, top]);
+  } else if (layout.mid === 'valley') {
+    cps.push([mid - 7, lerp(baseH[0], midH, 0.5)], [mid, midH], [mid + 7, lerp(baseH[1], midH, 0.5)]);
+  } else {
+    const a0 = lerp(baseH[0], midH, 0.55), a1 = lerp(baseH[1], midH, 0.55);
+    cps.push([mid - 7, a0], [mid, midH], [mid + 7, a1]);
+    if (layout.ledges) {
+      // little flat steps on both slopes near the top, each holding a boulder
+      const d = layout.ledges;
+      const at = (a, t) => lerp(a, midH, (1 - Math.cos(t * Math.PI)) / 2);
+      const hl = at(a0, (7 - d) / 7), hr = at(a1, (7 - d) / 7);
+      cps.push([mid - d - 0.9, hl], [mid - d + 0.9, hl], [mid + d - 0.9, hr], [mid + d + 0.9, hr]);
+      plateaus.push([mid - d - 0.9, mid - d + 0.9, hl], [mid + d - 0.9, mid + d + 0.9, hr]);
+      features.lips = [{ x: mid - d - 0.75, y: hl }, { x: mid + d + 0.75, y: hr }];
+      // each boulder sits at the uphill end of its step: a clean hit still sends it rolling
+      features.boulders = [{ x: mid - d + 0.4, y: hl, dir: 1 }, { x: mid + d - 0.4, y: hr, dir: -1 }];
+    }
+  }
+  cps.push([bases[1] - 7, baseH[1]], [bases[1] + 3, baseH[1]], [W - 5.5, baseH[1] - 1.5], [W - 2.2, SEA - 1.5], [W + 1, -2]);
+  cps.sort((a, b) => a[0] - b[0]);
   const heights = (x) => {
     let k = 0;
     while (k < cps.length - 2 && cps[k + 1][0] < x) k++;
@@ -664,7 +691,35 @@ export function buildLandscape(layout, seed) {
   if (layout.spire) {
     ops.push({ type: 'add', x: mid, y: midH + 2.5, rx: 1.1, ry: 3.2 });
   }
-  return { heights, ops, bases, baseH, mid, midH };
+  if (layout.tunnel) {
+    // a squirrel tunnel straight through the central hill, open at both slopes: a flat,
+    // well-aimed shot goes right through
+    // halfway up the mesa wall: dirt below the floor and above the roof, so it reads as a tunnel
+    const wall = lerp(Math.max(baseH[0], baseH[1]), midH, 0.22);
+    const ty = layout.mid === 'mesa' ? (wall + midH) / 2 - 0.3 : midH - 2.8;
+    let xa = mid, xb = mid;
+    while (xa > mid - 16 && heights(xa) > ty + 0.4) xa -= 0.25;
+    while (xb < mid + 16 && heights(xb) > ty + 0.4) xb += 0.25;
+    for (let x = xa - 1.2; x <= xb + 1.2; x += 0.5) ops.push({ type: 'sub', x, y: ty, rx: 1.05, ry: 1.05 });
+    features.tunnel = { x: mid, y: ty, xa, xb };
+    features.giant = { x: mid };
+  }
+  if (layout.spire) features.spire = { x: mid };
+  // a little rock lip on the downhill edge of each boulder step (round stones roll on any tilt)
+  for (const l of features.lips || []) ops.push({ type: 'add', x: l.x, y: l.y + 0.12, rx: 0.42, ry: 0.4 });
+  if (layout.islands) {
+    // two floating islands, mirrored, each carrying a nut basket
+    features.islands = [];
+    for (const side of [-1, 1]) {
+      const ix = mid + side * layout.islands, iy = midH + 6.8;
+      ops.push({ type: 'add', x: ix, y: iy, rx: 2.9, ry: 0.75 });
+      ops.push({ type: 'add', x: ix, y: iy - 0.7, rx: 1.9, ry: 0.8 });
+      ops.push({ type: 'add', x: ix + side * 0.3, y: iy - 1.4, rx: 0.9, ry: 0.6 });
+      features.islands.push({ x: ix, y: iy + 0.75 });
+    }
+    features.bounce = [{ x: mid - 3.4 }, { x: mid + 3.4 }];
+  }
+  return { heights, ops, bases, baseH, mid, midH, features };
 }
 
 // Tileable dirt texture as a CanvasPattern mapped at 64px per meter.

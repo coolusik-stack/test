@@ -20,6 +20,7 @@ export class Forest {
     this.webs = [];
     this.dandelions = [];
     this.stumps = [];
+    this.bumpers = []; // giant toadstools anchored in the ground: nuts spring off them
     this.homes = [];
     this.terrainVersion = -1;
   }
@@ -36,6 +37,8 @@ export class Forest {
     const x0 = land.bases[0] + 7.2, x1 = land.bases[1] - 7.2;
     this.taken = [];
     const kinds = g.theme.trees || ['oak'];
+    const f = land.features || {};
+    this._placeFeatures(f);
     // Mirrored pairs keep the two halves fair; a centre piece is optional.
     const pairOrSingle = (place, count, minD = 1.5) => {
       const mid = W / 2;
@@ -50,11 +53,41 @@ export class Forest {
       return placed;
     };
     // trees first: they are the landmarks
-    pairOrSingle((x) => this._placeTree(x, r.pick(kinds)), r.int(1, 3), 3);
+    pairOrSingle((x) => this._placeTree(x, r.pick(kinds)), f.giant ? r.int(0, 1) * 2 : r.int(1, 3), 3);
     pairOrSingle((x) => this._placeProp(x), r.int(1, 2) * 2);
     pairOrSingle((x) => this._placeStructure(CRATE, x, 0.6), r() < 0.5 ? 1 : 2);
     pairOrSingle((x) => this._placeDandelion(x), r() < 0.35 ? 1 : 2);
     this.terrainVersion = g.terrain.version;
+  }
+
+  // Each map's landmark: the giant oak over the tunnel, the canyon bridge, the ridge boulders,
+  // the floating islands' baskets and the valley's bounce mushrooms. Always mirrored.
+  _placeFeatures(f) {
+    const g = this.g, t = g.terrain;
+    if (f.spire) this.taken.push([f.spire.x - 1.8, f.spire.x + 1.8]);
+    if (f.tunnel) this.taken.push([f.tunnel.xa - 2, f.tunnel.xa + 1], [f.tunnel.xb - 1, f.tunnel.xb + 2]); // keep the mouths clear
+    if (f.giant) {
+      this._placeTree(f.giant.x, 'oak', { force: true, giant: true, h: 7.6, canopyR: 3.5, hp: TREE.hp * 2, nuts: 6, hive: true, web: false });
+      this.taken.push([f.giant.x - 3.2, f.giant.x + 3.2]);
+    }
+    if (f.bridge) {
+      const b = f.bridge;
+      const y = Math.max(t.surfaceY(b.x - b.span / 2 + 0.3), t.surfaceY(b.x + b.span / 2 - 0.3));
+      g._makeBlock('log', 'box', b.x, y + 0.25, b.span, 0.46, 0);
+      g._makeBlock('crate', 'box', b.x, y + 0.5 + 0.31, 0.76, 0.6, 0); // a basket right in the middle
+      this.taken.push([b.x - b.span / 2 - 0.6, b.x + b.span / 2 + 0.6]);
+    }
+    for (const o of f.boulders || []) {
+      g._makeBlock('stone', 'circle', o.x, t.surfaceY(o.x) + 0.72, 0, 0, 0.7);
+      this.taken.push([o.x - 1.3, o.x + 1.3]);
+    }
+    for (const o of f.islands || []) g._makeBlock('crate', 'box', o.x, t.surfaceY(o.x) + 0.32, 0.76, 0.6, 0);
+    for (const o of f.bounce || []) {
+      const b = { x: o.x, ground: t.surfaceY(o.x), seed: this.r.int(1, 9999), flash: 0 };
+      this._bumperBody(b);
+      this.bumpers.push(b);
+      this.taken.push([o.x - 1.4, o.x + 1.4]);
+    }
   }
 
   // Try x, then nudge left/right; returns the x used (number) or null.
@@ -82,29 +115,30 @@ export class Forest {
     return hi - lo <= tol ? hi : null;
   }
 
-  _placeTree(x, kind) {
+  _placeTree(x, kind, o = {}) {
     const g = this.g, r = this.r;
-    const canopyR = r.range(1.9, 2.4);
-    if (!this._free(x - canopyR * 0.7, x + canopyR * 0.7)) return false;
-    const ground = this._flat(x, 1.2, 0.7);
+    const canopyR = o.canopyR ?? r.range(1.9, 2.4);
+    if (!o.force && !this._free(x - canopyR * 0.7, x + canopyR * 0.7)) return false;
+    const ground = o.force ? g.terrain.surfaceY(x) : this._flat(x, 1.2, 0.7);
     if (ground == null) return false;
-    const h = r.range(5.0, 6.2);
+    const h = o.h ?? r.range(5.0, 6.2);
+    const hp = o.hp ?? TREE.hp;
     const tree = {
-      x, ground, h, canopyR, kind, nuts: r.int(3, 6), hp: TREE.hp, maxHp: TREE.hp,
-      shake: 0, seed: r.int(1, 99999), dead: false, hive: null, web: null,
+      x, ground, h, canopyR, kind, nuts: o.nuts ?? r.int(3, 6), hp, maxHp: hp,
+      shake: 0, seed: r.int(1, 99999), dead: false, hive: null, web: null, giant: !!o.giant,
     };
     this._treeBodies(tree);
     this.trees.push(tree);
     this.taken.push([x - canopyR * 0.7, x + canopyR * 0.7]);
     const a = this.anchors(tree);
     // a beehive hanging from a branch on a rope
-    if (r() < 0.4) {
+    if (o.hive ?? r() < 0.4) {
       const hive = g._makeBlock('hive', 'box', a.branch.x, a.branch.y - 1.3, 0.66, 0.66);
       tree.hive = { block: hive, blockId: hive.id, joint: null, released: false };
       this._hangHive(tree, hive);
     }
     // a spider web between trunk and branch
-    if (r() < 0.45) {
+    if (o.web ?? r() < 0.45) {
       const web = { x: a.web.x, y: a.web.y, r: 0.95, tree, broken: 0, wobble: 0, holding: null, seed: r.int(1, 9999) };
       this._webBody(web);
       tree.web = web;
@@ -144,6 +178,14 @@ export class Forest {
     d.body = this.g.world.createBody({ type: 'static', position: V(d.x, d.ground + d.h) });
     d.body.createFixture(planck.Circle(0.55), { isSensor: true });
     d.body.setUserData({ kind: 'dandelion', ref: d });
+  }
+
+  // Anchored toadstool: a springy cap on a stem. Indestructible, so it never needs saving.
+  _bumperBody(b) {
+    b.body = this.g.world.createBody({ type: 'static', position: V(b.x, b.ground) });
+    b.body.createFixture(planck.Circle(V(0, 1.0), 0.78), { friction: 0.3, restitution: 1.05 });
+    b.body.createFixture(planck.Box(0.25, 0.5, V(0, 0.4), 0), { friction: 0.6, restitution: 0.4 });
+    b.body.setUserData({ kind: 'bumper', ref: b });
   }
 
   _stumpFor(tree) {
@@ -193,6 +235,7 @@ export class Forest {
       if (web.torn) web.broken = Math.max(web.broken, 0.001);
       else { web.broken = 0; this._webBody(web); }
     });
+    for (const b of this.bumpers) this._bumperBody(b);
     this.dandelions.forEach((d, i) => {
       d.body = null;
       d.done = d.blowing = !!s.d[i];
@@ -435,6 +478,7 @@ export class Forest {
       if (web.torn) web.broken = Math.min(1, web.broken + dt * 3);
     }
     for (const d of this.dandelions) if (d.done) d.blown = Math.min(1, d.blown + dt * 2.5);
+    for (const b of this.bumpers) b.flash = Math.max(0, b.flash - dt * 4);
   }
 
   // ------------------------------------------------------------------ per physics tick
@@ -475,6 +519,7 @@ export class Forest {
     }
     for (const web of this.webs) if (!web.torn) solid.push({ x: web.x, y: web.y, rad: web.r * 0.9 });
     for (const s of this.stumps) solid.push({ x: s.x, y: s.ground + 0.25, rad: 0.5 });
+    for (const b of this.bumpers) solid.push({ x: b.x, y: b.ground + 1.0, rad: 0.8 });
     return { solid, soft };
   }
 
@@ -483,6 +528,7 @@ export class Forest {
     const out = [];
     for (const tree of this.trees) if (tree.body) out.push(tree.body);
     for (const s of this.stumps) if (s.body) out.push(s.body);
+    for (const b of this.bumpers) if (b.body) out.push(b.body);
     return out;
   }
 
@@ -498,6 +544,11 @@ export class Forest {
     for (const s of this.stumps) {
       if (!inView(s.x, 2)) continue;
       if (Art.drawStump) Art.drawStump(ctx, { x: s.x, y: -s.ground, w: s.w, h: s.h, kind: s.kind, seed: s.seed });
+    }
+    for (const b of this.bumpers) {
+      if (!inView(b.x, 2)) continue;
+      const sq = b.flash * 0.12; // a squash when something bounces off
+      Art.drawBlock(ctx, { material: 'mushroom', shape: 'box', x: b.x, y: -(b.ground + 0.8 - sq * 0.8), angle: 0, w: 1.7 * (1 + sq), h: 1.7 * (1 - sq), hp01: 1, seed: b.seed, flash: 0 });
     }
     for (const tree of this.trees) {
       if (tree.dead || !inView(tree.x, tree.canopyR + 1)) continue;

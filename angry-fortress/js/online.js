@@ -69,15 +69,27 @@ export class Online {
     this.set({ lobby: settings });
   }
 
-  // Host only: start the next match. The loser of the last one shoots first.
-  hostStart(settings) {
+  // Host only: start the next match. The loser of the last one shoots first. `series` carries
+  // the best-of-3 score into the next round (null = a fresh series / single match).
+  hostStart(settings, series = null) {
     const prev = this.match;
     const id = (prev ? prev.id : 0) + 1;
     let first = Math.random() < 0.5 ? 0 : 1;
     if (prev && this.lastWinner != null) first = this.lastWinner < 0 ? 1 - prev.first : 1 - this.lastWinner;
-    const match = { id, seed: (Math.random() * 1e9) | 0, theme: settings.theme, wind: settings.wind, timer: settings.timer, first };
-    this.set({ match, rm: null });
+    const bo = settings.bo || 1;
+    const match = {
+      id, seed: (Math.random() * 1e9) | 0, theme: settings.theme, wind: settings.wind, timer: settings.timer, first,
+      series: series || { bo, wins: [0, 0], round: 1 },
+    };
+    this.lastWinner = null;
+    this.set({ match, rm: null, pick: null });
     this._begin(match, false);
+  }
+
+  // The loser of a round picks the next battlefield. A guest sends it to the host.
+  sendPick(theme) {
+    if (!this.match) return;
+    this.set({ pick: { m: this.match.id, theme } });
   }
 
   _begin(match, needSync) {
@@ -170,6 +182,10 @@ export class Online {
     }
     this._checkRematch();
     if (ps.rm && this.match && ps.rm === this.match.id + 1) this.emit('rematch-asked');
+    if (this.role === 'host' && ps.pick && this.match && ps.pick.m === this.match.id && this.pickSeen !== this.match.id) {
+      this.pickSeen = this.match.id;
+      this.emit('pick', ps.pick.theme);
+    }
 
     const g = this.game;
     if (!g || !this.match) return;
