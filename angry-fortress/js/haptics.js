@@ -114,4 +114,10 @@ export const Haptics = {
   pickup: () => play([T(0, 0.45, 0.9), T(0.08, 0.6, 0.9), T(0.16, 0.8, 0.9)], 0.5),
   boar: () => play([T(0, 0.8, 0.3), B(0.05, 0.5, 0.1, 0.4)], 0.6),
   emote: () => play([T(0, 0.35, 0.9), T(0.09, 0.35, 0.9)], 0.2),
+  // dropping into the clouds: a sinking rumble that fades away under you
+  fall: () => play([T(0, 0.8, 0.6), B(0.02, 0.6, 0.35, 0.35), B(0.4, 0.4, 0.2, 0.4), B(0.85, 0.22, 0.1, 0.45)], 0.9),
+  // the walnut biting into the ground: a rising rat-a-tat
+  drill: () => play([B(0, 0.75, 0.7, 0.07), B(0.09, 0.85, 0.75, 0.07), B(0.18, 0.95, 0.8, 0.1)], 0.7),
+  // careful: the ground is giving way / a cliff right ahead
+  edge: () => play([T(0, 0.5, 1), T(0.08, 0.6, 1)], 0.3),
 };

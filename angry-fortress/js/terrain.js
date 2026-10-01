@@ -1,9 +1,11 @@
 // Destructible terrain: a signed-distance grid (negative = solid) that is carved by
 // explosions, contoured with marching squares, turned into planck chain loops for
-// physics and into Path2D shapes for rendering.
+// physics and into Path2D shapes for rendering. The land is a set of floating islands over a
+// bottomless sea of clouds: dig through one and whoever stands on it falls.
 import { clamp, lerp, rng, noise1D } from './util.js';
 
-export const WORLD = { W: 72, H: 40, CELL: 0.25, SEA: 2.6, SEA0: 2.6 };
+// SEA is the top of the cloud sea: anything that sinks below it has fallen out of the world.
+export const WORLD = { W: 72, H: 40, CELL: 0.25, SEA: 1.0, SEA0: 1.0 };
 
 const SDF_MAX = 3;
 
@@ -35,12 +37,14 @@ export class Terrain {
   _generate(opts) {
     const { nx, ny, cell, f, stride } = this;
     const h = opts.heights;
+    const under = opts.under || (() => -Infinity); // underside of the island over x (Infinity: open sky)
     for (let i = 0; i <= nx; i++) {
       const x = i * cell;
       const hx = h(x);
+      const ux = under(x);
       for (let j = 0; j <= ny; j++) {
         const y = j * cell;
-        f[j * stride + i] = clamp(y - hx, -SDF_MAX, SDF_MAX);
+        f[j * stride + i] = clamp(Math.max(y - hx, ux - y), -SDF_MAX, SDF_MAX);
       }
     }
     for (const op of opts.ops || []) this._applyOp(op);
@@ -122,6 +126,40 @@ export class Terrain {
       this.version++;
     }
     return changed;
+  }
+
+  // Several carves at once (a drilled shaft): logged one by one, exactly as rebuild() replays them,
+  // but contoured only once.
+  carveMany(list) {
+    let changed = false;
+    for (const [cx, cy, r] of list) {
+      const op = [Math.round(cx * 100), Math.round(cy * 100), Math.round(r * 100)];
+      this.opLog.push(op);
+      if (this._carveRaw(op[0] / 100, op[1] / 100, op[2] / 100)) {
+        this._removeDust();
+        changed = true;
+      }
+      this.craters.push({ x: op[0] / 100, y: op[1] / 100, r: op[2] / 100 });
+    }
+    if (this.craters.length > 80) this.craters.splice(0, this.craters.length - 80);
+    if (changed) {
+      this._contour();
+      this.version++;
+    }
+    return changed;
+  }
+
+  // How much solid ground is under (x, y0): metres of contiguous solid starting within `gap`
+  // below y0 (0 when there is only air there).
+  thicknessBelow(x, y0, gap = 0.6, max = 8) {
+    const step = this.cell;
+    let y = y0 - 0.1;
+    const lowest = y0 - gap;
+    while (y > lowest && this.sample(x, y) >= 0) y -= step;
+    if (y <= lowest) return 0;
+    const top = y;
+    while (y > top - max && y > 0 && this.sample(x, y) < 0) y -= step;
+    return top - y;
   }
 
   // Throw away every carve and replay `ops` from the freshly generated ground (used when a
@@ -321,6 +359,7 @@ export class Terrain {
     const fern = new Path2D(), fernHi = new Path2D();
     const bush = new Path2D(), bushHi = new Path2D();
     const clover = new Path2D(), needles = new Path2D();
+    const roots = new Path2D(), vines = new Path2D(), vineLeaves = new Path2D();
     const flowers = [], shrooms = [], leaves = [];
     const { stride, cell, scar } = this;
     const st = this.style;
@@ -402,6 +441,31 @@ export class Terrain {
         const len = Math.hypot(dx, dy) || 1;
         const nyUp = -dx / len; // outward (right-hand) normal y component
         const mx = (x0 + x1) / 2, my = (y0 + y1) / 2;
+        if (nyUp < -0.45 && !isScar(mx, my)) {
+          // roots and vines dangling from the underside of the island
+          const lo = Math.min(x0, x1), hi = Math.max(x0, x1);
+          for (let slot = Math.ceil(lo / SLOT); slot * SLOT < hi; slot++) {
+            if (hash(slot, 31) > 0.34) continue;
+            const tx = slot * SLOT;
+            const t = (tx - x0) / dx;
+            if (t < 0 || t > 1) continue;
+            const ty = -(y0 + dy * t) - 0.04;
+            const L = 0.35 + Math.pow(hash(slot, 32), 1.6) * 1.9;
+            const bend = (hash(slot, 33) - 0.5) * 0.7 * L;
+            if (hash(slot, 34) < 0.55) {
+              roots.moveTo(tx, ty);
+              roots.quadraticCurveTo(tx + bend, ty + L * 0.55, tx + bend * 0.4, ty + L);
+            } else {
+              vines.moveTo(tx, ty);
+              vines.quadraticCurveTo(tx - bend, ty + L * 0.5, tx - bend * 0.2, ty + L * 1.15);
+              for (let q = 1; q <= 3; q++) {
+                const u = q / 3.6, lx = tx - bend * u * (1.6 - u) * 0.9, ly = ty + L * 1.15 * u, side = q % 2 ? 1 : -1;
+                vineLeaves.moveTo(lx, ly);
+                vineLeaves.ellipse(lx + side * 0.09, ly, 0.11, 0.055, side * 0.5, 0, Math.PI * 2);
+              }
+            }
+          }
+        }
         const ok = nyUp > 0.42 && !isScar(mx, my) && my > WORLD.SEA0 - 0.2;
         if (!ok) { drawing = false; continue; }
         if (!drawing) { grass.moveTo(x0, -y0); drawing = true; }
@@ -431,6 +495,7 @@ export class Terrain {
     this.tuftPath = tufts;
     this.flowers = flowers;
     this.decor = { fern, fernHi, bush, bushHi, clover, needles, shrooms, leaves };
+    this.hanging = { roots, vines, vineLeaves };
   }
 
   draw(ctx, style, pattern, view) {
@@ -471,6 +536,18 @@ export class Terrain {
     ctx.lineWidth = 0.09;
     ctx.strokeStyle = s.outline;
     ctx.stroke(this.path);
+    const hg = this.hanging;
+    if (hg) {
+      ctx.lineCap = 'round';
+      ctx.strokeStyle = s.root || '#3e2210';
+      ctx.lineWidth = 0.075;
+      ctx.stroke(hg.roots);
+      ctx.strokeStyle = s.grassDark;
+      ctx.lineWidth = 0.045;
+      ctx.stroke(hg.vines);
+      ctx.fillStyle = s.grass;
+      ctx.fill(hg.vineLeaves);
+    }
     // undergrowth rooted on the surface (drawn under the grass band)
     const d = this.decor;
     if (d) {
@@ -598,21 +675,26 @@ function simplifyLoop(l, eps) {
 }
 
 // ---------- map generation ----------
-// Produces a height function + SDF ops for a given theme layout.
+// Produces a height function, the islands' undersides and SDF ops for a given theme layout.
+// Every map floats over the cloud sea: two home islands (or one long ridge), and whatever the
+// theme puts in the middle. Each island is an upside-down mountain: a flat top to stand on, a
+// rocky underside that is thickest in the middle and thins out toward the cliffs at its ends.
 export function buildLandscape(layout, seed) {
-  const { W, SEA } = WORLD;
+  const { W } = WORLD;
   const r = rng(seed);
   const n1 = noise1D(seed + 11);
   const n2 = noise1D(seed + 23);
-  const bases = [W * 0.17 + r.range(-1.5, 1.5), W * 0.83 + r.range(-1.5, 1.5)];
+  const nU = noise1D(seed + 37);
+  const bases = [W * 0.17 + r.range(-1.2, 1.2), W * 0.83 + r.range(-1.2, 1.2)];
   const baseH = [r.range(layout.baseMin, layout.baseMax), r.range(layout.baseMin, layout.baseMax)];
-  const mid = W / 2 + r.range(-3, 3);
+  const mid = W / 2 + r.range(-1.5, 1.5);
   const midH = r.range(layout.midMin, layout.midMax);
+  const ends = [bases[0] - 6.5, bases[1] + 6.5]; // outer cliffs of the two home islands
+  const HOME = layout.home ?? 3.6; // ground under each captain at the start
   // control points for the big shape
   const cps = [
-    [-1, -2],
-    [2.2, SEA - 1.5],
-    [5.5, baseH[0] - 1.5],
+    [ends[0] - 2, baseH[0] - 2.4],
+    [ends[0] + 2.4, baseH[0] - 0.2],
     [bases[0] - 3, baseH[0]],
     [bases[0] + 7, baseH[0]],
   ];
@@ -621,25 +703,34 @@ export function buildLandscape(layout, seed) {
     [bases[0] - 3, bases[0] + 7, baseH[0]],
     [bases[1] - 7, bases[1] + 3, baseH[1]],
   ];
-  if (layout.mid === 'twin') {
-    cps.push([mid - 8, midH], [mid - 1.5, lerp(baseH[0], baseH[1], 0.5) - 2.5], [mid + 1.5, lerp(baseH[0], baseH[1], 0.5) - 2.5], [mid + 8, midH]);
-  } else if (layout.mid === 'gorge') {
-    // a deep canyon down to the stream, flat rims on both sides for a log bridge
+  // islands: [left x, right x, max thickness, profile exponent (small = blunt, thick to the edges)]
+  let spans;
+  const homeSpans = (inner, D = HOME, p = 0.55) => [[ends[0], Math.min(bases[0] + 8.5, mid - inner), D, p], [Math.max(bases[1] - 8.5, mid + inner), ends[1], D, p]];
+  if (layout.mid === 'gorge') {
+    // a bottomless canyon between two big landmasses, flat rims on both sides for a log bridge
     const rim = midH, gap = 2.6, lip = 1.9;
     cps.push(
-      [mid - 10, lerp(baseH[0], rim, 0.5)], [mid - gap - lip, rim], [mid - gap, rim], [mid - gap + 1.0, SEA - 3],
-      [mid + gap - 1.0, SEA - 3], [mid + gap, rim], [mid + gap + lip, rim], [mid + 10, lerp(baseH[1], rim, 0.5)],
+      [mid - 10, lerp(baseH[0], rim, 0.5)], [mid - gap - lip, rim], [mid - gap, rim], [mid - gap + 1.0, rim - 3],
+      [mid + gap - 1.0, rim - 3], [mid + gap, rim], [mid + gap + lip, rim], [mid + 10, lerp(baseH[1], rim, 0.5)],
     );
     plateaus.push([mid - gap - lip, mid - gap, rim], [mid + gap, mid + gap + lip, rim]);
     features.bridge = { x: mid, y: rim, span: (gap + lip * 0.55) * 2 };
+    // thick enough under each captain, deeper toward the canyon
+    const D = (a, b, x) => HOME / Math.sqrt(Math.sin(Math.PI * (x - a) / (b - a)));
+    spans = [[ends[0], mid - gap, D(ends[0], mid - gap, bases[0]), 0.5], [mid + gap, ends[1], D(mid + gap, ends[1], bases[1]), 0.5]];
   } else if (layout.mid === 'mesa') {
-    // a steep, flat-topped hill: room on top for a landmark, thick enough to tunnel through
+    // a big floating mountain in the middle: room on top for a landmark, thick enough to tunnel through
     const top = midH;
     cps.push([mid - 8.6, lerp(baseH[0], top, 0.22)], [mid - 6, top], [mid + 6, top], [mid + 8.6, lerp(baseH[1], top, 0.22)]);
     plateaus.push([mid - 6, mid + 6, top]);
+    spans = homeSpans(13.6);
+    spans.splice(1, 0, [mid - 9.8, mid + 9.8, 9.5, 0.6]);
   } else if (layout.mid === 'valley') {
     cps.push([mid - 7, lerp(baseH[0], midH, 0.5)], [mid, midH], [mid + 7, lerp(baseH[1], midH, 0.5)]);
+    spans = homeSpans(15.5);
+    spans.splice(1, 0, [mid - 7.6, mid + 7.6, 6.2, 0.6]);
   } else {
+    // one long ridge floating end to end
     const a0 = lerp(baseH[0], midH, 0.55), a1 = lerp(baseH[1], midH, 0.55);
     cps.push([mid - 7, a0], [mid, midH], [mid + 7, a1]);
     if (layout.ledges) {
@@ -653,8 +744,10 @@ export function buildLandscape(layout, seed) {
       // each boulder sits at the uphill end of its step: a clean hit still sends it rolling
       features.boulders = [{ x: mid - d + 0.4, y: hl, dir: 1 }, { x: mid + d - 0.4, y: hr, dir: -1 }];
     }
+    const t0 = (bases[0] - ends[0]) / (ends[1] - ends[0]);
+    spans = [[ends[0], ends[1], HOME / Math.pow(Math.sin(Math.PI * t0), 0.4), 0.4]];
   }
-  cps.push([bases[1] - 7, baseH[1]], [bases[1] + 3, baseH[1]], [W - 5.5, baseH[1] - 1.5], [W - 2.2, SEA - 1.5], [W + 1, -2]);
+  cps.push([bases[1] - 7, baseH[1]], [bases[1] + 3, baseH[1]], [ends[1] - 2.4, baseH[1] - 0.2], [ends[1] + 2, baseH[1] - 2.4]);
   cps.sort((a, b) => a[0] - b[0]);
   const heights = (x) => {
     let k = 0;
@@ -671,32 +764,48 @@ export function buildLandscape(layout, seed) {
     const detail = n1(x * 0.16) * layout.rough + n2(x * 0.7) * layout.rough * 0.22;
     return h + detail * (1 - flat * 0.92);
   };
+  spans = spans.map(([a, b, D, p]) => ({ a, b, D, p }));
+  // the rocky underside: thickest in the middle of each island, jagged, never thinner than a lip
+  const under = (x) => {
+    for (const s of spans) {
+      if (x <= s.a || x >= s.b) continue;
+      const k = Math.sin(Math.PI * (x - s.a) / (s.b - s.a));
+      const d = s.D * Math.pow(k, s.p) + (nU(x * 0.55) * 0.55 + nU(x * 1.7 + 9) * 0.18) * k;
+      return heights(x) - Math.max(0.08, d);
+    }
+    return Infinity;
+  };
+  const onIsland = (x) => under(x) < Infinity;
   const ops = [];
+  // hanging crags under the islands (never right under a captain: that ground is fair game)
+  for (const s of spans) {
+    const w = s.b - s.a;
+    const n = w > 18 ? 2 : 1;
+    for (let c = 0; c < n; c++) {
+      let x = lerp(s.a, s.b, n === 1 ? r.range(0.3, 0.7) : c === 0 ? r.range(0.18, 0.38) : r.range(0.62, 0.82));
+      for (const bx of bases) if (Math.abs(x - bx) < 3.2) x = bx + Math.sign(x - bx || 1) * 3.2;
+      if (!onIsland(x)) continue;
+      const uy = under(x);
+      // long enough to look like a crag, never long enough to dip into the clouds
+      const ry = Math.min(r.range(1.3, 2.3) * Math.min(1.4, s.D / 5), (uy - WORLD.SEA - 2.6) / 1.5), rx = r.range(0.7, 1.2);
+      if (ry < 0.6) continue;
+      ops.push({ type: 'add', x, y: uy - ry * 0.35, rx, ry });
+      ops.push({ type: 'add', x: x + r.range(-0.6, 0.6), y: uy - ry * 0.9, rx: rx * 0.5, ry: ry * 0.6 });
+    }
+  }
   if (layout.arch) {
     ops.push({ type: 'sub', x: mid, y: midH * 0.55, rx: 2.6, ry: 1.9 });
-  }
-  if (layout.island) {
-    const ix = mid + r.range(-4, 4);
-    const iy = midH + r.range(5, 7);
-    ops.push({ type: 'add', x: ix, y: iy, rx: 3.2, ry: 0.9 });
-    ops.push({ type: 'add', x: ix + 0.4, y: iy - 0.7, rx: 2.2, ry: 0.9 });
-  }
-  if (layout.caves) {
-    for (let c = 0; c < layout.caves; c++) {
-      const cx = lerp(bases[0] + 9, bases[1] - 9, r());
-      const hy = heights(cx);
-      ops.push({ type: 'sub', x: cx, y: hy - r.range(2.5, 4), rx: r.range(1.4, 2.4), ry: r.range(0.8, 1.2) });
-    }
   }
   if (layout.spire) {
     ops.push({ type: 'add', x: mid, y: midH + 2.5, rx: 1.1, ry: 3.2 });
   }
   if (layout.tunnel) {
-    // a squirrel tunnel straight through the central hill, open at both slopes: a flat,
+    // a squirrel tunnel straight through the floating mountain, open at both slopes: a flat,
     // well-aimed shot goes right through
-    // halfway up the mesa wall: dirt below the floor and above the roof, so it reads as a tunnel
+    // low in the mountain's flank: a thick roof over it and solid rock under the floor, so it
+    // reads as a tunnel and not as two islands stacked up
     const wall = lerp(Math.max(baseH[0], baseH[1]), midH, 0.22);
-    const ty = layout.mid === 'mesa' ? (wall + midH) / 2 - 0.3 : midH - 2.8;
+    const ty = layout.mid === 'mesa' ? wall + 1.1 : midH - 2.8;
     let xa = mid, xb = mid;
     while (xa > mid - 16 && heights(xa) > ty + 0.4) xa -= 0.25;
     while (xb < mid + 16 && heights(xb) > ty + 0.4) xb += 0.25;
@@ -708,7 +817,7 @@ export function buildLandscape(layout, seed) {
   // a little rock lip on the downhill edge of each boulder step (round stones roll on any tilt)
   for (const l of features.lips || []) ops.push({ type: 'add', x: l.x, y: l.y + 0.12, rx: 0.42, ry: 0.4 });
   if (layout.islands) {
-    // two floating islands, mirrored, each carrying a nut basket
+    // two small sky islets, mirrored, each carrying a nut basket
     features.islands = [];
     for (const side of [-1, 1]) {
       const ix = mid + side * layout.islands, iy = midH + 6.8;
@@ -719,7 +828,7 @@ export function buildLandscape(layout, seed) {
     }
     features.bounce = [{ x: mid - 3.4 }, { x: mid + 3.4 }];
   }
-  return { heights, ops, bases, baseH, mid, midH, features };
+  return { heights, under, onIsland, spans, ops, bases, baseH, mid, midH, features };
 }
 
 // Tileable dirt texture as a CanvasPattern mapped at 64px per meter.

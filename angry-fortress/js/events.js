@@ -107,9 +107,12 @@ export class ForestEvents {
   // ------------------------------------------------------------------ boar
   _startBoar(dir) {
     const g = this.g;
-    const x = dir > 0 ? 5 : WORLD.W - 5;
+    // it bursts out of the bushes at the outer cliff of the first island
+    let x = dir > 0 ? 2 : WORLD.W - 2;
+    while (x > 1 && x < WORLD.W - 1 && g.terrain.surfaceY(x) < WORLD.SEA + 0.5) x += dir * 0.25;
+    x += dir * 0.8;
     const y = Math.max(g.terrain.surfaceY(x), WORLD.SEA);
-    this.boar = { x, y, vy: 0, dir, t: 0, hit: 0, hitIds: new Set() };
+    this.boar = { x, y, vy: 0, dir, t: 0, hit: 0, hitIds: new Set(), air: false };
     g._sfx('boar');
     g._hap('boar');
   }
@@ -119,22 +122,34 @@ export class ForestEvents {
     b.t += dt;
     b.hit = Math.max(0, b.hit - dt * 4);
     b.x += b.dir * BOAR.speed * dt;
-    // follow the ground it runs on (never the floating islands overhead); scramble up walls,
-    // tumble down drops, splash through the stream
+    // follow the ground it runs on (never the islets overhead), scramble up walls, tumble down
+    // slopes and leap the gaps between islands; with no land left ahead it sails off the edge
     let ground = t.surfaceY(b.x, b.y + 3.2);
     if (ground < 0 || t.solid(b.x, b.y + 3.1)) ground = t.surfaceY(b.x);
-    if (ground < WORLD.SEA) ground = WORLD.SEA;
-    if (ground > b.y) {
+    const sky = ground < WORLD.SEA + 0.3;
+    if (!b.air && sky) {
+      b.air = true;
+      b.vy = this._landAhead(b) ? 10.5 : 3;
+      g.fx.burst(b.x - b.dir * 0.6, b.y + 0.1, 'dust', 4, { speed: 2 });
+    }
+    if (!sky && ground > b.y) {
       b.y = Math.min(ground, b.y + 20 * dt);
       b.vy = 0;
+      if (b.air) { b.air = false; g.fx.burst(b.x, b.y + 0.1, 'dust', 5, { speed: 2 }); g._hap('dent'); }
     } else {
-      b.vy -= 32 * dt;
-      b.y = Math.max(ground, b.y + b.vy * dt);
-      if (b.y <= ground) b.vy = 0;
+      b.vy -= (b.air ? 30 : 32) * dt;
+      const floor = sky ? -Infinity : ground;
+      b.y = Math.max(floor, b.y + b.vy * dt);
+      if (b.y <= floor) {
+        b.vy = 0;
+        if (b.air) { b.air = false; g.fx.burst(b.x, b.y + 0.1, 'dust', 5, { speed: 2 }); g._hap('dent'); }
+      }
     }
-    const wet = b.y <= WORLD.SEA + 0.05;
-    if (wet && !b.wet) g._splash(b.x, 1);
-    b.wet = wet;
+    if (b.y < WORLD.SEA - 0.4) {
+      g._cloudPoof(b.x, 1);
+      this.boar = null;
+      return;
+    }
     // what it crashes into
     for (const p of g.players) {
       if (p.dead || b.hitIds.has(p)) continue;
@@ -170,7 +185,14 @@ export class ForestEvents {
       g.fx.burst(b.x - b.dir * 0.9, b.y + 0.15, 'dust', 2, { speed: 1.2 });
       if (Math.floor(b.t * 7) % 3 === 0) g._hap('dent');
     }
-    if ((b.dir > 0 && b.x > WORLD.W - 4) || (b.dir < 0 && b.x < 4)) this.boar = null;
+    if ((b.dir > 0 && b.x > WORLD.W + 2) || (b.dir < 0 && b.x < -2)) this.boar = null;
+  }
+
+  // Is there an island to land on within one leap?
+  _landAhead(b) {
+    const t = this.g.terrain;
+    for (let d = 1; d <= 10; d += 0.5) if (t.surfaceY(b.x + b.dir * d, b.y + 2.5) > WORLD.SEA + 0.5) return true;
+    return false;
   }
 
   // ------------------------------------------------------------------ supply drop
@@ -183,9 +205,9 @@ export class ForestEvents {
       d.y = Math.max(ground + 0.36, d.y - DROP_STEP);
       if (d.y <= ground + 0.37) {
         if (ground < WORLD.SEA + 0.2) {
-          // it came down in the stream
-          g._splash(d.x, 0.8);
-          g.fx.text(d.x, WORLD.SEA + 1.5, '보급이 개울에 빠졌어요', '#fff', 0.8, { life: 1.6 });
+          // nothing under it: lost to the clouds
+          g._cloudPoof(d.x, 0.8);
+          g.fx.text(d.x, WORLD.SEA + 2, '보급이 구름 아래로 떨어졌어요', '#fff', 0.8, { life: 1.6 });
           this._removeDrop();
           return;
         }
@@ -195,9 +217,9 @@ export class ForestEvents {
       this._dropBody();
     } else if (!d && n >= DROP_FIRST && (n - DROP_FIRST) % DROP_EVERY === 0) {
       const r = rng(((g.seed ^ 0xd809) + n * 131) >>> 0);
-      this.drop = { x: g.land.mid + r.range(-6, 6), y: 26, kind: r() < 0.5 ? 'nuts' : 'heal', landed: false, showY: 31 };
+      this.drop = { x: g.land.mid + r.range(-6, 6), y: 28, kind: r() < 0.5 ? 'nuts' : 'heal', landed: false, showY: 33 };
       this._dropBody();
-      g.fx.text(this.drop.x, 23, '보급 도착!', '#ffe45c', 1.0, { life: 1.8 });
+      g.fx.text(this.drop.x, 25, '보급 도착!', '#ffe45c', 1.0, { life: 1.8 });
       g._sfx('alert');
     }
   }

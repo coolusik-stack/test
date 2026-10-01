@@ -1,5 +1,5 @@
 // Offline cache for the game shell. Bump VERSION when files change.
-const VERSION = 'af-v5';
+const VERSION = 'af-v6';
 const SHELL = [
   './',
   './index.html',

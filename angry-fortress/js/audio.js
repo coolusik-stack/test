@@ -1262,6 +1262,34 @@ def('log_roll', 0.9, 1, 0.04, 3, (v) => {
     knock(v, t, 220, 0.3 * g, 0.1);
   });
 });
+def('fall', 1.2, 3, 0.02, 2, (v) => {
+  // a squeaky "으아아~" trailing away, a falling whistle and the wind rushing past
+  v.tone({ type: 'triangle', f: 980, pts: [[0.08, 1100], [1.3, 420]], a: 0.04, h: 1.0, d: 0.3, g: 0.3, vib: { r: 9, d: 40, delay: 0.05 } });
+  v.tone({ type: 'sawtooth', f: 490, pts: [[0.08, 550], [1.3, 210]], a: 0.04, h: 1.0, d: 0.3, g: 0.05, vib: { r: 9, d: 20 } });
+  v.tone({ t: 0.1, f: 2400, pts: [[1.4, 600]], a: 0.2, h: 1.0, d: 0.2, g: 0.07 });
+  v.noise({ k: 'p', a: 0.3, h: 0.8, d: 0.4, g: 0.3, ft: 'bandpass', f: 500, pts: [[1.2, 1600]], Q: 0.8 });
+});
+def('poof', 1.8, 2, 0.04, 3, (v) => {
+  // sinking into the cloud sea: a soft, swallowed whump
+  v.noise({ k: 'p', a: 0.02, h: 0.06, d: 0.5, g: 0.5, ft: 'lowpass', f: 1400, f1: 300, glide: 0.5 });
+  v.tone({ f: 160, f1: 60, glide: 0.25, a: 0.005, d: 0.3, g: 0.35 });
+  v.noise({ t: 0.03, k: 'w', a: 0.05, d: 0.35, g: 0.08, ft: 'highpass', f: 4000 });
+});
+def('drill', 1.3, 2, 0.03, 2, (v) => {
+  // the walnut grinding its way into the island
+  const grind = v.gain(0.7);
+  grind.connect(v.out);
+  v.lfo(grind.gain, 28, 0.5, 0, 0.45);
+  v.tone({ type: 'sawtooth', f: 90, f1: 55, glide: 0.4, a: 0.005, h: 0.25, d: 0.15, g: 0.35, out: grind });
+  v.noise({ k: 'c', a: 0.005, h: 0.25, d: 0.15, g: 0.5, ft: 'bandpass', f: 900, f1: 400, glide: 0.4, Q: 1.2, rate: 0.7, out: grind });
+  v.noise({ k: 'b', a: 0.003, d: 0.2, g: 0.4, ft: 'lowpass', f: 300 });
+});
+def('brake', 2.8, 2, 0.04, 2, (v) => {
+  // wheels skidding to a stop at the edge
+  v.noise({ k: 'w', a: 0.005, h: 0.06, d: 0.14, g: 0.25, ft: 'bandpass', f: 2600, f1: 1200, glide: 0.2, Q: 2.5 });
+  v.noise({ k: 'b', a: 0.003, d: 0.12, g: 0.3, ft: 'lowpass', f: 400 });
+  v.tone({ type: 'triangle', f: 300, f1: 180, glide: 0.1, a: 0.002, d: 0.1, g: 0.15 });
+});
 def('splash_small', 1.4, 1, 0.04, 3, (v) => {
   // "bloop" (bubble resonance rises) + light spray and a few bubbles
   v.tone({ f: 380, f1: 1100, glide: 0.06, a: 0.002, d: 0.08, g: 0.3 });

@@ -51,6 +51,7 @@ export class FX {
       else if (kind === 'shell') this.add({ ...base, type: 'rock', life: 0.8 + Math.random() * 0.5, size: 0.06 + Math.random() * 0.09, color: Math.random() < 0.5 ? '#a8733f' : '#e2c08a', rot: Math.random() * TAU, vr: (Math.random() - 0.5) * 14 });
       else if (kind === 'needle') this.add({ ...base, type: 'needle', life: 0.5 + Math.random() * 0.35, size: 0.2 + Math.random() * 0.14, color: Math.random() < 0.5 ? '#8bc34a' : '#c5e17a', g: 0.35, drag: 1.2 });
       else if (kind === 'seed') this.add({ ...base, vx: base.vx * 0.5, vy: Math.abs(base.vy) * 0.4 + 0.6, type: 'seed', life: 2.2 + Math.random() * 1.2, size: 0.12 + Math.random() * 0.06, g: -0.02, drag: 1.2, rot: Math.random() * TAU, vr: (Math.random() - 0.5) * 3 });
+      else if (kind === 'cloud') this.add({ ...base, vx: base.vx * 0.6, vy: Math.abs(base.vy) * 0.3 + 0.5, type: 'puff', life: 1.0 + Math.random() * 0.7, size: 0.35 + Math.random() * 0.5, grow: 1.7, color: opts.color || 'rgba(255,255,255,0.95)', g: -0.04, drag: 2.0 });
       else if (kind === 'honey') this.add({ ...base, type: 'drop', life: 0.9 + Math.random() * 0.5, size: 0.08 + Math.random() * 0.1, color: Math.random() < 0.6 ? '#f6b21b' : '#ffd45a', g: 0.9, drag: 0.6 });
     }
   }

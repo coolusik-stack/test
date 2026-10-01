@@ -11,7 +11,7 @@ export const AMMO_INFO = {
   pinenut: { name: '잣',     desc: '터치: 초고속 돌진', color: '#f0d8a8' },
   peanut:  { name: '땅콩',   desc: '터치: 알맹이 셋으로 분열', color: '#d9a86a' },
   burr:    { name: '밤송이', desc: '터치: 가시 대폭발', color: '#7cb342' },
-  walnut:  { name: '호두',   desc: '터치: 수직으로 쿵!', color: '#9c6b3f' },
+  walnut:  { name: '호두',   desc: '터치: 내리꽂혀 땅을 뚫어요', color: '#9c6b3f' },
 };
 export const CART = { radius: 0.75 };
 

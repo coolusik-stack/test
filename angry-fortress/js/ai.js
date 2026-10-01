@@ -1,6 +1,8 @@
 // CPU opponent: brute-force ballistic search over angle × power using the same
-// integrator as the physics engine, then scores each landing per bird type.
-import { GRAV, VMAX, WIND_ACC, AMMO, POUND_SPEED, CART_R, HEAD } from './config.js';
+// integrator as the physics engine, then scores each landing per bird type. Besides damage it
+// weighs how much ground a shot takes out from under the other captain: on floating islands,
+// digging someone out is a win.
+import { GRAV, VMAX, WIND_ACC, AMMO, POUND_SPEED, CART_R, HEAD, THIN_GROUND, CRUMBLE } from './config.js';
 import { WORLD } from './terrain.js';
 
 const H = 1 / 60;
@@ -97,6 +99,51 @@ export function planShot(game, me, difficulty) {
     return { x, y, t: maxT, vx, vy, kind: 'none' };
   };
 
+  // ---- digging: how much of the island under the enemy a set of removed circles takes away
+  const eb = ep.y - CART_R + 0.05; // bottom of their cart
+  const solidAfter = (x, y, rem) => {
+    if (terrain.sample(x, y) >= 0) return false;
+    for (const c of rem) if ((x - c[0]) * (x - c[0]) + (y - c[1]) * (y - c[1]) < c[2] * c[2]) return false;
+    return true;
+  };
+  // [thickness of the ground right under the cart, where that ground ends]
+  const supportAfter = (x, rem) => {
+    let y = eb - 0.1;
+    while (y > eb - 0.5 && !solidAfter(x, y, rem)) y -= 0.25;
+    if (y <= eb - 0.5) return [0, y];
+    const top = y;
+    while (y > top - 8 && y > 0 && solidAfter(x, y, rem)) y -= 0.25;
+    return [top - y, y];
+  };
+  const caughtBelow = (x, from, rem) => {
+    for (let y = from - 0.1; y > WORLD.SEA; y -= 0.3) if (solidAfter(x, y, rem)) return true;
+    return false;
+  };
+  const COLS = [-0.5, 0, 0.5];
+  const before = COLS.map((dx) => supportAfter(ep.x + dx, [])[0]);
+  // falling behind makes the CPU go for the island instead of the captain
+  const behind = 1 + Math.max(0, (me.hp - enemy.hp) < 0 ? (enemy.hp - me.hp) / 35 : 0);
+  const digScore = (rem) => {
+    if (!rem.some((c) => Math.abs(c[0] - ep.x) < c[2] + 0.8 && c[1] - c[2] < eb)) return 0;
+    const after = COLS.map((dx) => supportAfter(ep.x + dx, rem));
+    const t = after.map((a) => a[0]);
+    // nothing left, or an already-cracked crust that this hit breaks: the cart drops through
+    if (t[1] === 0 || (before[1] > 0 && before[1] < CRUMBLE) || t.filter((v) => v === 0).length >= 2) {
+      const caught = COLS.some((dx, k) => caughtBelow(ep.x + dx, after[k][1], rem));
+      return caught ? 14 : enemy.hp + 40;
+    }
+    let lost = 0;
+    for (let k = 0; k < 3; k++) lost += Math.max(0, before[k] - t[k]) / 3;
+    const thin = Math.min(...t);
+    return (lost * 5 + (thin < THIN_GROUND ? (THIN_GROUND - thin) * 9 : 0)) * behind;
+  };
+  const drillRem = (x, y) => {
+    const D = AMMO.walnut.drill, rem = [];
+    for (let d = 0; d <= D.depth + 0.01; d += 0.45) rem.push([x, y - d, D.r]);
+    rem.push([x, y - D.depth, AMMO.walnut.blast.crater]);
+    return rem;
+  };
+
   const blastDmg = (x, y, spec) => {
     const d = Math.max(0, Math.min(Math.hypot(x - ep.x, y - ep.y) - CART_R * 0.6, Math.hypot(x - ep.x, y - ep.y - HEAD.y) - HEAD.r * 0.6));
     const self = Math.max(0, Math.hypot(x - mp.x, y - mp.y) - CART_R * 0.6);
@@ -131,10 +178,16 @@ export function planShot(game, me, difficulty) {
       else if (type === 'acorn') {
         if (hit.kind === 'enemy') dmg = 28;
         else if (hit.kind === 'terrain' || hit.kind === 'block') dmg = d < 1.8 ? 12 * (1 - d / 1.8) : 0;
+        if (hit.kind === 'terrain' && d < 4) {
+          const sp = Math.hypot(hit.vx, hit.vy) || 1;
+          const rr = AMMO.acorn.dent * Math.min(1.2, Math.max(0.6, sp / 20));
+          dmg += digScore([[hit.x + (hit.vx / sp) * r, hit.y + (hit.vy / sp) * r, rr]]);
+        }
       } else if (type === 'burr') {
         if (hit.kind === 'enemy') dmg = AMMO.burr.blast.dmg + 6;
         else if (hit.kind === 'terrain' || hit.kind === 'block') {
           dmg = blastDmg(hit.x, hit.y, AMMO.burr.blast);
+          if (hit.kind === 'terrain' && d < 5) dmg += digScore([[hit.x, hit.y, AMMO.burr.blast.crater]]);
           abilityAt = Math.max(0.1, hit.t - H * 2);
         }
         dmg -= 8; // save bombs for when they matter
@@ -144,20 +197,32 @@ export function planShot(game, me, difficulty) {
         abilityAt = hit.t * 0.62;
         dmg -= 4;
       } else if (type === 'walnut') {
-        // find the moment we pass above the enemy, then slam straight down from there
-        let x = rest.x, y = rest.y, vx = vx0, vy = vy0, tc = -1;
-        let px = x;
-        for (let i = 1; i * H < hit.t; i++) {
+        // slam straight down from above the enemy (a head-on hit), or just beside them, where
+        // the walnut drills into the ground and blows the island out from under them
+        const OFFS = [0, -0.9, 0.9, -1.5, 1.5];
+        const found = new Map();
+        let x = rest.x, y = rest.y, vx = vx0, vy = vy0, px = x;
+        for (let i = 1; i * H < hit.t && found.size < OFFS.length; i++) {
           vx += wax * H; vy -= GRAV * H; x += vx * H; y += vy * H;
-          if ((px - ep.x) * (x - ep.x) <= 0 && y > ep.y + 1.2) { tc = i * H; break; }
+          for (const o of OFFS) {
+            const gx = ep.x + o;
+            if (!found.has(o) && (px - gx) * (x - gx) <= 0 && y > ep.y + 1.2) found.set(o, { x, y, t: i * H });
+          }
           px = x;
         }
-        if (tc > 0) {
-          const e = sim(x, y, 0, -POUND_SPEED, AMMO.walnut.r, 4, false);
-          if (e.kind === 'enemy') dmg = AMMO.walnut.blast.dmg + 4;
-          else if (e.kind !== 'water' && e.kind !== 'out') dmg = blastDmg(e.x, e.y, AMMO.walnut.blast);
-          abilityAt = tc;
-        } else if (hit.kind === 'enemy') dmg = 26;
+        let bestW = -Infinity;
+        for (const c of found.values()) {
+          const e = sim(c.x, c.y, 0, -POUND_SPEED, AMMO.walnut.r, 4, false);
+          let v = 0;
+          if (e.kind === 'enemy') v = AMMO.walnut.blast.dmg + 4;
+          else if (e.kind === 'terrain') {
+            const by = e.y - AMMO.walnut.drill.depth;
+            v = blastDmg(e.x, by, AMMO.walnut.blast) + digScore(drillRem(e.x, e.y));
+          } else if (e.kind === 'block') v = blastDmg(e.x, e.y, AMMO.walnut.blast);
+          if (v > bestW) { bestW = v; abilityAt = c.t; }
+        }
+        if (found.size) dmg = bestW;
+        else if (hit.kind === 'enemy') dmg = 26;
         dmg -= 6;
       }
       if (dmg > 0 && hit.kind === 'block' && d < 4) dmg += 2;

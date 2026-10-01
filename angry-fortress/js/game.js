@@ -14,6 +14,7 @@ import { clamp, rng, lerp, dist } from './util.js';
 import {
   GRAV, VMAX, WIND_ACC, MAX_PULL, CART_R, HEAD, HP_MAX, STAMINA, STAMINA_PER_M, MOVE_SPEED,
   MAT, AMMO, KERNEL, POUND_SPEED, HIVE_BLAST, SUPPLY, WIND_LEVELS, TEAM, HIT_K, HIT_CAP, FLOOD_TURN, FLOOD_STEP,
+  CLIFF_STOP, THIN_GROUND, CRUMBLE,
 } from './config.js';
 
 const planck = window.planck;
@@ -58,6 +59,7 @@ export class Game {
     this.pendingFalls = [];
     this.blastQueue = [];
     this.dentQueue = [];
+    this.drillQueue = [];
     this.pointers = new Map();
     this.aim = null;
     this.paused = false;
@@ -88,6 +90,7 @@ export class Game {
     this.emotes = [];
     this.event = null; // forest event on this turn (gust | rain | acornrain | boar)
     this.killcam = null;
+    this.fallcam = null;
     this.dangerT = 0;
     this.beatT = 0;
     this.slowScale = 0.3;
@@ -103,7 +106,7 @@ export class Game {
     this.world = new planck.World({ gravity: V(0, -GRAV) });
     const land = buildLandscape(this.theme.layout, this.seed);
     this.land = land;
-    this.terrain = new Terrain({ style: this.theme.ground, seed: this.seed, heights: land.heights, ops: land.ops });
+    this.terrain = new Terrain({ style: this.theme.ground, seed: this.seed, heights: land.heights, under: land.under, ops: land.ops });
     this.terrain.attach(this.world, planck);
     this.scene.setLand(land);
     this.pattern = makeDirtPattern(this.ctx, this.theme.ground, this.seed);
@@ -131,7 +134,10 @@ export class Game {
         blinkT: r.range(1, 4),
         blink: 0,
         dead: false,
-        drowned: false,
+        fell: false, // dropped into the clouds
+        falling: false, // on the way down (looks only)
+        support: 9, // metres of ground under the cart (looks only)
+        edge: false, // standing at a cliff over the clouds (looks only)
         lastTrail: [],
         dmgAcc: 0,
         dmgT: 0,
@@ -264,7 +270,9 @@ export class Game {
           if (P.kind === 'kernel') {
             this.blastQueue.push({ x: pos.x, y: pos.y, spec: P.spec.blast, owner: P.owner, proj: P, kind: 'kernel' });
           } else if (P.pound) {
-            this.blastQueue.push({ x: pos.x, y: pos.y - P.spec.r * 0.5, spec: P.spec.blast, owner: P.owner, proj: P, kind: 'pound' });
+            // into the ground it bores; anything else (a captain, a fort) takes the blow head-on
+            if (o.kind === 'terrain' && P.spec.drill) this.drillQueue.push(P);
+            else this.blastQueue.push({ x: pos.x, y: pos.y - P.spec.r * 0.5, spec: P.spec.blast, owner: P.owner, proj: P, kind: 'pound' });
           } else if (P.kind === 'nut' && P.type === 'burr') {
             P.fuse = o.kind === 'captain' ? 0.05 : 1.15;
             this._sfx('fuse');
@@ -411,19 +419,53 @@ export class Game {
     if (p.hp <= 0.01) this._kill(p, false);
   }
 
-  _kill(p, drowned) {
+  _kill(p, fell) {
     if (p.dead) return;
     p.dead = true;
     p.hp = 0;
-    p.drowned = drowned;
+    p.fell = fell;
     const pos = p.body.getPosition();
-    this._sfx(drowned ? 'splash' : 'squeak_ko');
-    this.fx.burst(pos.x, pos.y + 0.5, 'fur', 16, { color: FUR[p.team], speed: 7 });
-    this.fx.burst(pos.x, pos.y + 1.0, 'nutbit', 6, { speed: 6, dir: Math.PI / 2 });
-    this.fx.burst(pos.x, pos.y + 1.4, 'star', 8, { speed: 5 });
-    this.fx.text(pos.x, pos.y + 2.6, drowned ? '풍덩!' : 'K.O.!', '#ffe45c', 1.4, { life: 1.8 });
+    if (fell) {
+      // swallowed by the clouds
+      this._sfx('poof', { vol: 1 });
+      this.fx.burst(pos.x, WORLD.SEA + 0.4, 'cloud', 16, { speed: 5, color: this.theme.abyss.cloud, jitter: 1 });
+      this.fx.burst(pos.x, WORLD.SEA + 0.6, 'fur', 10, { color: FUR[p.team], speed: 5 });
+      this.fx.text(pos.x, WORLD.SEA + 3.2, '추락!', '#ffe45c', 1.6, { life: 2 });
+      this.fx.shake(0.35);
+      if (this.damageOn) this.emit('fall', { player: p.id, by: this.players[this.turn] === p ? null : this.turn });
+    } else {
+      this._sfx('squeak_ko');
+      this.fx.burst(pos.x, pos.y + 0.5, 'fur', 16, { color: FUR[p.team], speed: 7 });
+      this.fx.burst(pos.x, pos.y + 1.0, 'nutbit', 6, { speed: 6, dir: Math.PI / 2 });
+      this.fx.burst(pos.x, pos.y + 1.4, 'star', 8, { speed: 5 });
+      this.fx.text(pos.x, pos.y + 2.6, 'K.O.!', '#ffe45c', 1.4, { life: 1.8 });
+    }
     this.slowmo(0.8);
     this._hap('ko', this.isMine(p));
+  }
+
+  // A captain has nothing left under them: slow the world down and follow them all the way into
+  // the clouds. Presentation only (the fall itself is plain physics, judged at the cloud line).
+  _startFall(p) {
+    p.falling = true;
+    p.mood = 'scared';
+    p.moodT = 4;
+    const pos = p.body.getPosition();
+    this.slowmo(1.1, 0.3);
+    this.fallcam = { p, t: 3 };
+    this._sfx('fall');
+    this._hap('fall');
+    this.fx.text(pos.x, pos.y + 2.3, '으아아!', '#ffffff', 1.0, { life: 1.3 });
+    this.fx.burst(pos.x, pos.y - CART_R, 'dirt', 8, { speed: 3, color: this.theme.ground.dirtDark });
+  }
+
+  // Metres of ground under a captain, and whether one wheel already hangs over the clouds.
+  _footing(p) {
+    const t = this.terrain, pos = p.body.getPosition();
+    const by = pos.y - CART_R + 0.05;
+    const support = t.thicknessBelow(pos.x, by, 0.5);
+    const hangs = (dx) => t.thicknessBelow(pos.x + dx, by, 0.5) === 0 && t.surfaceY(pos.x + dx, by) < WORLD.SEA + 0.3;
+    return { support, edge: hangs(-0.75) || hangs(0.75), by };
   }
 
   slowmo(sec, scale = 0.3) {
@@ -432,9 +474,13 @@ export class Game {
   }
 
   // ------------------------------------------------------------------ explosions
-  _explode(x, y, spec, owner, kind = 'nut') {
+  _explode(x, y, spec, owner, kind = 'nut', extra = null) {
     const { r, dmg, crater, push } = spec;
-    if (crater) this.terrain.carve(x, y, crater);
+    if (crater) {
+      const weak = this._weakFooting(x, y, Math.max(r, crater) + 1.2);
+      this.terrain.carve(x, y, crater);
+      this._crumble(weak);
+    }
     if (kind === 'hive') {
       // no fireball: a honey splash and an angry swarm
       this.fx.burst(x, y, 'honey', 16, { speed: 6 });
@@ -442,6 +488,15 @@ export class Game {
       this._sfx('buzz');
       this._sfx('honey', { vol: 0.8 });
       this.fx.text(x, y + 1.2, '윙윙!', '#ffd23a', 0.8, { life: 1.1 });
+    } else if (kind === 'drill') {
+      // a muffled blast deep in the island, dirt shooting out of the shaft
+      const mouth = extra && extra.mouth != null ? extra.mouth : y + 2.8;
+      this.fx.add({ x, y, vx: 0, vy: 0, type: 'ring', life: 0.4, size: 0.4, grow: r * 4, color: 'rgba(255,230,190,0.8)', g: 0, drag: 0 });
+      this.fx.burst(x, mouth, 'dirt', 18, { speed: 10, spread: 0.18, color: this.theme.ground.dirtDark });
+      this.fx.burst(x, mouth, 'dust', 8, { speed: 3, color: 'rgba(200,170,130,0.8)' });
+      this.fx.burst(x, y, 'dirt', 10, { speed: 6, color: this.theme.ground.dirt });
+      this._sfx('explode_big', { vol: 0.75, pitch: 0.65 });
+      this._sfx('crack', { vol: 0.8, pitch: 0.7 });
     } else if (kind === 'pound') {
       this.fx.add({ x, y, vx: 0, vy: 0, type: 'ring', life: 0.45, size: 0.4, grow: r * 5, color: 'rgba(255,245,220,0.95)', g: 0, drag: 0 });
       this.fx.burst(x, y, 'dust', 10, { speed: 4, color: 'rgba(230,210,180,0.85)' });
@@ -504,6 +559,64 @@ export class Game {
       }
     }
     this._wakeAround(x, y, r + 3);
+  }
+
+  // The walnut bit into the ground: bore a shaft straight down, then burst at the bottom.
+  _drill(P) {
+    if (P.dead || P.drilling) return;
+    const { depth, r } = P.spec.drill;
+    const pos = P.body.getPosition();
+    const x = pos.x, y0 = pos.y + P.spec.r * 0.5;
+    const list = [];
+    for (let d = 0; d <= depth + 0.01; d += 0.45) list.push([x, y0 - d, r]);
+    const weak = this._weakFooting(x, y0 - depth / 2, 2.4);
+    this.terrain.carveMany(list);
+    this._crumble(weak);
+    P.drilling = true;
+    P.drillEnd = { x, y: y0 - depth, mouth: y0 };
+    P.fuse = 0.22;
+    P.body.setLinearVelocity(V(0, -15));
+    P.body.setAngularVelocity(18);
+    this.fx.burst(x, y0, 'dirt', 14, { speed: 7, spread: 0.3, color: this.theme.ground.dirtDark });
+    this.fx.burst(x, y0, 'dust', 6, { speed: 2 });
+    this.fx.shake(0.18);
+    this._sfx('drill');
+    this._hap('drill');
+    this._wakeAround(x, y0 - depth / 2, depth + 2);
+  }
+
+  // Captains already standing on a cracked crust (thinner than CRUMBLE) near a hit. Checked before
+  // the hit digs anything, so ground only gives way once it has had a turn to show its cracks.
+  _weakFooting(x, y, reach) {
+    const out = [];
+    for (const p of this.players) {
+      if (p.dead) continue;
+      const pos = p.body.getPosition();
+      if (Math.abs(pos.x - x) > reach || Math.abs(pos.y - y) > reach + 1.5) continue;
+      const t = this.terrain.thicknessBelow(pos.x, pos.y - CART_R + 0.05, 0.5);
+      if (t > 0 && t < CRUMBLE) out.push(p);
+    }
+    return out;
+  }
+
+  // A cracked crust breaks under the cart the moment something hits close by (part of the
+  // simulation: both phones break the same crust on the same tick).
+  _crumble(weak) {
+    for (const p of weak) {
+      if (p.dead) continue;
+      const pos = p.body.getPosition();
+      const by = pos.y - CART_R + 0.05;
+      const t = this.terrain.thicknessBelow(pos.x, by, 0.5);
+      if (!(t > 0 && t < CRUMBLE)) continue;
+      const top = this.terrain.surfaceY(pos.x, by + 0.2);
+      this.terrain.carve(pos.x, top - t / 2, 1.05);
+      this._wakeAround(pos.x, pos.y, 2);
+      this.fx.burst(pos.x, top - t, 'dirt', 14, { speed: 4, dir: -Math.PI / 2, color: this.theme.ground.dirtDark });
+      this.fx.burst(pos.x, top, 'dust', 6, { speed: 2 });
+      this.fx.text(pos.x, pos.y + 2.2, '우지끈!', '#ffd28a', 1.0, { life: 1.2 });
+      this._sfx('crack', { vol: 1, pitch: 0.75 });
+      this._sfx('break_stone', { vol: 0.6, pitch: 0.7 });
+    }
   }
 
   _wakeAround(x, y, rad) {
@@ -651,12 +764,12 @@ export class Game {
     let flood = null;
     if (this.turnNo > FLOOD_TURN) {
       this.seaTarget += FLOOD_STEP;
-      flood = this.turnNo === FLOOD_TURN + 1 ? '개울물이 불어납니다!' : null;
+      flood = this.turnNo === FLOOD_TURN + 1 ? '구름이 차오릅니다!' : null;
     }
     this.lastTickSec = -1;
     const pos = p.body.getPosition();
     this.cam.manual = 0;
-    this.cam.focus(pos.x + p.facing * 5, pos.y + 2.2, this.cam.baseZoom, 3);
+    this.cam.focus(pos.x + p.facing * 5, pos.y + 1.2, this.cam.baseZoom, 3);
     this.lead = null;
     this.netGate = this.netAb = this.netEnd = this.netLive = null;
     this.setState(eventFirst ? 'event' : p.isAI ? 'ai-think' : p.remote ? 'remote' : 'aim');
@@ -664,6 +777,14 @@ export class Game {
     if (ev.starting || ev.next) this._sfx('alert');
     else this._sfx('turn');
     this.emit('turn', { player: p.id, name: p.name, isAI: p.isAI, remote: p.remote, wind: this.wind, turnNo: this.turnNo, flood, ev });
+    if (!p.isAI && !p.remote && !p.dead) {
+      // warn whoever is about to play when the ground under them is giving way
+      const f = this._footing(p);
+      if (f.edge || (f.support > 0 && f.support < THIN_GROUND)) {
+        this.emit('danger', { edge: f.edge, thin: f.support > 0 && f.support < THIN_GROUND });
+        this._hap('edge');
+      }
+    }
     if (p.isAI) {
       this.aiPlan = null;
     }
@@ -752,6 +873,7 @@ export class Game {
     if (this.over) return;
     this.over = true;
     this.winner = winner;
+    this.fallcam = null;
     this.setState('over');
     const humanWon = winner && !winner.isAI;
     this._sfx(winner ? (this.opts.mode === 'cpu' && !humanWon ? 'lose' : 'win') : 'lose');
@@ -773,7 +895,7 @@ export class Game {
       isAIWin: w ? w.isAI : false,
       stars,
       turns: this.turnNo,
-      players: this.players.map((p) => ({ name: p.name, hp: Math.ceil(p.hp), ...p.stats, dmg: Math.round(p.stats.dmg) })),
+      players: this.players.map((p) => ({ name: p.name, hp: Math.ceil(p.hp), fell: p.fell, ...p.stats, dmg: Math.round(p.stats.dmg) })),
     };
   }
 
@@ -795,7 +917,7 @@ export class Game {
     this._flushKills();
     const P = this.players.map((p) => {
       const b = p.body, pos = b.getPosition(), v = b.getLinearVelocity();
-      return [q4(pos.x), q4(pos.y), q3(v.x), q3(v.y), q2(p.hp), (p.dead ? 1 : 0) | (p.drowned ? 2 : 0) | (b.isAwake() ? 4 : 0),
+      return [q4(pos.x), q4(pos.y), q3(v.x), q3(v.y), q2(p.hp), (p.dead ? 1 : 0) | (p.fell ? 2 : 0) | (b.isAwake() ? 4 : 0),
         p.facing, q2(p.stamina), AMMO_KEYS.map((k) => (p.ammo[k] === Infinity ? -1 : p.ammo[k])), p.stats.shots, p.stats.hits, q2(p.stats.dmg), p.stats.blocks, AMMO_KEYS.indexOf(p.sel)];
     });
     const B = [], S = {};
@@ -851,7 +973,8 @@ export class Game {
       if (e[5] & 4) p.body.setLinearVelocity(V(e[2] / 1e3, e[3] / 1e3));
       p.hp = e[4] / 100;
       p.dead = !!(e[5] & 1);
-      p.drowned = !!(e[5] & 2);
+      p.fell = !!(e[5] & 2);
+      p.falling = false;
       p.facing = e[6];
       p.stamina = e[7] / 100;
       AMMO_KEYS.forEach((k, j) => { p.ammo[k] = e[8][j] < 0 ? Infinity : e[8][j]; }); // JSON has no Infinity
@@ -884,7 +1007,7 @@ export class Game {
     this.projectiles = [];
     this.lead = null;
     this.killQueue.length = this.afterStep.length = this.pendingFalls.length = 0;
-    this.blastQueue.length = this.dentQueue.length = 0;
+    this.blastQueue.length = this.dentQueue.length = this.drillQueue.length = 0;
     this.turnNo = s.n;
     this.turn = s.tu;
     this.wind = s.w;
@@ -1086,7 +1209,7 @@ export class Game {
     const p = this.players[this.turn];
     const pos = p.body.getPosition();
     this.cam.manual = 0;
-    this.cam.focus(pos.x + p.facing * 5, pos.y + 2.2, this.cam.baseZoom, 4);
+    this.cam.focus(pos.x + p.facing * 5, pos.y + 1.2, this.cam.baseZoom, 4);
   }
 
   toggleOverview() {
@@ -1203,7 +1326,9 @@ export class Game {
     }
     if (this.dentQueue.length) {
       for (const d of this.dentQueue) {
+        const weak = this._weakFooting(d.x, d.y, d.r + 1.0);
         this.terrain.carve(d.x, d.y, d.r);
+        this._crumble(weak);
         this._hap('dent');
         this.fx.burst(d.x, d.y, 'dirt', 8, { speed: 5, color: this.theme.ground.dirtDark });
         this.fx.burst(d.x, d.y, 'dust', 4, { speed: 1.2 });
@@ -1211,6 +1336,10 @@ export class Game {
         this._wakeAround(d.x, d.y, d.r + 2);
       }
       this.dentQueue.length = 0;
+    }
+    if (this.drillQueue.length) {
+      for (const P of this.drillQueue) this._drill(P);
+      this.drillQueue.length = 0;
     }
     let guard = 0;
     while (this.blastQueue.length && guard++ < 20) {
@@ -1220,27 +1349,24 @@ export class Game {
         b.proj.dead = true;
         this.killQueue.push(b.proj.body);
       }
-      if (!warmup) this._explode(b.x, b.y, b.spec, b.owner, b.kind);
+      if (!warmup) this._explode(b.x, b.y, b.spec, b.owner, b.kind, b);
     }
     this._flushKills();
     this.terrain.syncPhysics();
-    // water & bounds
+    // the cloud sea and the edges of the world: whatever goes in is gone
     for (const B of this.blocks) {
       const pos = B.body.getPosition();
       if (pos.y < WORLD.SEA - 0.6 || pos.x < -6 || pos.x > WORLD.W + 6) {
         B.dead = true;
         this.killQueue.push(B.body);
-        if (!warmup && pos.y < WORLD.SEA) this._splash(pos.x, 0.8);
+        if (!warmup && pos.y < WORLD.SEA) this._cloudPoof(pos.x, 0.8);
       }
     }
     for (const p of this.players) {
       if (p.dead) continue;
       const pos = p.body.getPosition();
       if (pos.y < WORLD.SEA - 0.2 || pos.x < -3 || pos.x > WORLD.W + 3) {
-        if (!warmup) {
-          this._splash(pos.x, 1.4);
-          this._kill(p, true);
-        }
+        if (!warmup) this._kill(p, true);
       }
     }
     if (warmup) return;
@@ -1259,6 +1385,19 @@ export class Game {
       const v = p.body.getLinearVelocity();
       if (moving) {
         const grounded = Math.abs(v.y) < 2.5;
+        if (grounded && this._cliffAhead(p)) {
+          // the cart digs its heels in at the edge instead of driving off into the clouds
+          p.body.setLinearVelocity(V(0, v.y));
+          p.moveDir = 0;
+          p.moving = false;
+          const pos = p.body.getPosition();
+          this.fx.burst(pos.x + p.facing * 0.6, pos.y - CART_R + 0.1, 'dust', 4, { speed: 1.5 });
+          this.fx.burst(pos.x + p.facing * 0.9, pos.y - CART_R, 'dirt', 3, { speed: 1.2, dir: -Math.PI / 2, color: this.theme.ground.dirtDark });
+          this._sfx('brake');
+          this._hap('edge');
+          this.emit('cliff');
+          continue;
+        }
         if (grounded) {
           p.body.setLinearVelocity(V(p.moveDir * MOVE_SPEED, v.y));
           p.stamina = Math.max(0, p.stamina - Math.abs(v.x) * dt * STAMINA_PER_M);
@@ -1278,6 +1417,17 @@ export class Game {
     }
   }
 
+  // Is the ground about to end in front of a moving cart (a drop into the clouds, or one deep
+  // enough to hurt)? A wall or a slope going up is not a cliff.
+  _cliffAhead(p) {
+    const t = this.terrain, pos = p.body.getPosition();
+    const foot = pos.y - CART_R;
+    const ax = pos.x + p.moveDir * (CART_R + 0.35);
+    if (t.solid(ax, foot + 0.5)) return false;
+    const gy = t.surfaceY(ax, foot + 0.5);
+    return gy < WORLD.SEA + 0.3 || foot - gy > CLIFF_STOP;
+  }
+
   // Fuses, spent nuts and splashes: part of the simulation, so they run per tick.
   _tickProjectiles(dt) {
     for (const P of this.projectiles) {
@@ -1288,7 +1438,9 @@ export class Game {
       if (P.fuse > 0) {
         P.fuse -= dt;
         if (P.fuse <= 0) {
-          this.blastQueue.push({ x: pos.x, y: pos.y, spec: P.spec.blast, owner: P.owner, proj: P });
+          const d = P.drillEnd;
+          if (d) this.blastQueue.push({ x: d.x, y: d.y, spec: P.spec.blast, owner: P.owner, proj: P, kind: 'drill', mouth: d.mouth });
+          else this.blastQueue.push({ x: pos.x, y: pos.y, spec: P.spec.blast, owner: P.owner, proj: P, kind: P.type === 'burr' ? 'burr' : 'nut' });
           P.fuse = -1;
         }
       }
@@ -1302,7 +1454,7 @@ export class Game {
         this._poof(P);
       }
       if (pos.y < WORLD.SEA - 0.3) {
-        this._splash(pos.x, 0.7);
+        this._cloudPoof(pos.x, 0.5);
         P.dead = true;
         this.killQueue.push(P.body);
       } else if (pos.x < -6 || pos.x > WORLD.W + 6) {
@@ -1316,9 +1468,10 @@ export class Game {
     }
   }
 
-  _splash(x, size) {
-    this.fx.burst(x, WORLD.SEA + 0.1, 'splash', Math.round(10 * size), { speed: 4 * size, color: '#dff4ff' });
-        this._sfx(size < 1 ? 'splash_small' : 'splash', { vol: clamp(size, 0.4, 1) });
+  // Something sank into the cloud sea.
+  _cloudPoof(x, size) {
+    this.fx.burst(x, WORLD.SEA + 0.3, 'cloud', Math.round(6 + 8 * size), { speed: 3 * size + 1, color: this.theme.abyss.cloud, jitter: 0.6 * size });
+    this._sfx('poof', { vol: clamp(size, 0.35, 1) });
   }
 
   _updateState(dt, realDt) {
@@ -1483,6 +1636,7 @@ export class Game {
       if (this.currentTrail.length) p.lastTrail = this.currentTrail;
     }
     this._tension(realDt);
+    this._watchFooting(realDt);
   }
 
   // The make-or-break moments: a nut closing in on the other captain slows time (and zooms in when
@@ -1534,6 +1688,41 @@ export class Game {
       }
     } else this.beatT = 0;
     if (this.killcam && (this.killcam.t -= realDt) <= 0) this.killcam = null;
+    if (this.fallcam && (this.fallcam.t -= realDt) <= 0) this.fallcam = null;
+  }
+
+  // Who is about to drop, who stands on cracking ground, who teeters at a cliff. Looks only.
+  _watchFooting(realDt) {
+    const live = this.damageOn && !this.silent && this.state !== 'intro';
+    for (const p of this.players) {
+      if (p.dead) { p.falling = false; continue; }
+      const pos = p.body.getPosition(), v = p.body.getLinearVelocity();
+      if (p.falling) {
+        if (v.y > -1) { p.falling = false; if (this.fallcam && this.fallcam.p === p) this.fallcam = null; }
+        continue;
+      }
+      if (live && v.y < -3.5) {
+        const by = pos.y - CART_R - 0.05;
+        if ([-0.5, 0, 0.5].every((dx) => this.terrain.surfaceY(pos.x + dx, by) < WORLD.SEA + 0.3)) {
+          this._startFall(p);
+          continue;
+        }
+      }
+      if (Math.abs(v.y) > 0.5) continue;
+      const f = this._footing(p);
+      p.support = f.support;
+      p.edge = f.edge;
+      const aiming = this.aim && p === this.players[this.turn];
+      if (f.edge && live && !aiming && p.mood !== 'happy') { p.mood = 'scared'; p.moodT = 0.4; }
+      // thin ground sheds crumbs from the underside of the island
+      const thin = f.support > 0 && f.support < THIN_GROUND;
+      p.crumbT = (p.crumbT || 0) - realDt;
+      if (thin && live && p.crumbT <= 0) {
+        p.crumbT = 0.25 + f.support * 0.35;
+        const y = f.by - f.support - 0.1;
+        this.fx.add({ x: pos.x + (Math.random() - 0.5) * 1.2, y, vx: (Math.random() - 0.5) * 0.4, vy: -0.5, type: 'rock', life: 1.2, size: 0.05 + Math.random() * 0.07, color: this.theme.ground.dirtDark, g: 0.7, drag: 0.3, rot: Math.random() * TAU, vr: 4 });
+      }
+    }
   }
 
   // It came within a whisker and did no harm. `landed`: the shot is over (all nuts gone).
@@ -1573,6 +1762,12 @@ export class Game {
       this.cam.focus(b.x + b.dir * 3, b.y + 2.5, this.cam.baseZoom * 0.95, 5);
       return;
     }
+    if (this.fallcam) {
+      // ride along with a captain dropping into the clouds
+      const pos = this.fallcam.p.body.getPosition();
+      this.cam.focus(pos.x, Math.max(pos.y, WORLD.SEA + 1.5) + 0.8, this.cam.baseZoom * 1.1, 7);
+      return;
+    }
     if (this.killcam && this.lead && !this.lead.dead) {
       // lean in on the moment of truth
       const tp = this.killcam.p.body.getPosition(), pos = this.lead.body.getPosition();
@@ -1604,11 +1799,12 @@ export class Game {
     const [shx, shy] = this.fx.shakeOffset();
     cam.apply(ctx, dpr, shx, shy);
     const view = cam.view();
-    this.scene.drawWater(ctx, view, this.time, false);
+    this.scene.drawAbyss(ctx, view, this.time, false);
     this.scene.drawBackTrees(ctx, view, this.time);
     this.forest.drawBehind(ctx);
     this.terrain.draw(ctx, this.theme.ground, this.pattern, view);
-    this.scene.drawShore(ctx, view, this.time);
+    for (const p of this.players) this._drawCracks(ctx, p);
+    this.scene.drawFalls(ctx, view, this.time, this.terrain);
     this.forest.drawFront(ctx, view);
 
     const cur = this.players[this.turn];
@@ -1672,7 +1868,7 @@ export class Game {
     }
 
     this.fx.draw(ctx);
-    this.scene.drawWater(ctx, view, this.time, true);
+    this.scene.drawAbyss(ctx, view, this.time, true);
 
     // aim guide
     if (this.aim && (this.state === 'aim' || this.state === 'ai-aim' || this.state === 'remote')) this._drawAimGuide(ctx, cur);
@@ -1733,6 +1929,40 @@ export class Game {
         lookX: p.facing, lookY: 0, blink: 0, squash: pouch ? -this.aim.power * 0.15 : 0,
       });
     } : null);
+  }
+
+  // Ground giving way under a captain: cracks running from the wheels down through the island.
+  _drawCracks(ctx, p) {
+    if (p.dead || p.falling || !(p.support > 0 && p.support < THIN_GROUND)) return;
+    const k = clamp((THIN_GROUND - p.support) / 1.3, 0.25, 1);
+    const pos = p.body.getPosition();
+    const top = -(pos.y - CART_R + 0.02), depth = p.support;
+    const r = rng(p.id * 977 + 13);
+    ctx.save();
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.strokeStyle = `rgba(25,10,4,${0.55 + 0.4 * k})`;
+    ctx.lineWidth = 0.075 + 0.04 * k;
+    ctx.beginPath();
+    const n = 2 + Math.round(k * 3);
+    for (let c = 0; c < n; c++) {
+      let x = pos.x + (c - (n - 1) / 2) * 0.45, y = top;
+      ctx.moveTo(x, y);
+      const steps = 4 + Math.round(k * 3);
+      for (let i = 0; i < steps; i++) {
+        x += (r() - 0.5) * 0.5;
+        y += (depth * (0.4 + 0.6 * k)) / steps;
+        ctx.lineTo(x, y);
+      }
+    }
+    ctx.stroke();
+    if (k > 0.6) {
+      // a glint of sky through the worst of it
+      ctx.strokeStyle = `rgba(255,255,255,${0.25 * Math.max(0, Math.sin(this.time * 6))})`;
+      ctx.lineWidth = 0.03;
+      ctx.stroke();
+    }
+    ctx.restore();
   }
 
   _drawTag(ctx, p) {

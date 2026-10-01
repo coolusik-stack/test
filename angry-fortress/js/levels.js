@@ -9,8 +9,8 @@ export const THEMES = {
   oak: {
     id: 'oak',
     name: '도토리 숲',
-    desc: '거대 참나무 고원과 관통 굴',
-    layout: { mid: 'mesa', baseMin: 9, baseMax: 10.5, midMin: 17, midMax: 18, rough: 0.9, tunnel: true },
+    desc: '거대 참나무가 선 두 층 하늘섬',
+    layout: { mid: 'mesa', baseMin: 11, baseMax: 12.5, midMin: 19, midMax: 20, rough: 0.9, tunnel: true },
     sky: ['#5fb6ea', '#a8dcf5', '#e9f8e8'],
     sun: { x: 0.78, y: 0.16, color: '#fff7cf', glow: 'rgba(255,246,200,0.6)' },
     rays: 'rgba(255,250,215,0.10)',
@@ -26,6 +26,7 @@ export const THEMES = {
     ambient: 'pollen',
     leaf: ['rgba(120,200,80,0.75)', 'rgba(170,215,90,0.7)'],
     sea: { top: 'rgba(70,170,200,0.78)', bottom: 'rgba(26,92,120,0.95)', foam: '#e8fbff', reed: '#5d8f3a' },
+    abyss: { cloud: '#ffffff', shade: '#d6ebf7', deep: '#8fb9d8', water: 'rgba(225,245,255,0.85)' },
     ground: {
       ...PAL.soil,
       grass: '#67c23a', grassDark: '#3b8f27', grassLight: '#b9ee72',
@@ -38,8 +39,8 @@ export const THEMES = {
   maple: {
     id: 'maple',
     name: '단풍 협곡',
-    desc: '통나무 다리가 걸린 깊은 협곡',
-    layout: { mid: 'gorge', baseMin: 9, baseMax: 11.5, midMin: 11, midMax: 12.5, rough: 0.8 },
+    desc: '끝없는 낭떠러지 위 통나무 다리',
+    layout: { mid: 'gorge', baseMin: 11, baseMax: 13.5, midMin: 13, midMax: 14.5, rough: 0.8 },
     sky: ['#f39b5c', '#ffcf94', '#fff1d6'],
     sun: { x: 0.24, y: 0.22, color: '#fff3d0', glow: 'rgba(255,214,140,0.6)' },
     rays: 'rgba(255,225,170,0.12)',
@@ -55,6 +56,7 @@ export const THEMES = {
     ambient: 'leaf',
     leaf: ['rgba(230,110,40,0.85)', 'rgba(245,170,50,0.85)', 'rgba(205,60,40,0.8)'],
     sea: { top: 'rgba(70,175,190,0.8)', bottom: 'rgba(24,100,120,0.95)', foam: '#eafffb', reed: '#8a7a3a' },
+    abyss: { cloud: '#fff4e6', shade: '#ffd3ad', deep: '#d98a6a', water: 'rgba(235,250,250,0.85)' },
     ground: {
       ...PAL.soil,
       dirt: '#8a4f2a', dirtLight: '#a8683d', dirtDark: '#5a3016',
@@ -68,8 +70,8 @@ export const THEMES = {
   pine: {
     id: 'pine',
     name: '소나무 언덕',
-    desc: '능선 위에 아슬아슬한 바위',
-    layout: { mid: 'hill', baseMin: 10, baseMax: 12, midMin: 17, midMax: 18.5, rough: 1.0, ledges: 3.6 },
+    desc: '구름 위 긴 능선과 아슬아슬한 바위',
+    layout: { mid: 'hill', baseMin: 12, baseMax: 14, midMin: 19, midMax: 20.5, rough: 1.0, ledges: 3.6 },
     sky: ['#86b4cf', '#c3dde6', '#eef6ef'],
     sun: { x: 0.7, y: 0.2, color: '#fffbe8', glow: 'rgba(255,250,230,0.5)' },
     rays: 'rgba(255,255,240,0.09)',
@@ -85,6 +87,7 @@ export const THEMES = {
     ambient: 'mist',
     leaf: ['rgba(90,140,90,0.7)'],
     sea: { top: 'rgba(90,160,180,0.8)', bottom: 'rgba(30,80,100,0.95)', foam: '#f2fbff', reed: '#6b7f3f' },
+    abyss: { cloud: '#f7fafa', shade: '#d3e0e3', deep: '#8fa7b0', water: 'rgba(235,245,250,0.85)' },
     ground: {
       ...PAL.soil,
       dirt: '#6d4a33', dirtLight: '#86604a', dirtDark: '#452c1c',
@@ -97,8 +100,8 @@ export const THEMES = {
   night: {
     id: 'night',
     name: '반딧불 밤숲',
-    desc: '떠 있는 섬과 통통 버섯',
-    layout: { mid: 'valley', baseMin: 11, baseMax: 13, midMin: 6.5, midMax: 7.5, rough: 1.0, spire: true, islands: 8 },
+    desc: '조각난 하늘섬과 통통 버섯',
+    layout: { mid: 'valley', baseMin: 13, baseMax: 15, midMin: 10, midMax: 11, rough: 1.0, spire: true, islands: 8 },
     sky: ['#101a3c', '#233a6b', '#3e5f8a'],
     sun: { x: 0.62, y: 0.16, color: '#fff4d6', glow: 'rgba(200,220,255,0.28)', moon: true },
     rays: null,
@@ -115,6 +118,7 @@ export const THEMES = {
     ambient: 'firefly',
     leaf: ['rgba(120,170,140,0.5)'],
     sea: { top: 'rgba(60,100,160,0.8)', bottom: 'rgba(12,28,60,0.97)', foam: '#bfd6ff', reed: '#2f4a3a' },
+    abyss: { cloud: '#8fa2d6', shade: '#5b6aa6', deep: '#141c3d', water: 'rgba(190,215,255,0.75)' },
     ground: {
       ...PAL.soil,
       dirt: '#4a3a3a', dirtLight: '#5e4a48', dirtDark: '#2c2124',

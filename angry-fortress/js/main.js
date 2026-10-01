@@ -277,6 +277,19 @@ function onGameEvent(evt, data) {
     case 'banner':
       banner(data.text, data.sub, '#fff');
       break;
+    case 'fall': {
+      // the big one: somebody went over the edge
+      const p = game.players[data.player];
+      const who = game.online ? (p.remote ? '친구' : '내 다람쥐') : game.opts.mode === 'cpu' ? (p.isAI ? 'CPU' : '내 다람쥐') : `${p.id + 1}P`;
+      banner('추락 K.O.!', `${who}가 구름 아래로 떨어졌어요`, '#ffd21f');
+      break;
+    }
+    case 'danger':
+      hint(data.edge ? '벼랑 끝이에요! 안쪽으로 움직여 피하세요' : '발밑이 갈라지고 있어요! 옆으로 움직여 피하세요', 3.5);
+      break;
+    case 'cliff':
+      hint('낭떠러지! 더 가면 떨어져요', 1.6);
+      break;
     case 'hud':
       renderSlots();
       break;
@@ -479,6 +492,7 @@ function showResult(r) {
     else nextRound = next;
   } else if (friend && online) { online.pendingNext = null; online.lastWinner = r.winner; }
   const sw = wins && done ? wins.findIndex((w) => w >= needWins(S)) : r.winner; // who won it all
+  const fell = r.winner >= 0 && r.players[1 - r.winner].fell; // won by dropping the other one
   const pre = wins ? (done ? '최종 ' : `${S.round}판 `) : '';
   if (r.winner < 0) {
     title = `${pre}무승부`;
@@ -486,15 +500,17 @@ function showResult(r) {
   } else if (friend) {
     const won = r.winner === me;
     title = pre + (won ? '승리!' : '패배…');
-    sub = won ? `친구를 이겼어요! 남은 체력 ${r.players[me].hp}` : done ? '친구가 이겼어요. 복수전 한 판?' : '아직 끝나지 않았어요!';
+    sub = won ? (fell ? '친구를 구름 아래로 떨어뜨렸어요!' : `친구를 이겼어요! 남은 체력 ${r.players[me].hp}`)
+      : done ? (fell ? '구름 아래로 떨어졌어요… 복수전 한 판?' : '친구가 이겼어요. 복수전 한 판?') : fell ? '구름 아래로 떨어졌지만, 아직 끝나지 않았어요!' : '아직 끝나지 않았어요!';
     if (done) { if (sw === me) record.fw++; else record.fl++; }
   } else if (cpu) {
     title = pre + (r.isAIWin ? '패배…' : '승리!');
-    sub = r.isAIWin ? `CPU ${TEAM[1].name}이 창고를 지켰어요. 다시 도전!` : `남은 체력 ${r.players[r.winner].hp}로 도토리 창고를 지켰어요`;
+    sub = r.isAIWin ? (fell ? '구름 아래로 떨어졌어요… 다시 도전!' : `CPU ${TEAM[1].name}이 창고를 지켰어요. 다시 도전!`)
+      : fell ? 'CPU를 구름 아래로 떨어뜨렸어요!' : `남은 체력 ${r.players[r.winner].hp}로 도토리 창고를 지켰어요`;
     if (done) { if (sw === 1) record.losses++; else record.wins++; }
   } else {
     title = `${pre}${r.winner + 1}P 승리!`;
-    sub = `${TEAM[r.winner].name} · 남은 체력 ${r.players[r.winner].hp}`;
+    sub = fell ? `${TEAM[r.winner].name}이 상대를 구름 아래로 떨어뜨렸어요!` : `${TEAM[r.winner].name} · 남은 체력 ${r.players[r.winner].hp}`;
     if (done) record.pvp++;
   }
   storage.set('af.record', record);
@@ -616,32 +632,41 @@ function drawMapPreview(cv, id) {
   const land = buildLandscape(t.layout, 1234);
   const sx = W / WORLD.W, sy = H / 26;
   const toY = (y) => H - y * sy;
-  g.beginPath();
-  g.moveTo(0, H);
-  for (let x = 0; x <= W; x += 2) g.lineTo(x, toY(land.heights(x / sx)));
-  g.lineTo(W, H);
-  g.closePath();
-  g.fillStyle = t.ground.dirt;
-  g.fill();
-  g.lineWidth = 4;
-  g.strokeStyle = t.ground.grass;
-  g.beginPath();
-  for (let x = 0; x <= W; x += 2) {
-    const y = land.heights(x / sx);
-    if (y > WORLD.SEA0) g.lineTo(x, toY(y)); else g.moveTo(x, toY(y));
+  // the cloud sea first, then the floating islands over it
+  const ab = t.abyss;
+  const cg = g.createLinearGradient(0, toY(WORLD.SEA0 + 1.5), 0, H);
+  cg.addColorStop(0, ab.cloud);
+  cg.addColorStop(1, ab.deep);
+  g.fillStyle = cg;
+  g.fillRect(0, toY(WORLD.SEA0 + 1.5), W, H);
+  g.fillStyle = ab.cloud;
+  for (let x = 4; x < W; x += 13) {
+    g.beginPath();
+    g.arc(x, toY(WORLD.SEA0 + 1.3), 7 + (x % 5), 0, Math.PI * 2);
+    g.fill();
   }
-  g.stroke();
+  for (const sp of land.spans) {
+    g.beginPath();
+    for (let x = sp.a; x <= sp.b; x += 0.5) g.lineTo(x * sx, toY(land.heights(x)));
+    for (let x = sp.b; x >= sp.a; x -= 0.5) g.lineTo(x * sx, toY(Math.min(land.under(x), land.heights(x))));
+    g.closePath();
+    g.fillStyle = t.ground.dirt;
+    g.fill();
+  }
   // carve preview ops
   for (const op of land.ops) {
-    g.fillStyle = op.type === 'sub' ? t.sky[2] : t.ground.dirt;
+    g.fillStyle = op.type === 'sub' ? t.ground.dirtDark : t.ground.dirt;
     g.beginPath();
     g.ellipse(op.x * sx, toY(op.y), op.rx * sx, op.ry * sy, 0, 0, Math.PI * 2);
     g.fill();
   }
-  g.fillStyle = t.sea.bottom;
-  g.fillRect(0, toY(WORLD.SEA0), W, H);
-  g.fillStyle = t.sea.top;
-  g.fillRect(0, toY(WORLD.SEA0), W, 3);
+  g.lineWidth = 4;
+  g.strokeStyle = t.ground.grass;
+  for (const sp of land.spans) {
+    g.beginPath();
+    for (let x = sp.a + 0.4; x <= sp.b - 0.4; x += 0.5) g.lineTo(x * sx, toY(land.heights(x)));
+    g.stroke();
+  }
   for (const bx of land.bases) {
     g.fillStyle = bx < WORLD.W / 2 ? TEAM[0].color : TEAM[1].color;
     g.strokeStyle = '#2b1a12';

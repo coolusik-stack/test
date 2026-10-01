@@ -1,6 +1,6 @@
-// Forest backdrop: sky, sun or moon with light shafts, layered tree lines with mist,
-// undergrowth behind the playfield, a forest stream with reeds and lily pads, and
-// ambient pollen / falling leaves / mist / fireflies.
+// Sky-forest backdrop: sky, sun or moon with light shafts, layers of distant floating islands
+// drifting in the mist, undergrowth behind the playfield, waterfalls spilling off the islands,
+// the bottomless sea of clouds underneath, and ambient pollen / falling leaves / mist / fireflies.
 import { rng, noise1D, clamp } from './util.js';
 import { WORLD } from './terrain.js';
 
@@ -13,9 +13,10 @@ export class Scene {
     this.seed = seed;
     const r = rng(seed * 3 + 5);
     this.r = r;
-    this.far = this._forestLine(0.18, seed + 1, 9, 6.5, r);
-    this.mid = this._treeLayer(0.42, seed + 2, 5, r, theme.bgTree === 'pine' ? 'pine' : 'round', 1.0);
-    this.near = this._treeLayer(0.7, seed + 3, 2.5, r, theme.bgTree === 'pine' ? 'pine' : 'round', 1.9);
+    const shape = theme.bgTree === 'pine' ? 'pine' : 'round';
+    this.far = this._islandLayer(0.18, seed + 1, 13, 0.7, shape, r);
+    this.mid = this._islandLayer(0.42, seed + 2, 9.5, 1.0, shape, r);
+    this.near = this._islandLayer(0.7, seed + 3, 6, 1.5, shape, r);
     this.clouds = [];
     for (let i = 0; i < (theme.clouds ?? 5); i++) {
       this.clouds.push({
@@ -35,15 +36,16 @@ export class Scene {
     this.brush = null;
   }
 
-  // Called once the landscape exists: undergrowth behind the terrain, reeds and lily pads at the shore.
+  // Called once the landscape exists: undergrowth behind the island tops, and the waterfalls
+  // that spill off the outer cliffs.
   setLand(land) {
     const r = rng(this.seed * 7 + 11);
     const h = land.heights;
     const brush = new Path2D();
     const brushHi = new Path2D();
     for (let x = -2; x <= WORLD.W + 2; x += r.range(0.7, 1.4)) {
+      if (!land.onIsland(x - 0.8) || !land.onIsland(x + 0.8)) continue;
       const y = h(x);
-      if (y < WORLD.SEA0 + 0.4) continue;
       const s = r.range(0.7, 1.4);
       const top = -(y + 0.2);
       for (const [dx, dy, rr] of [[-0.6, 0.1, 0.55], [0, -0.35, 0.75], [0.6, 0.05, 0.55]]) {
@@ -54,81 +56,78 @@ export class Scene {
       }
     }
     this.brush = { path: brush, hi: brushHi };
-    // shore points: where the ground drops into the stream
-    const shores = [];
-    let prev = h(0) > WORLD.SEA0;
-    for (let x = 0.25; x < WORLD.W; x += 0.25) {
-      const above = h(x) > WORLD.SEA0 + 0.1;
-      if (above !== prev) shores.push({ x, dir: above ? -1 : 1 });
-      prev = above;
-    }
-    this.reeds = [];
-    this.pads = [];
-    for (const s of shores) {
-      for (let k = 0; k < 7; k++) {
-        this.reeds.push({ x: s.x + s.dir * r.range(-0.4, 1.6), h: r.range(0.8, 1.7), lean: r.range(-0.15, 0.15), ph: r() * TAU, cat: r() < 0.45 });
-      }
-      for (let k = 0; k < 3; k++) this.pads.push({ x: s.x + s.dir * r.range(1.8, 5), r: r.range(0.35, 0.6), rot: r() * TAU, flower: r() < 0.35, ph: r() * TAU });
-    }
+    // a waterfall off the outer cliff of each home island (and one off the middle island, if any)
+    const sp = land.spans;
+    this.falls = [];
+    const add = (x, dir) => this.falls.push({ x, dir, y: h(x) - 0.35, w: r.range(0.32, 0.5), ph: r() * TAU });
+    add(sp[0].a + 0.7, -1);
+    add(sp[sp.length - 1].b - 0.7, 1);
+    if (sp.length === 3) add(r() < 0.5 ? sp[1].a + 0.9 : sp[1].b - 0.9, r() < 0.5 ? -1 : 1);
+    for (const f of this.falls) if (f.dir === 1 ? f.x < WORLD.W / 2 : f.x > WORLD.W / 2) f.dir = -f.dir;
+    this.reeds = this.pads = null;
   }
 
-  _forestLine(par, seed, amp, base, r) {
+  // Distant floating islands: a forested top over an upside-down crag, each bobbing on its own.
+  _islandLayer(par, seed, base, scale, shape, r) {
     const n = noise1D(seed);
-    const path = new Path2D();
-    const x0 = -90, x1 = WORLD.W + 90;
-    const hAt = (x) => WORLD.SEA + base + amp * (0.5 + 0.5 * n(x * 0.03));
-    path.moveTo(x0, 40);
-    for (let x = x0; x <= x1; x += 1) path.lineTo(x, -hAt(x));
-    path.lineTo(x1, 40);
-    path.closePath();
-    // canopy bumps along the ridge read as a distant tree line
-    for (let x = x0; x <= x1; x += r.range(0.9, 1.6)) {
-      const rr = r.range(0.9, 1.7);
-      path.moveTo(x + rr, -hAt(x) - rr * 0.35);
-      path.arc(x, -hAt(x) - rr * 0.35, rr, 0, TAU);
-    }
-    return { par, path };
-  }
-
-  _treeLayer(par, seed, base, r, shape, scale) {
-    const n = noise1D(seed);
-    const body = new Path2D();
-    const hi = new Path2D();
-    const trunks = new Path2D();
-    const x0 = -90, x1 = WORLD.W + 90;
-    const gAt = (x) => WORLD.SEA + base + 2.5 * n(x * 0.04);
-    body.moveTo(x0, 40);
-    for (let x = x0; x <= x1; x += 1) body.lineTo(x, -gAt(x));
-    body.lineTo(x1, 40);
-    body.closePath();
-    for (let x = x0; x <= x1; x += r.range(2.2, 4.2) * scale) {
-      const g = -gAt(x) + 0.3;
-      const s = r.range(0.8, 1.25) * scale;
-      const th = r.range(2.6, 4) * s;
-      trunks.rect(x - 0.16 * s, g - th, 0.32 * s, th);
-      if (shape === 'pine') {
-        for (let k = 0; k < 4; k++) {
-          const w = (1.5 - k * 0.3) * s, yy = g - th * 0.45 - k * 0.95 * s;
-          body.moveTo(x - w, yy);
-          body.lineTo(x, yy - 1.5 * s);
-          body.lineTo(x + w, yy);
-          body.closePath();
-          hi.moveTo(x - w * 0.55, yy - 0.2 * s);
-          hi.lineTo(x - 0.05 * s, yy - 1.35 * s);
-          hi.lineTo(x + w * 0.05, yy - 0.2 * s);
-          hi.closePath();
-        }
-      } else {
-        const cy = g - th - 0.5 * s;
-        for (const [dx, dy, rr] of [[-0.9, 0.3, 1.0], [0.9, 0.35, 1.0], [0, -0.45, 1.25], [-0.2, 0.55, 0.9]]) {
-          body.moveTo(x + dx * s + rr * s, cy + dy * s);
-          body.arc(x + dx * s, cy + dy * s, rr * s, 0, TAU);
-          hi.moveTo(x + dx * s - 0.25 * s + rr * s * 0.55, cy + dy * s - 0.3 * s);
-          hi.arc(x + dx * s - 0.25 * s, cy + dy * s - 0.3 * s, rr * s * 0.55, 0, TAU);
+    const isles = [];
+    for (let x = -90 + r.range(0, 8); x <= WORLD.W + 90; ) {
+      const w = r.range(2.4, 6.5) * scale;
+      const cx = x + w;
+      const top = WORLD.SEA + base + 2.5 * n(cx * 0.05) + r.range(-1.2, 1.2) * scale;
+      const canopy = new Path2D();
+      const hi = new Path2D();
+      const rock = new Path2D();
+      // the crag: flat-ish top edge, jagged underside narrowing to a point or two
+      const deep = w * r.range(0.8, 1.3);
+      rock.moveTo(cx - w, -top);
+      const steps = 14;
+      for (let k = 0; k <= steps; k++) {
+        const t = k / steps;
+        const d = deep * Math.pow(Math.sin(Math.PI * t), 0.8) * (0.75 + 0.25 * Math.sin(t * 17 + cx)) + (k % 2 ? 0.25 * scale : 0);
+        rock.lineTo(cx + w - 2 * w * t, -top + d);
+      }
+      rock.closePath();
+      // trees along the top
+      for (let tx = cx - w + 0.5 * scale; tx <= cx + w - 0.5 * scale; tx += r.range(0.9, 1.6) * scale) {
+        const s2 = r.range(0.75, 1.2) * scale;
+        const g = -top + 0.1;
+        if (shape === 'pine') {
+          for (let k = 0; k < 3; k++) {
+            const ww = (1.0 - k * 0.25) * s2, yy = g - 0.3 * s2 - k * 0.7 * s2;
+            canopy.moveTo(tx - ww, yy);
+            canopy.lineTo(tx, yy - 1.1 * s2);
+            canopy.lineTo(tx + ww, yy);
+            canopy.closePath();
+            hi.moveTo(tx - ww * 0.5, yy - 0.15 * s2);
+            hi.lineTo(tx - 0.05, yy - 1.0 * s2);
+            hi.lineTo(tx + ww * 0.05, yy - 0.15 * s2);
+            hi.closePath();
+          }
+        } else {
+          const cy = g - 0.9 * s2;
+          for (const [dx, dy, rr] of [[-0.45, 0.25, 0.6], [0.45, 0.3, 0.6], [0, -0.2, 0.75]]) {
+            canopy.moveTo(tx + dx * s2 + rr * s2, cy + dy * s2);
+            canopy.arc(tx + dx * s2, cy + dy * s2, rr * s2, 0, TAU);
+            hi.moveTo(tx + dx * s2 - 0.15 * s2 + rr * s2 * 0.5, cy + dy * s2 - 0.2 * s2);
+            hi.arc(tx + dx * s2 - 0.15 * s2, cy + dy * s2 - 0.2 * s2, rr * s2 * 0.5, 0, TAU);
+          }
         }
       }
+      canopy.rect(cx - w, -top - 0.15 * scale, 2 * w, 0.3 * scale);
+      // a few vines trailing from the underside
+      const vines = new Path2D();
+      for (let k = 0; k < 3; k++) {
+        const vx = cx + r.range(-0.7, 0.7) * w;
+        const t = (cx + w - vx) / (2 * w);
+        const vy = -top + deep * Math.pow(Math.sin(Math.PI * t), 0.8) * 0.7;
+        vines.moveTo(vx, vy);
+        vines.quadraticCurveTo(vx + r.range(-0.4, 0.4) * scale, vy + 0.8 * scale, vx + r.range(-0.2, 0.2), vy + r.range(1, 2.2) * scale);
+      }
+      isles.push({ canopy, hi, rock, vines, ph: r() * TAU, amp: r.range(0.08, 0.2) * scale, top, deep });
+      x = cx + w + r.range(3, 10) * scale;
     }
-    return { par, body, hi, trunks, groundAt: gAt };
+    return { par, isles };
   }
 
   // Leaf clusters hanging into the top of the backdrop (screen space, gentle parallax).
@@ -216,40 +215,73 @@ export class Scene {
     }
     for (const c of this.clouds) this._drawCloud(ctx, c, cam, vw, vh, dpr);
     const z = cam.zoom;
-    const layerT = (par) => {
-      const ty = vh / 2 + ((cam.y - YREF) * par + YREF) * z;
+    const layerT = (par, bob = 0) => {
+      const ty = vh / 2 + ((cam.y - YREF) * par + YREF + bob) * z;
       ctx.setTransform(dpr * z, 0, 0, dpr * z, dpr * (vw / 2 - cam.x * par * z), dpr * ty);
     };
-    // distant tree line + mist
-    layerT(this.far.par);
-    ctx.fillStyle = t.far;
-    ctx.fill(this.far.path);
-    this._mist(ctx, vw, vh, dpr, cam, this.far.par, WORLD.SEA + 13, 0.9);
+    // the cloud sea stretching to the horizon far below
+    this._horizon(ctx, vw, vh, dpr, cam, time, layerT);
+    // distant floating islands + mist, nearer ones darker and bigger
+    this._isles(ctx, this.far, cam, vw, time, layerT, t.far, null, 0, null);
+    this._mist(ctx, vw, vh, dpr, cam, this.far.par, WORLD.SEA + 12, 0.9);
     // light shafts fall across the middle distance
     if (t.rays) this._rays(ctx, vw, vh, dpr, sx, sy, time);
-    // mid trees
-    layerT(this.mid.par);
-    ctx.fillStyle = t.mid[0];
-    ctx.fill(this.mid.trunks);
-    ctx.fill(this.mid.body);
-    ctx.fillStyle = t.mid[1];
-    ctx.globalAlpha = 0.55;
-    ctx.fill(this.mid.hi);
-    ctx.globalAlpha = 1;
-    this._mist(ctx, vw, vh, dpr, cam, this.mid.par, WORLD.SEA + 7.5, 0.7);
-    // near trees
-    layerT(this.near.par);
-    ctx.fillStyle = t.near[1];
-    ctx.fill(this.near.trunks);
-    ctx.fillStyle = t.near[0];
-    ctx.fill(this.near.body);
-    ctx.fillStyle = t.mid[1];
-    ctx.globalAlpha = 0.35;
-    ctx.fill(this.near.hi);
-    ctx.globalAlpha = 1;
+    this._isles(ctx, this.mid, cam, vw, time, layerT, t.mid[0], t.mid[1], 0.16, null);
+    this._mist(ctx, vw, vh, dpr, cam, this.mid.par, WORLD.SEA + 8, 0.7);
+    this._isles(ctx, this.near, cam, vw, time, layerT, t.near[0], t.mid[1], 0.3, t.near[1]);
     this._mist(ctx, vw, vh, dpr, cam, this.near.par, WORLD.SEA + 4.5, 0.8);
     // leaves hanging into the top of the view
     this._frameLeaves(ctx, vw, vh, dpr, cam, time);
+  }
+
+  _isles(ctx, layer, cam, vw, time, layerT, color, hiColor, shade, vineColor) {
+    const z = cam.zoom;
+    for (const is of layer.isles) {
+      layerT(layer.par, Math.sin(time * 0.45 + is.ph) * is.amp);
+      ctx.fillStyle = color;
+      ctx.fill(is.rock);
+      if (shade) {
+        ctx.fillStyle = `rgba(20,12,30,${shade})`;
+        ctx.fill(is.rock);
+      }
+      if (vineColor) {
+        ctx.strokeStyle = vineColor;
+        ctx.lineWidth = 0.08;
+        ctx.stroke(is.vines);
+      }
+      ctx.fillStyle = color;
+      ctx.fill(is.canopy);
+      if (hiColor) {
+        ctx.fillStyle = hiColor;
+        ctx.globalAlpha = 0.5;
+        ctx.fill(is.hi);
+        ctx.globalAlpha = 1;
+      }
+    }
+    void z; void vw;
+  }
+
+  // Far below and far away: the top of the cloud sea, rolling to the horizon.
+  _horizon(ctx, vw, vh, dpr, cam, time, layerT) {
+    const a = this.t.abyss;
+    const par = 0.3, y = WORLD.SEA + 2.4;
+    layerT(par);
+    const x0 = cam.x * par - vw / cam.zoom, x1 = cam.x * par + vw / cam.zoom;
+    const g = ctx.createLinearGradient(0, -y, 0, -y + 14);
+    g.addColorStop(0, a.shade);
+    g.addColorStop(1, a.deep);
+    ctx.fillStyle = g;
+    ctx.fillRect(x0 - 2, -y + 0.6, x1 - x0 + 4, 60);
+    ctx.fillStyle = a.shade;
+    ctx.beginPath();
+    const step = 2.2, off = (time * 0.12) % step;
+    for (let x = Math.floor(x0 / step) * step - step; x < x1 + step; x += step) {
+      const k = Math.round(x / step);
+      const rr = 1.1 + 0.6 * Math.abs(Math.sin(k * 12.9898));
+      ctx.moveTo(x + off + rr, -y);
+      ctx.arc(x + off, -y + 0.2 * Math.sin(k * 3.1), rr, 0, TAU);
+    }
+    ctx.fill();
   }
 
   _mist(ctx, vw, vh, dpr, cam, par, worldY, strength) {
@@ -344,110 +376,88 @@ export class Scene {
     ctx.globalAlpha = 1;
   }
 
-  // Reeds and cattails where the ground meets the stream.
-  drawShore(ctx, view, time) {
-    if (!this.reeds) return;
-    const color = this.t.sea.reed;
-    ctx.lineCap = 'round';
-    for (const rd of this.reeds) {
-      if (rd.x < view.x0 - 2 || rd.x > view.x1 + 2) continue;
-      const sway = Math.sin(time * 1.3 + rd.ph) * 0.08 + rd.lean;
-      const bx = rd.x, by = -(WORLD.SEA - 0.3);
-      const tx = bx + sway * rd.h, ty = by - rd.h;
-      ctx.strokeStyle = color;
-      ctx.lineWidth = 0.07;
-      ctx.beginPath();
-      ctx.moveTo(bx, by);
-      ctx.quadraticCurveTo(bx + sway * rd.h * 0.3, by - rd.h * 0.6, tx, ty);
-      ctx.stroke();
-      // a blade leaf
-      ctx.fillStyle = color;
-      ctx.beginPath();
-      ctx.moveTo(bx, by);
-      ctx.quadraticCurveTo(bx - 0.3, by - rd.h * 0.5, bx - 0.25 + sway, by - rd.h * 0.8);
-      ctx.quadraticCurveTo(bx - 0.1, by - rd.h * 0.45, bx + 0.05, by);
-      ctx.fill();
-      if (rd.cat) {
-        ctx.fillStyle = '#7a4a26';
-        ctx.beginPath();
-        ctx.ellipse(tx, ty + 0.18, 0.07, 0.2, sway * 0.5, 0, TAU);
-        ctx.fill();
-      }
+  // The cloud sea under the islands (world render space, y down = -worldY). The back layer sits
+  // behind the terrain; the front layer is a row of puffs that swallows whatever sinks into it.
+  drawAbyss(ctx, view, time, front) {
+    const a = this.t.abyss;
+    const x0 = Math.floor(view.x0) - 2, x1 = Math.ceil(view.x1) + 2;
+    const top = WORLD.SEA;
+    if (-top + 3 < -view.y1) return; // the clouds are far below the view
+    const bottom = Math.max(-view.y0 + 2, -top + 4);
+    if (!front) {
+      const g = ctx.createLinearGradient(0, -top - 0.6, 0, -top + 7);
+      g.addColorStop(0, a.shade);
+      g.addColorStop(1, a.deep);
+      ctx.fillStyle = g;
+      ctx.fillRect(x0, -top - 0.5, x1 - x0, bottom + top + 0.5);
     }
+    const step = front ? 1.35 : 1.7;
+    const drift = (time * (front ? 0.35 : -0.2)) % step;
+    const rows = front ? [[0.15, 0.75, a.cloud, 0.94]] : [[0.75, 1.0, a.shade, 1], [0.45, 0.8, a.cloud, 0.9]];
+    for (const [dy, size, color, alpha] of rows) {
+      ctx.fillStyle = color;
+      ctx.globalAlpha = alpha;
+      ctx.beginPath();
+      for (let x = Math.floor(x0 / step) * step - step; x < x1 + step; x += step) {
+        const k = Math.round(x / step) + (front ? 7 : 0);
+        const h = Math.abs(Math.sin(k * 12.9898 + dy * 7));
+        const rr = size * (0.7 + 0.5 * h);
+        const cx = x + drift, cy = -(top + dy + 0.25 * Math.sin(k * 2.3 + time * 0.6));
+        ctx.moveTo(cx + rr, cy);
+        ctx.arc(cx, cy, rr, 0, TAU);
+      }
+      ctx.fill();
+    }
+    if (front) {
+      // inside the clouds: thick white fading into the depths
+      const g = ctx.createLinearGradient(0, -top, 0, -top + 5);
+      g.addColorStop(0, a.cloud);
+      g.addColorStop(1, a.deep);
+      ctx.fillStyle = g;
+      ctx.globalAlpha = 0.94;
+      ctx.fillRect(x0, -top + 0.05, x1 - x0, bottom + top);
+    }
+    ctx.globalAlpha = 1;
   }
 
-  // Stream water in world render space (y down = -worldY). Back layer sits behind terrain.
-  drawWater(ctx, view, time, front) {
-    const s = this.t.sea;
-    const x0 = Math.floor(view.x0) - 1, x1 = Math.ceil(view.x1) + 1;
-    const bottom = Math.min(-WORLD.SEA + 40, -view.y0 + 2);
-    const phase = front ? 0 : 1.7;
-    const amp = 0.1;
-    const yAt = (x) => -(WORLD.SEA + Math.sin(x * 0.85 + time * 1.4 + phase) * amp + Math.sin(x * 0.33 - time * 0.8 + phase) * amp * 0.8 + (front ? -0.08 : 0.1));
-    ctx.beginPath();
-    ctx.moveTo(x0, bottom);
-    for (let x = x0; x <= x1; x += 0.35) ctx.lineTo(x, yAt(x));
-    ctx.lineTo(x1, bottom);
-    ctx.closePath();
-    const g = ctx.createLinearGradient(0, -WORLD.SEA, 0, -WORLD.SEA + 6);
-    g.addColorStop(0, front ? s.top : s.bottom);
-    g.addColorStop(1, s.bottom);
-    ctx.globalAlpha = front ? 0.82 : 1;
-    ctx.fillStyle = g;
-    ctx.fill();
-    ctx.globalAlpha = 1;
-    if (!front) return;
-    ctx.lineWidth = 0.1;
-    ctx.strokeStyle = s.foam;
-    ctx.globalAlpha = 0.75;
-    ctx.beginPath();
-    for (let x = x0; x <= x1; x += 0.35) {
-      const y = yAt(x);
-      if (x === x0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
-    }
-    ctx.stroke();
-    // shimmering reflections
-    ctx.fillStyle = s.foam;
-    for (let k = Math.floor(x0 / 1.9); k < x1 / 1.9; k++) {
-      const bx = k * 1.9 + Math.sin(k * 12.9) * 0.8;
-      const life = (time * 0.35 + Math.abs(Math.sin(k * 7.1))) % 1;
-      ctx.globalAlpha = Math.sin(life * Math.PI) * 0.45;
-      ctx.fillRect(bx - 0.35, yAt(bx) + 0.35 + (k % 3) * 0.35, 0.7 * (1 - life * 0.5), 0.05);
-    }
-    ctx.globalAlpha = 1;
-    // lily pads bob on the surface
-    if (this.pads) {
-      for (const p of this.pads) {
-        if (p.x < view.x0 - 1 || p.x > view.x1 + 1) continue;
-        const y = yAt(p.x) + 0.02 + Math.sin(time * 1.1 + p.ph) * 0.02;
-        ctx.save();
-        ctx.translate(p.x, y);
-        ctx.scale(1, 0.38);
-        ctx.fillStyle = '#3f8f3a';
+  // Water spilling off the island cliffs into the clouds (gone once its spring is blown away).
+  drawFalls(ctx, view, time, terrain) {
+    if (!this.falls) return;
+    const a = this.t.abyss;
+    for (const f of this.falls) {
+      if (f.x < view.x0 - 3 || f.x > view.x1 + 3) continue;
+      if (!terrain.solid(f.x - f.dir * 0.3, f.y - 0.25)) continue;
+      const bottom = WORLD.SEA + 0.3;
+      const xAt = (y, side) => f.x + f.dir * (1.1 * Math.sqrt(clamp((f.y - y) / 1.6, 0, 1))) + side * f.w * (0.5 + 0.35 * clamp((f.y - y) / 8, 0, 1));
+      ctx.beginPath();
+      for (let y = f.y; y >= bottom; y -= 0.4) ctx.lineTo(xAt(y, -1), -y);
+      for (let y = bottom; y <= f.y + 0.01; y += 0.4) ctx.lineTo(xAt(y, 1), -y);
+      ctx.closePath();
+      ctx.fillStyle = a.water;
+      ctx.globalAlpha = 0.75;
+      ctx.fill();
+      // streaks rushing down
+      ctx.globalAlpha = 0.9;
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 0.05;
+      ctx.setLineDash([0.5, 0.8]);
+      for (const side of [-0.5, 0, 0.5]) {
+        ctx.lineDashOffset = -(time * 7 + f.ph + side * 3);
         ctx.beginPath();
-        ctx.moveTo(0, 0);
-        ctx.arc(0, 0, p.r, p.rot + 0.3, p.rot + TAU - 0.3);
-        ctx.closePath();
-        ctx.fill();
-        ctx.fillStyle = 'rgba(160,220,110,0.5)';
-        ctx.beginPath();
-        ctx.arc(-p.r * 0.25, -p.r * 0.2, p.r * 0.45, 0, TAU);
-        ctx.fill();
-        ctx.restore();
-        if (p.flower) {
-          ctx.fillStyle = '#ffd0e4';
-          for (let i = 0; i < 5; i++) {
-            const a = (i / 5) * TAU;
-            ctx.beginPath();
-            ctx.ellipse(p.x + Math.cos(a) * 0.1, y - 0.1 + Math.sin(a) * 0.05, 0.09, 0.05, a, 0, TAU);
-            ctx.fill();
-          }
-          ctx.fillStyle = '#ffd24d';
-          ctx.beginPath();
-          ctx.arc(p.x, y - 0.1, 0.05, 0, TAU);
-          ctx.fill();
-        }
+        for (let y = f.y; y >= bottom; y -= 0.4) ctx.lineTo(xAt(y, side), -y);
+        ctx.stroke();
       }
+      ctx.setLineDash([]);
+      // spray where it meets the clouds
+      ctx.fillStyle = a.cloud;
+      for (let k = 0; k < 4; k++) {
+        const ph = (time * 0.8 + k * 0.25 + f.ph) % 1;
+        ctx.globalAlpha = 0.6 * (1 - ph);
+        ctx.beginPath();
+        ctx.arc(xAt(bottom, 0) + (k - 1.5) * 0.35, -(bottom + ph * 0.8), 0.25 + ph * 0.5, 0, TAU);
+        ctx.fill();
+      }
+      ctx.globalAlpha = 1;
     }
   }
 

@@ -24,17 +24,19 @@ export const MAT = {
 };
 
 // Nut ammo. mul = damage multiplier against block materials (missing = 1). hit = direct-hit
-// multiplier against captains. dent = small crater when slamming into the ground.
+// multiplier against captains. dent = small crater when slamming into the ground. Craters are
+// big on purpose: the islands float, and digging out the ground under someone drops them.
+// drill = the walnut's tap: it slams down, bores `depth` metres into the island, then bursts.
 export const AMMO = {
-  acorn: { r: 0.38, density: 4.2, ammo: Infinity, mul: { wood: 1.3, stone: 1.1, leaf: 1.1 }, hit: 1.0, dent: 0.75 },
-  pinenut: { r: 0.34, density: 3.4, ammo: 3, mul: { wood: 2.6, stone: 0.7, leaf: 1.3, log: 1.6 }, hit: 0.95, dent: 0.65, ability: 'dash' },
-  peanut: { r: 0.34, density: 3.2, ammo: 3, mul: { wood: 0.8, stone: 0.5, leaf: 3, mushroom: 0.8 }, hit: 0.7, dent: 0.5, ability: 'split' },
-  burr: { r: 0.4, density: 4.0, ammo: 2, mul: { stone: 1.2 }, hit: 0.3, ability: 'boom', blast: { r: 2.6, dmg: 38, crater: 2.2, push: 26 } },
-  walnut: { r: 0.4, density: 5.2, ammo: 2, mul: { wood: 1.2, stone: 1.3, log: 1.3 }, hit: 0.75, dent: 0.6, ability: 'pound', blast: { r: 2.0, dmg: 30, crater: 1.8, push: 18 } },
+  acorn: { r: 0.38, density: 4.2, ammo: Infinity, mul: { wood: 1.3, stone: 1.1, leaf: 1.1 }, hit: 1.0, dent: 1.0 },
+  pinenut: { r: 0.34, density: 3.4, ammo: 3, mul: { wood: 2.6, stone: 0.7, leaf: 1.3, log: 1.6 }, hit: 0.95, dent: 0.85, ability: 'dash' },
+  peanut: { r: 0.34, density: 3.2, ammo: 3, mul: { wood: 0.8, stone: 0.5, leaf: 3, mushroom: 0.8 }, hit: 0.7, dent: 0.6, ability: 'split' },
+  burr: { r: 0.4, density: 4.0, ammo: 2, mul: { stone: 1.2 }, hit: 0.3, ability: 'boom', blast: { r: 2.6, dmg: 38, crater: 2.6, push: 26 } },
+  walnut: { r: 0.4, density: 5.2, ammo: 2, mul: { wood: 1.2, stone: 1.3, log: 1.3 }, hit: 0.75, dent: 0.6, ability: 'pound', blast: { r: 2.0, dmg: 30, crater: 2.0, push: 18 }, drill: { depth: 2.8, r: 0.8 } },
 };
 
 // Peanut kernels after the shell splits.
-export const KERNEL = { r: 0.22, density: 3.6, mul: { wood: 0.9, stone: 0.5, leaf: 3.2, mushroom: 0.8 }, hit: 0.6, blast: { r: 1.1, dmg: 9, crater: 0.9, push: 5 } };
+export const KERNEL = { r: 0.22, density: 3.6, mul: { wood: 0.9, stone: 0.5, leaf: 3.2, mushroom: 0.8 }, hit: 0.6, blast: { r: 1.1, dmg: 9, crater: 1.0, push: 5 } };
 // Nuts shaken loose from a tree canopy: small, but they hurt whoever is standing below.
 export const FALLNUT = { r: 0.2, density: 4, mul: {}, hit: 2.2 };
 
@@ -51,9 +53,15 @@ export const HIVE_BLAST = { r: 2.4, dmg: 24, crater: 0.5, push: 12 };
 export const HIT_K = 0.95;
 export const HIT_CAP = 30;
 
-// Sudden death: after this many turns the sea rises each turn so matches always end.
+// Sudden death: after this many turns the cloud sea rises each turn so matches always end.
 export const FLOOD_TURN = 18;
-export const FLOOD_STEP = 0.55;
+export const FLOOD_STEP = 1.2;
+// A cart won't drive itself over a drop deeper than this (being knocked off is another story).
+export const CLIFF_STOP = 2.2;
+// Ground thinner than this under a captain shows cracks (and the CPU smells an opening).
+export const THIN_GROUND = 2.1;
+// A crust thinner than this under a cart gives way the moment something hits close by.
+export const CRUMBLE = 1.5;
 
 export const WIND_LEVELS = { off: 0, normal: 5, strong: 9 };
 
