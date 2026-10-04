@@ -163,12 +163,10 @@ export class Crew {
           m.vy += 16 * dt;
           m.ox += m.vx * dt;
           m.oy += m.vy * dt;
-          m.rot = m.t * 14 * (p.facing || 1);
           if (m.oy > 0 && m.vy > 0) { m.oy = 0; m.vy = 0; m.vx = 0; }
         } else {
           m.ox *= Math.exp(-10 * dt);
           m.oy = Math.min(0, m.oy * Math.exp(-10 * dt));
-          m.rot = 0;
         }
         if (m.hold > 0 && (m.hold -= dt) <= 0) {
           const nx = m.then;
@@ -223,7 +221,7 @@ export class Crew {
       tx = pos.x + f * HAT.x;
       ty = -pos.y + HAT.y;
     } else {
-      const back = p.moving ? 1.0 : GROUND_BACK;
+      const back = p.moving ? 1.15 : GROUND_BACK; // pushing: paws on the back wheel
       const gx = pos.x - f * back;
       const ground = this.g.terrain.surfaceY(gx, pos.y + 1.2);
       const foot = pos.y - CART_R;
@@ -248,26 +246,20 @@ export class Crew {
     const p = m.p;
     if (!Art.drawCrew || (p.fell && p.dead)) return; // gone with the cart into the clouds
     const pose = m.pose === 'sit' && m.slot !== 'hat' ? 'idle' : m.pose;
-    const x = m.x + m.ox, y = m.y + m.oy;
-    if (m.rot) {
-      ctx.save();
-      ctx.translate(x, y - 0.3);
-      ctx.rotate(m.rot);
-      Art.drawCrew(ctx, 0, 0.3, { team: p.team, variant: m.variant, facing: p.facing, pose, t: m.t, time: this.g.time + m.variant * 1.3, blink: m.blink > 0 ? 1 : 0 });
-      ctx.restore();
-    } else {
-      Art.drawCrew(ctx, x, y, { team: p.team, variant: m.variant, facing: p.facing, pose, t: m.t, time: this.g.time + m.variant * 1.3, blink: m.blink > 0 ? 1 : 0 });
-    }
+    Art.drawCrew(ctx, m.x + m.ox, m.y + m.oy, { team: p.team, variant: m.variant, facing: p.facing, pose, t: m.t, time: this.g.time + m.variant * 1.3, blink: m.blink > 0 ? 1 : 0 });
   }
 
-  // the runner, behind the cart
+  // the runner, behind the cart (unless it is hanging off the back of it)
   drawBack(ctx) {
-    for (const [, run] of this.squad) this._draw(ctx, run);
+    for (const [, run] of this.squad) if (!run.cling) this._draw(ctx, run);
   }
 
-  // the one on the hat, over the captain
+  // the one on the hat over the captain, and a runner clinging to the rim
   drawFront(ctx) {
-    for (const [hat] of this.squad) this._draw(ctx, hat);
+    for (const [hat, run] of this.squad) {
+      if (run.cling) this._draw(ctx, run);
+      this._draw(ctx, hat);
+    }
   }
 
   // speech bubbles, a constant size on screen
@@ -281,7 +273,8 @@ export class Crew {
         const f = m.p.facing || 1;
         const side = m.slot === 'hat' ? f : -f;
         ctx.save();
-        ctx.translate(m.x + m.ox + side * 0.35, m.y + m.oy - (m.slot === 'hat' ? 0.75 : 0.85));
+        // the hat one talks off to the side, clear of the HP bar; the runner talks overhead
+        ctx.translate(m.x + m.ox + side * (m.slot === 'hat' ? 0.6 : 0.35), m.y + m.oy - (m.slot === 'hat' ? 0.4 : 0.85));
         ctx.scale(s, s);
         ctx.globalAlpha = clamp(pop * 1.5, 0, 1);
         ctx.font = '15px Jua, "Black Han Sans", system-ui, sans-serif';

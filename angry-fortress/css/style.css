@@ -184,8 +184,8 @@ svg { width: 1em; height: 1em; fill: currentColor; flex: none; }
 /* 깡이 fist-pumping next to the big 깡! */
 .logo-crew {
   position: absolute;
-  right: -6%;
-  top: 22%;
+  right: -24%;
+  top: 44%;
   width: clamp(70px, 13vw, 150px);
   height: clamp(70px, 13vw, 150px);
   transform: rotate(4deg);

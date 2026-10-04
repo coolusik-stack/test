@@ -1,6 +1,6 @@
 // =====================================================================
-//  엥그리 포트리스 (Angry Fortress) — procedural vector art module
-//  Theme: two squirrel villages fling angry-cute nuts from twig slingshots.
+//  도토리깡 (Dotori-Kkang) — procedural vector art module
+//  Theme: two plucky squirrel captains (and their 깡단 crews) fling cute nuts from twig slingshots.
 //  ES module, no dependencies. Render space: 1 unit = 1 m, x right, y down.
 //  Every public draw function saves/restores the context state.
 // =====================================================================
@@ -3314,5 +3314,822 @@ export function drawCaptainIcon(canvas, team) {
   ctx.setTransform(k, 0, 0, k, w / 2 - 0.05 * m, h / 2 + (tm ? 0.5 : 0.36) * k);
   const o = { eye: 'open', blink: 0, tilt: 1, browUp: 0, mouth: 'w', puff: 0, llx: 0.5, lly: 0.1 };
   drawCaptainHead(ctx, tm, CAPT[tm], o, LIGHT_X, LIGHT_Y, 0.5, CAP_LW / HEAD_K * 1.1);
+  ctx.restore();
+}
+
+// =====================================================================
+//  깡단 꼬맹이들 — the little crew that tags along with each captain
+//  Crew-local metres, +x = facing, y down. Origin = where the feet touch the ground
+//  ('cling': the grip point of the paws, body hanging below; 'sit': its bottom).
+//  Same family as the captain: CAPT palettes, chunky outline, two-tone fur, cream muzzle and
+//  belly, pink blush, glossy eyes and an acorn-cap helmet with the team band.
+//    variant 0 — the tiny eager one: helmet far too big (keeps slipping over one eye),
+//                one big buck tooth, always fist-pumping
+//    variant 1 — the chubby munchy one: puffy cheeks, a tail fluffier than it is, and
+//                nearly always clutching an acorn
+//  Poses: idle nibble cheer shout push tumble salute scared cling dance cry flex sit peek
+// =====================================================================
+const CREW_LW = 0.04;            // body / head outline (m)
+const CREW_LLW = 0.034;          // limb outline (m)
+const CREW_LIMB = 0.072;         // limb thickness (m)
+const CREW_PAW = 0.046;          // paw radius (m)
+const CREW_FOOT = [0.058, 0.03]; // foot half-length / half-height (m)
+const CREW_HK = 0.2;             // head unit -> m (the captain's is 0.58)
+const CREW_HIP = -0.1;           // pivot for the upper-body lean and squash
+const CREW_FEAT = 0.17;          // face stroke (head units)
+const CREW_BLUSH = 'rgba(255,110,140,0.55)';
+const CREW_HAT = '#9c6c3c';
+const CREW_V = [
+  { // 0 — tiny eager one
+    by: -0.155, brx: 0.11, bry: 0.118, belly: [0.034, -0.132, 0.066, 0.078],
+    hx: 0.02, hy: -0.372, puff: 0,
+    sb: [-0.07, -0.2], sf: [0.075, -0.198], hb: [-0.045, -0.07], hf: [0.045, -0.07], fb: -0.05, ff: 0.055,
+    tx: -0.07, ty: -0.085, tk: 0.33, fluff: 0,
+    helm: [0.05, 0.47, -0.58, 1.6], acR: 0.056,
+  },
+  { // 1 — chubby munchy one
+    by: -0.162, brx: 0.148, bry: 0.138, belly: [0.04, -0.14, 0.094, 0.098],
+    hx: 0.03, hy: -0.39, puff: 0.5,
+    sb: [-0.095, -0.21], sf: [0.105, -0.205], hb: [-0.065, -0.065], hf: [0.065, -0.065], fb: -0.075, ff: 0.08,
+    tx: -0.1, ty: -0.15, tk: 0.39, fluff: 1,
+    helm: [0.0, 0.04, -0.05, 0.98], acR: 0.07,
+  },
+];
+for (const V of CREW_V) {
+  V.body = (p) => crewBodyShape(p, V.brx, V.bry, V.by);
+  V.bellyP = (p) => { const b = V.belly; p.moveTo(b[0] + b[2], b[1]); p.ellipse(b[0], b[1], b[2], b[3], 0, 0, TAU); p.closePath(); };
+}
+
+function smooth01(u) { u = clamp(u, 0, 1); return u * u * (3 - 2 * u); }
+function easeOutBack(u) { u = clamp(u, 0, 1) - 1; return 1 + 2.7 * u * u * u + 1.7 * u * u; }
+function lerpN(a, b, u) { return a + (b - a) * u; }
+
+// egg-shaped body: narrow shoulders, round bottom
+function crewBodyShape(p, rx, ry, cy) {
+  p.moveTo(0, cy - ry);
+  p.bezierCurveTo(rx * 0.7, cy - ry, rx, cy - ry * 0.25, rx, cy + ry * 0.18);
+  p.bezierCurveTo(rx, cy + ry * 0.74, rx * 0.56, cy + ry, 0, cy + ry);
+  p.bezierCurveTo(-rx * 0.56, cy + ry, -rx, cy + ry * 0.74, -rx, cy + ry * 0.18);
+  p.bezierCurveTo(-rx, cy - ry * 0.25, -rx * 0.7, cy - ry, 0, cy - ry);
+  p.closePath();
+}
+
+// The captain's S-curl tail, with a scalloped (fluffy) or spiky (fur on end) outline.
+// mode 1 = scallops, 2 = spikes. Commander-local metres like tailShape.
+function crewTailShape(p, wmul, mode) {
+  const S = TAIL_S, N = 9, pts = [];
+  for (let i = 0; i <= N; i++) {
+    const u = i / N, seg = u < 0.5 ? 0 : 1, t = seg ? (u - 0.5) * 2 : u * 2;
+    pts.push(seg ? cubicPt(S[3], S[4], S[5], S[6], t) : cubicPt(S[0], S[1], S[2], S[3], t));
+  }
+  const L = [], R = [];
+  for (let i = 0; i <= N; i++) {
+    const a = pts[Math.max(0, i - 1)], b = pts[Math.min(N, i + 1)];
+    let tx = b[0] - a[0], ty = b[1] - a[1]; const d = Math.hypot(tx, ty) || 1; tx /= d; ty /= d;
+    const w = tailW(i / N) * wmul / 2;
+    L.push([pts[i][0] - ty * w, pts[i][1] + tx * w]); R.push([pts[i][0] + ty * w, pts[i][1] - tx * w]);
+  }
+  const amt = mode === 2 ? 0.13 * wmul : 0.1 * wmul;
+  const edge = (A, B, C0, C1) => {
+    const mx = (A[0] + B[0]) / 2, my = (A[1] + B[1]) / 2;
+    let nx = mx - (C0[0] + C1[0]) / 2, ny = my - (C0[1] + C1[1]) / 2;
+    const d = Math.hypot(nx, ny) || 1; nx /= d; ny /= d;
+    if (mode === 2) { p.lineTo(mx + nx * amt, my + ny * amt); p.lineTo(B[0], B[1]); }
+    else p.quadraticCurveTo(mx + nx * amt * 2, my + ny * amt * 2, B[0], B[1]);
+  };
+  p.moveTo(L[0][0], L[0][1]);
+  for (let i = 0; i < N; i++) edge(L[i], L[i + 1], pts[i], pts[i + 1]);
+  // round, extra-fluffy tip
+  const e = pts[N], q = pts[N - 1];
+  let tx = e[0] - q[0], ty = e[1] - q[1]; const dd = Math.hypot(tx, ty) || 1; tx /= dd; ty /= dd;
+  const w = tailW(1) * wmul / 2, tip = [e[0] + tx * w * 1.2, e[1] + ty * w * 1.2];
+  edge(L[N], tip, e, e);
+  edge(tip, R[N], e, e);
+  for (let i = N; i > 0; i--) edge(R[i], R[i - 1], pts[i], pts[i - 1]);
+  p.closePath();
+}
+
+// ---------------------------------------------------------------------
+//  pose: every pose fills this one scratch object (no per-frame allocation)
+// ---------------------------------------------------------------------
+const CQ = {};
+function crewHelmSlip(q, time, amt) {
+  // v0's helmet slowly slides down over its eye… then gets shoved back up
+  const ph = frac(time / 4.4 + 0.2);
+  const slip = ph < 0.86 ? smooth01(ph / 0.86) : 1 - smooth01((ph - 0.86) / 0.14);
+  q.helmRot -= 0.13 * slip * amt;
+  q.helmDy += 0.12 * slip * amt;
+}
+function crewPump(time) {
+  // two quick fist pumps every few seconds
+  const ph = frac(time / 2.7);
+  return ph < 0.42 ? Math.abs(Math.sin(ph / 0.42 * TAU)) : 0;
+}
+function crewHug(q, V) {
+  // v1: acorn hugged against the belly, front paw over it
+  q.acorn = 1; q.acx = V.brx * 0.62; q.acy = V.by - 0.005; q.acRot = -0.35;
+  q.afx = q.acx + 0.012; q.afy = q.acy + 0.03; q.afex = q.sfx + 0.075; q.afey = q.sfy + 0.075; q.afL = 1;
+}
+function crewToMouth(q, V, u) {
+  // move the hugged acorn (and the front paw) up to the mouth by u
+  const mx = V.hx + 0.86 * CREW_HK, my = V.hy + 0.42 * CREW_HK;
+  q.acx = lerpN(q.acx, mx + 0.03, u); q.acy = lerpN(q.acy, my + 0.02, u); q.acRot = lerpN(q.acRot, 0.5, u);
+  q.afx = q.acx + 0.012; q.afy = q.acy + 0.035;
+  q.afex = lerpN(q.afex, q.sfx + 0.11, u); q.afey = lerpN(q.afey, q.sfy + 0.03, u);
+  if (u > 0.5) q.afL = 2;
+}
+
+function crewPose(q, pose, V, v, t, time, blink) {
+  q.rot = 0; q.rx = 0; q.ry = 0; q.lean = 0; q.sqx = 1; q.sqy = 1;
+  q.hx = 0; q.hy = 0; q.ht = 0;
+  q.sbx = V.sb[0]; q.sby = V.sb[1]; q.sfx = V.sf[0]; q.sfy = V.sf[1];
+  q.abx = q.sbx - 0.035; q.aby = q.sby + 0.135; q.abex = NaN; q.abey = 0; q.abL = 0;
+  q.afx = q.sfx + 0.04; q.afy = q.sfy + 0.135; q.afex = NaN; q.afey = 0; q.afL = 1;
+  q.bicep = 0;
+  q.lbx = V.fb; q.lby = 0; q.lbA = 0; q.lfx = V.ff; q.lfy = 0; q.lfA = 0; q.legsFront = 0;
+  q.eye = 'open'; q.mouth = 'w'; q.tilt = 0.3; q.browUp = 0; q.llx = 0.6; q.lly = 0.1;
+  q.blink = blink; q.puff = V.puff; q.blush = 1;
+  q.tailRot = 0; q.tailPuff = 0;
+  q.helmDy = 0; q.helmRot = 0; q.spikes = 0;
+  q.acorn = 0; q.acx = 0; q.acy = 0; q.acRot = 0;
+  q.sweat = 0; q.tears = 0; q.stars = 0; q.sparkle = 0; q.spX = 0; q.spY = 0;
+  q.crumbs = 0; q.shout = 0; q.note = 0; q.dust = 0; q.spin = 0;
+  const HK = CREW_HK;
+  switch (pose) {
+    case 'nibble': {
+      const chew = Math.abs(Math.sin(time * 9));
+      q.hy = 0.006 * Math.sin(time * 18);
+      q.puff = Math.min(1, V.puff + 0.35 + 0.3 * chew);
+      q.mouth = 'munch';
+      const mx = V.hx + 0.86 * HK, my = V.hy + 0.42 * HK;
+      q.acorn = 1; q.acx = mx + 0.03; q.acy = my + 0.025 + 0.006 * chew; q.acRot = 0.45;
+      q.afx = q.acx + 0.015; q.afy = q.acy + 0.04; q.afex = q.sfx + 0.1; q.afey = q.sfy + 0.04; q.afL = 2;
+      q.sbx = V.sf[0] - 0.06; q.sby = V.sf[1] + 0.01;
+      q.abx = q.acx - 0.035; q.aby = q.acy + 0.03; q.abex = q.sbx + 0.06; q.abey = q.sby + 0.07; q.abL = 2;
+      if (v) { q.eye = 'happy'; q.tilt = -0.4; } else { q.llx = 1; q.lly = 0.7; }
+      q.crumbs = 1;
+      q.tailRot = 0.05 * Math.sin(time * 2.4);
+      if (!v) crewHelmSlip(q, time, 1);
+      break;
+    }
+    case 'cheer': {
+      const T = 0.46, ph = frac(t / T), up = Math.sin(ph * PI);
+      const land = Math.max(0, 1 - Math.min(ph, 1 - ph) * 7);
+      q.ry = -0.14 * up;
+      q.sqy = 1 - 0.13 * land + 0.05 * up; q.sqx = 1 + 0.1 * land - 0.03 * up;
+      const wave = 0.03 * Math.sin(time * 17);
+      q.abex = q.sbx - 0.11; q.abey = q.sby - 0.01; q.abx = q.sbx - 0.165; q.aby = q.sby - 0.2 + wave; q.abL = 0;
+      q.afex = q.sfx + 0.15; q.afey = q.sfy - 0.02; q.afx = q.sfx + 0.22; q.afy = q.sfy - 0.22 - wave; q.afL = 1;
+      q.lby = q.lfy = -0.05 * up; q.lbx -= 0.03 * up; q.lfx += 0.03 * up; q.lbA = 0.4 * up; q.lfA = 0.4 * up;
+      q.eye = 'happy'; q.mouth = 'grin'; q.tilt = -0.5;
+      q.tailRot = -0.14 * Math.cos(ph * TAU);
+      q.helmDy = 0.1 * Math.cos(ph * TAU) - 0.03;
+      if (v) { q.acorn = 1; q.acx = q.afx + 0.02; q.acy = q.afy - 0.065; q.acRot = 0.25; }
+      break;
+    }
+    case 'shout': {
+      const a = easeOutBack(t / 0.2);
+      const ph = frac(t / 0.5), punch = ph < 0.1 ? ph / 0.1 : 1 - 0.4 * smooth01((ph - 0.1) / 0.9);
+      q.lean = -0.12 + 0.34 * a;
+      q.ht = -0.14 * a; q.hx = 0.015 * a;
+      q.afx = q.sfx + 0.04 + 0.16 * punch * a; q.afy = q.sfy + 0.1 - 0.17 * a; q.afL = 2;
+      q.abx = q.sbx - 0.1; q.aby = q.sby + 0.07; q.abex = q.sbx - 0.03; q.abey = q.sby + 0.1;
+      q.lbx = V.fb - 0.035; q.lfx = V.ff + 0.04;
+      q.eye = 'squeeze'; q.mouth = 'shout'; q.tilt = 1.7; q.browUp = -0.02;
+      q.rx = Math.sin(time * 47) * 0.005 * a;
+      q.shout = a;
+      q.tailRot = -0.15 + 0.04 * Math.sin(time * 30);
+      q.helmRot = 0.05 * a;
+      break;
+    }
+    case 'push': {
+      const ph = time * 13, s1 = Math.sin(ph), c1 = Math.cos(ph);
+      q.lean = 0.62;
+      q.ry = -0.012 * Math.abs(s1);
+      q.ht = -0.42; q.hx = -0.005; q.hy = 0.012;
+      // both paws out front (behind the head, so they peek out past the face)
+      q.afx = q.sfx + 0.21; q.afy = q.sfy - 0.24 + 0.006 * s1; q.afex = q.sfx + 0.13; q.afey = q.sfy - 0.06; q.afL = 1;
+      q.abx = q.sbx + 0.28; q.aby = q.sby - 0.28 - 0.006 * s1; q.abex = q.sbx + 0.17; q.abey = q.sby - 0.08;
+      q.lbx = -0.1 + 0.1 * s1; q.lby = -0.055 * Math.max(0, c1); q.lbA = -0.5 * Math.max(0, c1);
+      q.lfx = -0.08 - 0.1 * s1; q.lfy = -0.055 * Math.max(0, -c1); q.lfA = -0.5 * Math.max(0, -c1);
+      q.eye = 'determined'; q.mouth = 'grit'; q.tilt = 1.4; q.llx = 1; q.lly = -0.3;
+      q.tailRot = -0.4 + 0.07 * s1;
+      q.dust = 1; q.sweat = 1;
+      if (v) { q.acorn = 1; q.acx = V.hx + 0.9 * HK; q.acy = V.hy + 0.48 * HK; q.acRot = 1.2; q.mouth = 'munch'; }
+      else { q.helmDy = 0.05; crewHelmSlip(q, time, 0.6); }
+      break;
+    }
+    case 'tumble':
+      q.spin = t * 12;
+      q.eye = 'spiral'; q.mouth = 'o'; q.tilt = -0.8; q.stars = 1;
+      break;
+    case 'salute': {
+      const a = easeOutBack((t - 0.05) / 0.2);
+      const pre = 1 - smooth01(t / 0.1);
+      q.sqy = 1 - 0.1 * pre + 0.04 * a; q.sqx = 1 + 0.06 * pre + 0.02 * a;
+      q.lean = 0.14 * pre - 0.12 * a;
+      q.ht = -0.07 * a;
+      const bx = V.hx + (v ? 0.62 : 0.6) * HK, by = V.hy - (v ? 0.62 : 0.5) * HK;
+      const rx = q.sfx + 0.04, ry = q.sfy + 0.135;
+      q.afx = lerpN(rx, bx, a); q.afy = lerpN(ry, by, a);
+      q.afex = lerpN(q.sfx + 0.07, q.sfx + 0.17, a); q.afey = lerpN(q.sfy + 0.08, q.sfy - 0.08, a); q.afL = a > 0.3 ? 2 : 1;
+      q.abx = q.sbx - 0.01; q.aby = q.sby + 0.14;
+      q.lbx = V.fb + 0.025; q.lfx = V.ff - 0.02;
+      q.eye = a > 0.5 ? 'happy' : 'squeeze'; q.mouth = a > 0.5 ? 'smile' : 'grit'; q.tilt = -0.45; q.browUp = 0.04;
+      q.tailRot = -0.1 * a + 0.04 * Math.sin(time * 3) * a;
+      if (t > 0.12 && t < 0.62) { q.sparkle = 1 - Math.abs((t - 0.27) / 0.35); q.spX = bx + 0.1; q.spY = by - 0.06; }
+      if (!v) {
+        const re = smooth01((t - 1.3) / 2.2);   // straightened by the salute… then it slips again
+        q.helmRot = 0.2 * a * (1 - re); q.helmDy = -0.12 * a * (1 - re);
+      }
+      break;
+    }
+    case 'scared': {
+      q.rx = Math.sin(time * 61) * 0.011;
+      q.lean = -0.14; q.sqy = 0.94; q.sqx = 1.03; q.ht = -0.06;
+      q.afx = V.hx + 1.0 * HK; q.afy = V.hy + 0.42 * HK; q.afex = q.sfx + 0.12; q.afey = q.sfy + 0.03; q.afL = 2;
+      q.abx = V.hx - 1.05 * HK; q.aby = V.hy + 0.4 * HK; q.abex = q.sbx - 0.07; q.abey = q.sby + 0.04;
+      if (v) {
+        q.acorn = 1; q.acx = V.brx * 0.5; q.acy = V.by - 0.06; q.acRot = -0.2;
+        q.afx = q.acx + 0.02; q.afy = q.acy + 0.02; q.afex = q.sfx + 0.08; q.afey = q.sfy + 0.08; q.afL = 2;
+      }
+      q.lbx = V.fb + 0.025; q.lfx = V.ff - 0.02; q.lbA = -0.25; q.lfA = 0.25;
+      q.eye = 'wide'; q.mouth = 'o'; q.tilt = -1.5; q.browUp = 0.1; q.llx = 0.3 + 0.4 * Math.sin(time * 5); q.lly = -0.1;
+      q.tailPuff = 1; q.tailRot = -0.08 + 0.05 * Math.sin(time * 40);
+      q.helmDy = -0.32 + 0.03 * Math.sin(time * 37); q.helmRot = 0.1 * Math.sin(time * 23); q.spikes = 1;
+      q.sweat = 1;
+      break;
+    }
+    case 'cling': {
+      // hang from the grip point: the whole body swings below it
+      q.rot = 0.13 * Math.sin(time * 3.3);
+      // the helmet top hangs ~0.13 m under the grip; both arms reach up from behind the head
+      q.rx = -0.01; q.ry = -(V.hy - 1.05 * HK - 0.13);
+      q.sbx = V.hx - 0.08; q.sby = V.hy + 0.02; q.sfx = V.hx + 0.09; q.sfy = V.hy + 0.02;
+      q.abx = -0.065 - q.rx; q.aby = -q.ry; q.abL = 0;
+      q.afx = 0.07 - q.rx; q.afy = -q.ry; q.afL = 1;
+      const k1 = time * 15;
+      q.lbx = V.fb - 0.03 + 0.05 * Math.sin(k1); q.lby = 0.01 - 0.05 * Math.max(0, Math.sin(k1)); q.lbA = 0.7;
+      q.lfx = V.ff + 0.02 - 0.05 * Math.sin(k1); q.lfy = 0.01 - 0.05 * Math.max(0, -Math.sin(k1)); q.lfA = 0.7;
+      q.eye = 'wide'; q.mouth = 'O'; q.tilt = -1.6; q.browUp = 0.08; q.llx = 0.3; q.lly = 0.9;
+      q.tailPuff = 1; q.tailRot = 0.25 + 0.3 * Math.sin(time * 6.5);
+      q.sweat = 1;
+      if (v) { q.acorn = 1; q.acx = V.hx + 0.9 * HK; q.acy = V.hy + 0.5 * HK; q.acRot = 1.2; q.mouth = 'munch'; }
+      else q.helmRot = 0.06 * Math.sin(time * 6.5);
+      break;
+    }
+    case 'dance': {
+      const beat = time * TAU * 0.8, s1 = Math.sin(beat), c1 = Math.cos(beat);
+      q.rx = 0.03 * s1; q.lean = -0.16 * s1; q.ht = 0.15 * s1;
+      q.ry = -0.04 * Math.abs(c1); q.sqy = 1 + 0.04 * Math.abs(c1); q.sqx = 1 - 0.02 * Math.abs(c1);
+      const u = (s1 + 1) / 2;
+      q.afex = q.sfx + lerpN(0.07, 0.15, u); q.afey = q.sfy + lerpN(0.08, -0.02, u);
+      q.afx = q.sfx + lerpN(0.1, 0.22, u); q.afy = q.sfy + lerpN(0.12, -0.22, u); q.afL = 1;
+      q.abex = q.sbx + lerpN(-0.11, -0.05, u); q.abey = q.sby + lerpN(-0.01, 0.08, u);
+      q.abx = q.sbx + lerpN(-0.165, -0.08, u); q.aby = q.sby + lerpN(-0.2, 0.12, u);
+      q.lfy = -0.06 * Math.max(0, s1); q.lby = -0.06 * Math.max(0, -s1);
+      q.lfA = -0.3 * Math.max(0, s1); q.lbA = 0.3 * Math.max(0, -s1);
+      q.eye = 'happy'; q.mouth = 'grin'; q.tilt = -0.4;
+      q.tailRot = 0.2 * s1;
+      q.note = 1;
+      q.helmRot = 0.08 * s1;
+      if (v) { q.acorn = 1; q.acx = q.afx + 0.02; q.acy = q.afy - 0.06; q.acRot = 0.3 + 0.3 * s1; }
+      break;
+    }
+    case 'cry': {
+      const sob = Math.pow(Math.max(0, Math.sin(time * 6.5)), 4);
+      q.ry = -0.015 * sob; q.sqy = 0.98 + 0.04 * sob; q.sqx = 1.02;
+      q.lean = 0.03; q.ht = -0.16;
+      q.afx = q.sfx + 0.075; q.afy = q.sfy + 0.12; q.abx = q.sbx - 0.08; q.aby = q.sby + 0.12;
+      q.lfy = -0.035 * Math.max(0, Math.sin(time * 6.5)); q.lby = -0.035 * Math.max(0, -Math.sin(time * 6.5));
+      q.eye = 'squeeze'; q.mouth = 'wail'; q.tilt = -1.7; q.browUp = 0.05;
+      q.tears = 1; q.blush = 1.4;
+      q.tailRot = 0.25;
+      if (v) crewHug(q, V); else { q.helmDy = -0.08; q.helmRot = 0.12; }
+      break;
+    }
+    case 'flex': {
+      const pulse = Math.pow(Math.abs(Math.sin(time * 2.6)), 3);
+      q.lean = -0.06; q.sqx = 1.03 + 0.02 * pulse; q.sqy = 1.02 + 0.02 * pulse;
+      q.sfy += 0.03; q.sby += 0.03;
+      q.afex = q.sfx + 0.19; q.afey = q.sfy + 0.02; q.afx = q.sfx + 0.2 - 0.01 * pulse; q.afy = q.sfy - 0.13 - 0.025 * pulse; q.afL = 2;
+      q.abex = q.sbx - 0.18; q.abey = q.sby + 0.02; q.abx = q.sbx - 0.18 + 0.01 * pulse; q.aby = q.sby - 0.13 - 0.025 * pulse;
+      q.bicep = 1 + 0.4 * pulse;
+      q.lbx = V.fb - 0.035; q.lfx = V.ff + 0.035;
+      q.eye = 'determined'; q.mouth = 'teeth'; q.tilt = 1.2; q.llx = 0.9; q.lly = -0.2;
+      q.sparkle = 0.55 + 0.45 * Math.abs(Math.sin(time * 4.2)); q.spX = q.afx + 0.08; q.spY = q.afy - 0.1;
+      q.tailRot = -0.06 + 0.05 * Math.sin(time * 2.6);
+      q.helmRot = 0.06;
+      break;
+    }
+    case 'sit': {
+      q.sqy = 0.92; q.sqx = 1.05;
+      q.ry = -(CREW_HIP + (V.by + V.bry - CREW_HIP) * q.sqy) + 0.012;
+      const sw = time * 3.6;
+      q.lfx = V.ff + 0.085 + 0.03 * Math.sin(sw); q.lfy = 0.07 - q.ry + 0.02 * Math.cos(sw); q.lfA = 0.55 + 0.25 * Math.sin(sw);
+      q.lbx = V.fb + 0.13 + 0.03 * Math.sin(sw + PI); q.lby = 0.06 - q.ry + 0.02 * Math.cos(sw + PI); q.lbA = 0.55 + 0.25 * Math.sin(sw + PI);
+      q.legsFront = 1;
+      q.ht = 0.07 * Math.sin(time * 1.8); q.llx = 0.7; q.lly = 0.15;
+      q.mouth = 'smile'; q.tilt = -0.2;
+      q.tailRot = 0.06 * Math.sin(time * 1.8 + 1);
+      q.afx = q.sfx + 0.08; q.afy = q.sfy + 0.12;
+      q.abx = q.sbx - 0.06; q.aby = q.sby + 0.13;
+      if (v) {
+        crewHug(q, V);
+        const ph = frac(time / 3.9 + 0.5), n = ph > 0.74 ? Math.sin((ph - 0.74) / 0.26 * PI) : 0;
+        if (n > 0) { crewToMouth(q, V, n); q.puff = Math.min(1, V.puff + 0.4 * n); q.eye = 'happy'; q.mouth = 'munch'; }
+      } else {
+        const pump = crewPump(time + 1.1);
+        if (pump > 0.02) {
+          q.afex = q.sfx + 0.1 + 0.06 * pump; q.afey = q.sfy + 0.05 - 0.05 * pump;
+          q.afx = q.sfx + 0.08 + 0.12 * pump; q.afy = q.sfy + 0.12 - 0.33 * pump;
+          q.mouth = 'grin'; q.llx = 0.9; q.lly = -0.3;
+        }
+        crewHelmSlip(q, time, 1);
+      }
+      break;
+    }
+    case 'peek': {
+      const g = frac(time / 1.7), gulp = g < 0.2 ? Math.sin(g / 0.2 * PI) : 0;
+      q.lean = 0.5 + 0.03 * Math.sin(time * 2);
+      q.ht = 0.22 + 0.08 * gulp; q.hy = 0.012 * gulp;
+      q.rx = Math.sin(time * 43) * 0.004;
+      q.abx = q.sbx - 0.15; q.aby = q.sby - 0.08; q.abex = q.sbx - 0.07; q.abey = q.sby + 0.0;
+      q.afx = q.sfx + 0.08; q.afy = q.sfy + 0.11; q.afL = 1;
+      q.lbx = V.fb - 0.075; q.lbA = -0.55; q.lby = -0.012; q.lfx = V.ff + 0.02;
+      q.eye = 'wide'; q.mouth = 'gulp'; q.tilt = -1.4; q.browUp = 0.06; q.llx = 0.6; q.lly = 1;
+      q.sweat = 1;
+      q.tailRot = -0.5 + 0.05 * Math.sin(time * 21);
+      if (v) crewHug(q, V);
+      else { q.helmDy = 0.05; q.helmRot = -0.05; }
+      break;
+    }
+    default: { // 'idle'
+      const b = Math.sin(time * 3.2);
+      q.sqy = 1 + 0.025 * b; q.sqx = 1 - 0.015 * b;
+      const look = clamp(Math.sin(time * 0.73) + 0.45 * Math.sin(time * 1.9), -1, 1);
+      q.llx = 0.85 * look; q.lly = 0.25 * Math.sin(time * 1.13);
+      q.ht = -0.05 * look;
+      q.tailRot = 0.07 * Math.sin(time * 2.1);
+      if (v) {
+        crewHug(q, V);
+        const ph = frac(time / 3.7 + 0.3), n = ph > 0.72 ? Math.sin((ph - 0.72) / 0.28 * PI) : 0;
+        if (n > 0) { crewToMouth(q, V, n); q.puff = Math.min(1, V.puff + 0.45 * n * (0.7 + 0.3 * Math.abs(Math.sin(time * 12)))); q.mouth = 'munch'; q.llx = 1; q.lly = 0.5; }
+      } else {
+        // fist pumps beside the face (arm behind the head so the face stays clear)
+        const pump = crewPump(time);
+        q.afex = q.sfx + 0.09 + 0.07 * pump; q.afey = q.sfy + 0.06 - 0.06 * pump;
+        q.afx = q.sfx + 0.05 + 0.15 * pump; q.afy = q.sfy + 0.13 - 0.34 * pump;
+        if (pump > 0.02) { q.mouth = 'grin'; q.ry = -0.025 * pump; q.llx = 0.9; q.lly = -0.4; q.tilt = 0.8; }
+        crewHelmSlip(q, time, 1);
+      }
+    }
+  }
+  return q;
+}
+
+// ---------------------------------------------------------------------
+//  parts
+// ---------------------------------------------------------------------
+// stubby limbs: polylines with round ends + paw blobs, outlined by a darker under-stroke
+function crewArm(ctx, sx, sy, ex, ey, px, py) {
+  ctx.moveTo(sx, sy);
+  if (ex === ex) ctx.lineTo(ex, ey);
+  ctx.lineTo(px, py);
+}
+function crewArms(ctx, P, q, which, col) {
+  // which: bitmask 1 = back arm, 2 = front arm
+  for (let pass = 0; pass < 2; pass++) {
+    ctx.beginPath();
+    if (which & 1) crewArm(ctx, q.sbx, q.sby, q.abex, q.abey, q.abx, q.aby);
+    if (which & 2) crewArm(ctx, q.sfx, q.sfy, q.afex, q.afey, q.afx, q.afy);
+    ctx.lineWidth = pass ? CREW_LIMB - CREW_LLW : CREW_LIMB + CREW_LLW;
+    ctx.strokeStyle = pass ? col : P.line; ctx.stroke();
+    ctx.beginPath();
+    const r = CREW_PAW + (pass ? -CREW_LLW / 2 : CREW_LLW / 2);
+    if (which & 1) { ctx.moveTo(q.abx + r, q.aby); ctx.arc(q.abx, q.aby, r, 0, TAU); }
+    if (which & 2) {
+      ctx.moveTo(q.afx + r, q.afy); ctx.arc(q.afx, q.afy, r, 0, TAU);
+      if (q.bicep) {
+        // flexed biceps on both arms
+        const br = 0.036 * q.bicep + (pass ? -CREW_LLW / 2 : CREW_LLW / 2);
+        const fx = q.sfx + 0.62 * (q.afex - q.sfx), fy = q.sfy + 0.62 * (q.afey - q.sfy) - 0.028;
+        const bx = q.sbx + 0.62 * (q.abex - q.sbx), by = q.sby + 0.62 * (q.abey - q.sby) - 0.028;
+        ctx.moveTo(fx + br, fy); ctx.arc(fx, fy, br, 0, TAU);
+        ctx.moveTo(bx + br, by); ctx.arc(bx, by, br, 0, TAU);
+      }
+    }
+    ctx.fillStyle = pass ? col : P.line; ctx.fill();
+  }
+}
+// hip joint of a leg in the root frame (follows the upper-body lean and squash)
+function crewHipPt(q, hx, hy, out) {
+  const c = Math.cos(q.lean), s = Math.sin(q.lean);
+  const x = hx * q.sqx, y = (hy - CREW_HIP) * q.sqy;
+  out[0] = x * c - y * s; out[1] = CREW_HIP + x * s + y * c;
+}
+const _hipB = [0, 0], _hipF = [0, 0];
+function crewLegs(ctx, P, V, q, which) {
+  crewHipPt(q, V.hb[0], V.hb[1], _hipB); crewHipPt(q, V.hf[0], V.hf[1], _hipF);
+  const fw = CREW_FOOT[0], fh = CREW_FOOT[1];
+  for (let pass = 0; pass < 2; pass++) {
+    const e = pass ? -CREW_LLW / 2 : CREW_LLW / 2;
+    for (let i = 0; i < 2; i++) {
+      if (!(which & (1 << i))) continue;
+      const hp = i ? _hipF : _hipB, fx = i ? q.lfx : q.lbx, fy = i ? q.lfy : q.lby, fa = i ? q.lfA : q.lbA;
+      // ankle = foot centre: the sole touches (fx, fy) when the foot is flat
+      const ax = fx + 0.012, ay = fy - fh - CREW_LLW / 2;
+      const col = pass ? (i ? P.fur : P.furD) : P.line;
+      ctx.beginPath(); ctx.moveTo(hp[0], hp[1]); ctx.lineTo(ax, ay);
+      ctx.lineWidth = CREW_LIMB * 0.92 + 2 * e; ctx.strokeStyle = col; ctx.stroke();
+      ctx.beginPath(); ctx.ellipse(ax + Math.cos(fa) * 0.018, ay + Math.sin(fa) * 0.018, fw + e, fh + e, fa, 0, TAU);
+      ctx.fillStyle = col; ctx.fill();
+    }
+  }
+}
+function drawCrewTail(ctx, P, V, q, lw) {
+  let outer, inner;
+  if (q.tailPuff) outer = V.fluff ? P2('crew:tailSpk1', (p) => crewTailShape(p, 1.55, 2)) : P2('crew:tailSpk0', (p) => crewTailShape(p, 1.35, 2));
+  else outer = V.fluff ? P2('crew:tailFluff', (p) => crewTailShape(p, 1.3, 1)) : P2('cap:tail', (p) => tailShape(p, 1));
+  if (V.fluff || q.tailPuff) inner = P2('crew:tailIn', (p) => tailShape(p, 0.62));
+  else inner = P2('cap:tailIn', (p) => tailShape(p, 0.42));
+  const k = V.tk;
+  ctx.save();
+  ctx.translate(V.tx, V.ty - (q.tailPuff ? 0.045 : 0)); ctx.rotate(q.tailRot); ctx.scale(k, k); ctx.translate(-TAIL_S[0][0], -TAIL_S[0][1]);
+  ctx.fillStyle = P.tail; ctx.fill(outer);
+  ctx.save(); ctx.translate(0.05, -0.04); ctx.fillStyle = P.tailL; ctx.fill(inner); ctx.restore();
+  ctx.strokeStyle = P.line; ctx.lineWidth = lw / k; ctx.stroke(outer);
+  ctx.restore();
+}
+function drawCrewBody(ctx, P, V, v, gx, gy) {
+  const body = P2('crew:body' + v, V.body);
+  fill2(ctx, body, P.fur, P.furD, gx, gy, 0, V.by, 0.025, 0.9);
+  ctx.fillStyle = P.cream; ctx.fill(P2('crew:belly' + v, V.bellyP));
+  ctx.strokeStyle = P.line; ctx.lineWidth = CREW_LW; ctx.stroke(body);
+}
+function drawCrewAcorn(ctx, x, y, r, rot) {
+  const N = NUT.acorn;
+  ctx.save();
+  ctx.translate(x, y); ctx.rotate(rot); ctx.scale(r, r);
+  ctx.beginPath(); ctx.moveTo(0.02, -0.82); ctx.quadraticCurveTo(0.04, -1.12, 0.26, -1.26);
+  ctx.strokeStyle = N.o; ctx.lineWidth = 0.32; ctx.stroke();
+  const body = P2('nut:acorn', acornBodyPath), cap = P2('nut:acorncap', acornCapPath);
+  ctx.fillStyle = N.c; ctx.fill(body);
+  ctx.beginPath(); ctx.ellipse(-0.36, 0.14, 0.15, 0.3, 0.3, 0, TAU); ctx.fillStyle = 'rgba(255,236,200,0.7)'; ctx.fill();
+  ctx.strokeStyle = N.o; ctx.lineWidth = 0.03 / r; ctx.stroke(body);
+  ctx.fillStyle = N.acc; ctx.fill(cap); ctx.stroke(cap);
+  ctx.restore();
+}
+
+// --- head (head-unit space, facing +x; same paths as the captain's head)
+const CREW_EYES = [[0.1, -0.03, 1], [0.6, -0.05, 0.9]];
+function crewMouthAnchor(m) {
+  // where the buck tooth hangs from, per mouth
+  switch (m) {
+    case 'smile': return 0.385;
+    case 'grin': return 0.3;
+    case 'shout': return 0.28;
+    case 'O': return 0.29;
+    case 'o': return 0.31;
+    case 'wail': return 0.33;
+    case 'gulp': return 0.355;
+    default: return 0.335;
+  }
+}
+function crewFace(ctx, P, v, q, time) {
+  const ink = P.ink, lx = q.llx * 0.07, ly = q.lly * 0.06;
+  let eye = q.eye;
+  if ((eye === 'open' || eye === 'wide' || eye === 'determined') && q.blink > 0.55) eye = 'closed';
+  const bk = 1 - q.blink * 0.75;
+  // --- fills: eyes, nose, open mouths
+  ctx.beginPath();
+  if (eye === 'open' || eye === 'determined') {
+    for (const e of CREW_EYES) {
+      const rx = 0.2 * e[2], ry = 0.26 * e[2] * bk, cx = e[0] + lx, cy = e[1] + ly;
+      if (eye === 'determined') { ctx.moveTo(cx + rx, cy - ry * 0.12); ctx.ellipse(cx, cy - ry * 0.12, rx, ry * 0.95, 0, -0.18, PI + 0.18); ctx.closePath(); }
+      else { ctx.moveTo(cx + rx, cy); ctx.ellipse(cx, cy, rx, ry, 0, 0, TAU); }
+    }
+  }
+  ctx.moveTo(1.01, 0.15); ctx.ellipse(0.92, 0.15, 0.1, 0.075, 0.2, 0, TAU);
+  ctx.fillStyle = ink; ctx.fill();
+  if (eye === 'wide') {
+    ctx.beginPath();
+    for (const e of CREW_EYES) { const rx = 0.21 * e[2], ry = 0.28 * e[2]; ctx.moveTo(e[0] + rx, e[1]); ctx.ellipse(e[0], e[1], rx, ry, 0, 0, TAU); }
+    ctx.fillStyle = '#ffffff'; ctx.fill(); ctx.strokeStyle = ink; ctx.lineWidth = 0.1; ctx.stroke();
+    ctx.beginPath();
+    for (const e of CREW_EYES) { const px = e[0] + lx * 1.3, py = e[1] + ly * 1.5, r = 0.095 * e[2]; ctx.moveTo(px + r, py); ctx.arc(px, py, r, 0, TAU); }
+    ctx.fillStyle = ink; ctx.fill();
+  }
+  // glossy highlights
+  if (eye === 'open' || eye === 'determined') {
+    ctx.beginPath();
+    for (const e of CREW_EYES) {
+      const cx = e[0] + lx, cy = e[1] + ly, r = 0.085 * e[2];
+      const hy = eye === 'determined' ? cy - 0.02 : cy - 0.1 * bk;
+      ctx.moveTo(cx - 0.06 + r, hy); ctx.arc(cx - 0.06, hy, r, 0, TAU);
+      if (eye === 'open' && bk > 0.5) { ctx.moveTo(cx + 0.08 + 0.04, cy + 0.1); ctx.arc(cx + 0.08, cy + 0.1, 0.04, 0, TAU); }
+    }
+    ctx.fillStyle = '#ffffff'; ctx.fill();
+  }
+  // open mouths
+  const m = q.mouth;
+  if (m === 'grin' || m === 'shout' || m === 'O' || m === 'o' || m === 'wail') {
+    ctx.beginPath();
+    crewMouthPath(ctx, m, time);
+    ctx.fillStyle = '#6a1a1a'; ctx.fill();
+    if (m !== 'o') {
+      ctx.save(); ctx.clip();
+      ctx.beginPath();
+      if (m === 'shout') ctx.ellipse(0.78, 0.74, 0.2, 0.13, 0, 0, TAU);
+      else if (m === 'O') ctx.ellipse(0.8, 0.62, 0.11, 0.08, 0, 0, TAU);
+      else ctx.ellipse(0.8, 0.6, 0.13, 0.08, 0, 0, TAU);
+      ctx.fillStyle = '#ff7a92'; ctx.fill();
+      ctx.restore();
+    }
+  } else if (m === 'grit' || m === 'teeth') {
+    ctx.beginPath();
+    crewMouthPath(ctx, m, time);
+    ctx.fillStyle = '#ffffff'; ctx.fill();
+  }
+  // --- strokes: brows, line eyes, mouth lines
+  ctx.beginPath();
+  const tl = q.tilt, yb = -0.4 - q.browUp;
+  ctx.moveTo(-0.04, yb - 0.07 * tl); ctx.lineTo(0.24, yb + 0.07 * tl);
+  ctx.moveTo(0.48, yb + 0.07 * tl - 0.02); ctx.lineTo(0.72, yb - 0.07 * tl - 0.03);
+  for (let i = 0; i < 2; i++) {
+    const e = CREW_EYES[i], cx = e[0], cy = e[1], d = i ? -1 : 1, s = e[2];
+    if (eye === 'closed') { ctx.moveTo(cx - 0.17 * s, cy); ctx.quadraticCurveTo(cx, cy + 0.15, cx + 0.17 * s, cy); }
+    else if (eye === 'happy') { ctx.moveTo(cx - 0.17 * s, cy + 0.07); ctx.quadraticCurveTo(cx, cy - 0.18, cx + 0.17 * s, cy + 0.07); }
+    else if (eye === 'squeeze') { ctx.moveTo(cx - d * 0.16 * s, cy - 0.15); ctx.lineTo(cx + d * 0.13 * s, cy); ctx.lineTo(cx - d * 0.16 * s, cy + 0.15); }
+    else if (eye === 'spiral') {
+      for (let j = 0; j <= 12; j++) {
+        const u = j / 12, a = time * 8 * d + u * TAU * 1.7, rr = 0.015 + u * 0.18 * s;
+        if (j) ctx.lineTo(cx + Math.cos(a) * rr, cy + Math.sin(a) * rr); else ctx.moveTo(cx + Math.cos(a) * rr, cy + Math.sin(a) * rr);
+      }
+    }
+  }
+  if (m === 'w' || m === 'munch') { ctx.moveTo(0.68, 0.32); ctx.quadraticCurveTo(0.745, 0.42, 0.81, 0.32); ctx.quadraticCurveTo(0.875, 0.42, 0.94, 0.32); }
+  else if (m === 'smile') { ctx.moveTo(0.62, 0.28); ctx.quadraticCurveTo(0.8, 0.52, 0.99, 0.25); }
+  else if (m === 'gulp') { ctx.moveTo(0.64, 0.36); ctx.quadraticCurveTo(0.69, 0.28, 0.74, 0.36); ctx.quadraticCurveTo(0.79, 0.44, 0.84, 0.36); ctx.quadraticCurveTo(0.89, 0.28, 0.95, 0.35); }
+  else if (m !== 'o') crewMouthPath(ctx, m, time);
+  if (m === 'grit') { ctx.moveTo(0.63, 0.35); ctx.lineTo(0.97, 0.33); ctx.moveTo(0.75, 0.27); ctx.lineTo(0.75, 0.43); ctx.moveTo(0.86, 0.26); ctx.lineTo(0.86, 0.42); }
+  else if (m === 'teeth') { ctx.moveTo(0.62, 0.34); ctx.quadraticCurveTo(0.8, 0.38, 0.99, 0.3); }
+  ctx.strokeStyle = ink; ctx.lineWidth = CREW_FEAT; ctx.stroke();
+  // the one big buck tooth (variant 0)
+  if (v === 0 && m !== 'grit' && m !== 'teeth' && m !== 'munch') {
+    const ty = crewMouthAnchor(m), tx = m === 'shout' ? 0.74 : 0.8;
+    ctx.beginPath();
+    ctx.moveTo(tx - 0.075, ty - 0.02); ctx.lineTo(tx - 0.075, ty + 0.13); ctx.quadraticCurveTo(tx - 0.075, ty + 0.17, tx - 0.035, ty + 0.17);
+    ctx.lineTo(tx + 0.035, ty + 0.17); ctx.quadraticCurveTo(tx + 0.075, ty + 0.17, tx + 0.075, ty + 0.13); ctx.lineTo(tx + 0.075, ty - 0.02);
+    ctx.fillStyle = '#ffffff'; ctx.fill(); ctx.strokeStyle = ink; ctx.lineWidth = 0.1; ctx.stroke();
+  }
+}
+function crewMouthPath(ctx, m, time) {
+  if (m === 'grin') { ctx.moveTo(0.6, 0.27); ctx.quadraticCurveTo(0.8, 0.33, 1.0, 0.23); ctx.quadraticCurveTo(0.98, 0.64, 0.8, 0.64); ctx.quadraticCurveTo(0.6, 0.6, 0.6, 0.27); ctx.closePath(); }
+  else if (m === 'shout') { ctx.moveTo(0.48, 0.24); ctx.quadraticCurveTo(0.76, 0.3, 1.06, 0.16); ctx.quadraticCurveTo(1.1, 0.86, 0.76, 0.88); ctx.quadraticCurveTo(0.44, 0.86, 0.48, 0.24); ctx.closePath(); }
+  else if (m === 'O') { const w = 1 + 0.08 * Math.sin(time * 30); ctx.moveTo(0.95, 0.46); ctx.ellipse(0.8, 0.46, 0.15 * w, 0.19 / w, 0, 0, TAU); ctx.closePath(); }
+  else if (m === 'o') { ctx.moveTo(0.91, 0.42); ctx.ellipse(0.82, 0.42, 0.09, 0.11, 0, 0, TAU); ctx.closePath(); }
+  else if (m === 'wail') {
+    const w = 0.045 * Math.sin(time * 24);
+    ctx.moveTo(0.6, 0.36); ctx.quadraticCurveTo(0.68, 0.27 + w, 0.79, 0.33); ctx.quadraticCurveTo(0.9, 0.39 - w, 0.99, 0.29);
+    ctx.quadraticCurveTo(1.0, 0.7, 0.8, 0.7); ctx.quadraticCurveTo(0.6, 0.7, 0.6, 0.36); ctx.closePath();
+  }
+  else if (m === 'grit') { roundRectPath(ctx, 0.62, 0.26, 0.36, 0.17, 0.06); }
+  else if (m === 'teeth') { ctx.moveTo(0.6, 0.27); ctx.quadraticCurveTo(0.8, 0.32, 1.0, 0.23); ctx.quadraticCurveTo(0.97, 0.52, 0.8, 0.52); ctx.quadraticCurveTo(0.62, 0.5, 0.6, 0.27); ctx.closePath(); }
+}
+function drawCrewHelmet(ctx, P, V, q, lw) {
+  const H = V.helm, k = H[3];
+  ctx.save();
+  ctx.translate(H[0], H[1] - 0.6 + q.helmDy); ctx.rotate(H[2] + q.helmRot); ctx.scale(k, k); ctx.translate(0, 0.6);
+  const cap = P2('cap:cap', capPath);
+  ctx.fillStyle = CREW_HAT; ctx.fill(cap);
+  ctx.fillStyle = P.team; ctx.fill(P2('cap:band', bandPath));
+  ctx.strokeStyle = P.line; ctx.lineWidth = lw / k; ctx.stroke(P2('cap:hatOL', hatOutlinePath));
+  ctx.restore();
+}
+// slightly bigger ears than the captain's so they still read under the thick crew outline
+function crewEarsPath(p) { for (const e of EARS) earShape(p, e[0], e[1], e[2], 0.64, 0.56); }
+function crewEarsInPath(p) { for (const e of EARS) earShape(p, e[0] + Math.cos(e[2]) * 0.12, e[1] + Math.sin(e[2]) * 0.12, e[2], 0.4, 0.27); }
+function drawCrewHead(ctx, P, V, v, q, gx, gy, time) {
+  const lw = CREW_LW / CREW_HK;
+  if (P.tuft) { const tp = P2('cap:tufts', tuftsPath); ctx.fillStyle = P.tuft; ctx.fill(tp); ctx.strokeStyle = P.line; ctx.lineWidth = lw; ctx.stroke(tp); }
+  const ears = P2('crew:ears', crewEarsPath);
+  ctx.fillStyle = P.fur; ctx.fill(ears);
+  ctx.fillStyle = P.ear; ctx.fill(P2('crew:earsIn', crewEarsInPath));
+  ctx.strokeStyle = P.line; ctx.lineWidth = lw; ctx.stroke(ears);
+  if (q.spikes) {
+    // fur standing on end under the popped-up helmet
+    ctx.beginPath();
+    ctx.moveTo(-0.46, -0.84); ctx.lineTo(-0.36, -1.22); ctx.lineTo(-0.18, -0.94); ctx.lineTo(-0.02, -1.3);
+    ctx.lineTo(0.14, -0.95); ctx.lineTo(0.34, -1.2); ctx.lineTo(0.44, -0.84); ctx.closePath();
+    ctx.fillStyle = P.fur; ctx.fill(); ctx.stroke();
+  }
+  const pq = Math.round(clamp(q.puff, 0, 1) * 6) / 6;
+  const head = P2('cap:head' + pq, (p) => headPath(p, pq));
+  fill2(ctx, head, P.fur, P.furD, gx, gy, 0, 0, 0.08, 0.92);
+  ctx.fillStyle = P.cream; ctx.fill(P2('cap:muzzle', muzzlePath));
+  const bs = (1 + 0.5 * pq) * q.blush;
+  ctx.beginPath();
+  ctx.moveTo(-0.2 + 0.21 * bs, 0.36); ctx.ellipse(-0.2, 0.36, 0.21 * bs, 0.12 * bs, 0, 0, TAU);
+  ctx.moveTo(0.98, 0.27); ctx.ellipse(0.89, 0.27, 0.09, 0.065, 0, 0, TAU);
+  ctx.fillStyle = CREW_BLUSH; ctx.fill();
+  ctx.strokeStyle = P.line; ctx.lineWidth = lw; ctx.stroke(head);
+  crewFace(ctx, P, v, q, time);
+  drawCrewHelmet(ctx, P, V, q, lw);
+}
+
+// --- little effects (local metres unless noted)
+function crewDrop(ctx, x, y, s, fill, line) {
+  ctx.save(); ctx.translate(x, y); ctx.scale(s, s);
+  ctx.beginPath(); ctx.moveTo(0, -1); ctx.quadraticCurveTo(0.55, -0.15, 0.55, 0.22); ctx.arc(0, 0.22, 0.55, 0, PI); ctx.quadraticCurveTo(-0.55, -0.15, 0, -1); ctx.closePath();
+  ctx.fillStyle = fill; ctx.fill(); ctx.strokeStyle = line; ctx.lineWidth = 0.022 / s; ctx.stroke();
+  ctx.restore();
+}
+function crewSparkle(ctx, x, y, r, rot) {
+  if (r <= 0.005) return;
+  ctx.beginPath(); starPath(ctx, x, y, r, r * 0.32, 4, rot);
+  ctx.fillStyle = '#fff6b0'; ctx.fill(); ctx.strokeStyle = '#d08a10'; ctx.lineWidth = 0.016; ctx.stroke();
+}
+function crewTears(ctx, time) {
+  // head-unit space: two comic fountains arcing out of the squeezed eyes
+  const w = Math.sin(time * 19) * 0.05;
+  ctx.beginPath();
+  ctx.moveTo(-0.05, 0.08); ctx.quadraticCurveTo(-0.5, 0.0 + w, -0.66, 0.95);
+  ctx.moveTo(0.72, 0.06); ctx.quadraticCurveTo(1.18, -0.02 - w, 1.3, 0.92);
+  ctx.strokeStyle = '#2f79ad'; ctx.lineWidth = 0.34; ctx.stroke();
+  ctx.strokeStyle = '#a8e0ff'; ctx.lineWidth = 0.2; ctx.stroke();
+  for (let i = 0; i < 2; i++) {
+    const ph = frac(time * 2.2 + i * 0.5);
+    ctx.save(); ctx.globalAlpha = ph < 0.75 ? 1 : (1 - ph) * 4;
+    crewDrop(ctx, -0.7 - ph * 0.12, 1.0 + ph * 0.7, 0.12, '#a8e0ff', '#2f79ad');
+    crewDrop(ctx, 1.34 + ph * 0.12, 0.98 + ph * 0.7, 0.12, '#a8e0ff', '#2f79ad');
+    ctx.restore();
+  }
+}
+function crewStars(ctx, x, y, time) {
+  ctx.beginPath();
+  for (let i = 0; i < 3; i++) {
+    const a = time * 5 + i * TAU / 3;
+    starPath(ctx, x + Math.cos(a) * 0.22, y + Math.sin(a) * 0.07, 0.065, 0.028, 5, a * 0.5);
+  }
+  ctx.fillStyle = '#ffd83a'; ctx.fill(); ctx.strokeStyle = '#b07a00'; ctx.lineWidth = 0.014; ctx.stroke();
+}
+function crewNote(ctx, x, y, time) {
+  const ph = frac(time * 0.7);
+  ctx.save();
+  ctx.translate(x + Math.sin(ph * TAU) * 0.04, y - ph * 0.22); ctx.rotate(0.25 * Math.sin(time * 3));
+  ctx.globalAlpha = ph < 0.7 ? 1 : (1 - ph) / 0.3;
+  ctx.beginPath(); ctx.ellipse(0, 0, 0.042, 0.032, -0.4, 0, TAU);
+  ctx.moveTo(0.036, -0.012); ctx.lineTo(0.036, -0.15); ctx.quadraticCurveTo(0.08, -0.12, 0.09, -0.07);
+  ctx.strokeStyle = '#2b1a12'; ctx.lineWidth = 0.022; ctx.stroke(); ctx.fillStyle = '#2b1a12'; ctx.fill();
+  ctx.restore();
+}
+
+// tumble: curled into a tail-wrapped ball, spinning about a centre 0.3 m above the anchor
+function drawCrewBall(ctx, P, V, v, q, f, time) {
+  const R = v ? 0.27 : 0.25;
+  ctx.save();
+  ctx.translate(0, -0.3); ctx.rotate(q.spin);
+  const a = -q.spin;
+  const gx = LIGHT_X * f * Math.cos(a) - LIGHT_Y * Math.sin(a), gy = LIGHT_X * f * Math.sin(a) + LIGHT_Y * Math.cos(a);
+  // the tail coiled right round the ball
+  ctx.beginPath(); ctx.arc(0, 0, R, 0, TAU);
+  ctx.fillStyle = P.tail; ctx.fill();
+  ctx.beginPath();
+  for (let j = 0; j <= 18; j++) { const u = j / 18, an = PI * 0.6 + u * TAU * 1.05, rr = R * (0.88 - u * 0.5); if (j) ctx.lineTo(Math.cos(an) * rr, Math.sin(an) * rr); else ctx.moveTo(Math.cos(an) * rr, Math.sin(an) * rr); }
+  ctx.strokeStyle = P.tailL; ctx.lineWidth = 0.05; ctx.stroke();
+  ctx.beginPath(); ctx.arc(0, 0, R, 0, TAU); ctx.strokeStyle = P.line; ctx.lineWidth = CREW_LW; ctx.stroke();
+  // tucked paws and feet
+  ctx.beginPath();
+  for (const p of [[0.14, 0.14, CREW_PAW], [0.04, 0.2, CREW_PAW], [-0.08, 0.2, 0.05]]) { ctx.moveTo(p[0] + p[2], p[1]); ctx.arc(p[0], p[1], p[2], 0, TAU); }
+  ctx.fillStyle = P.fur; ctx.fill(); ctx.strokeStyle = P.line; ctx.lineWidth = CREW_LLW; ctx.stroke();
+  // head on the front of the ball
+  ctx.save();
+  ctx.translate(0.05, -0.04); ctx.rotate(0.15); ctx.scale(CREW_HK * 0.95, CREW_HK * 0.95);
+  drawCrewHead(ctx, P, V, v, q, gx, gy, time);
+  ctx.restore();
+  // speed swooshes
+  ctx.beginPath(); ctx.arc(0, 0, R + 0.09, -2.4, -1.2); ctx.moveTo(Math.cos(0.7) * (R + 0.09), Math.sin(0.7) * (R + 0.09)); ctx.arc(0, 0, R + 0.09, 0.7, 1.9);
+  ctx.strokeStyle = 'rgba(255,255,255,0.85)'; ctx.lineWidth = 0.03; ctx.stroke();
+  ctx.restore();
+  crewStars(ctx, 0, -0.3 - R - 0.13, time);
+}
+
+/**
+ * One 깡단 crew squirrel. (x, y) render space: where its feet touch the ground
+ * ('cling': the grip point of its paws; 'sit': its bottom).
+ * s = { team: 0|1, variant: 0|1, facing: 1|-1, pose, t, time, blink }
+ *   t = seconds since this pose started, time = global clock, blink 0..1
+ */
+export function drawCrew(ctx, x, y, s) {
+  s = s || EMPTY;
+  const f = s.facing < 0 ? -1 : 1;
+  const team = s.team ? 1 : 0, v = s.variant ? 1 : 0;
+  const P = CAPT[team], V = CREW_V[v];
+  const time = +s.time || 0, t = Math.max(0, +s.t || 0);
+  const pose = s.pose || 'idle';
+  const q = crewPose(CQ, pose, V, v, t, time, clamp(+s.blink || 0, 0, 1));
+  ctx.save();
+  ctx.translate(x, y); ctx.scale(f, 1);
+  ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+  if (pose === 'tumble') { drawCrewBall(ctx, P, V, v, q, f, time); ctx.restore(); return; }
+  if (q.rot) ctx.rotate(q.rot);
+  ctx.translate(q.rx, q.ry);
+  // light direction in the upper-body frame
+  const ab = q.rot + q.lean, ca = Math.cos(ab), sa = Math.sin(ab);
+  const lx0 = LIGHT_X * f, gx = lx0 * ca + LIGHT_Y * sa, gy = -lx0 * sa + LIGHT_Y * ca;
+  const upper = () => {
+    ctx.translate(0, CREW_HIP); ctx.rotate(q.lean); ctx.scale(q.sqx, q.sqy); ctx.translate(0, -CREW_HIP);
+  };
+  // back layer: tail, back limbs
+  ctx.save(); upper();
+  drawCrewTail(ctx, P, V, q, CREW_LW);
+  if (q.abL === 0) crewArms(ctx, P, q, 1, P.furD);
+  ctx.restore();
+  crewLegs(ctx, P, V, q, q.legsFront ? 1 : 3);
+  // body, head, front limbs
+  ctx.save(); upper();
+  drawCrewBody(ctx, P, V, v, gx, gy);
+  if (q.legsFront) { ctx.restore(); crewLegs(ctx, P, V, q, 2); ctx.save(); upper(); }
+  if (q.afL === 1) crewArms(ctx, P, q, 2, P.fur);
+  if (q.abL === 1) crewArms(ctx, P, q, 1, P.furD);
+  ctx.save();
+  ctx.translate(V.hx + q.hx, V.hy + q.hy + 0.1); ctx.rotate(q.ht); ctx.translate(0, -0.1);
+  ctx.scale(CREW_HK, CREW_HK);
+  const hc = Math.cos(q.ht), hs = Math.sin(q.ht);
+  drawCrewHead(ctx, P, V, v, q, gx * hc + gy * hs, -gx * hs + gy * hc, time);
+  if (q.tears) crewTears(ctx, time);
+  if (q.sweat) {
+    const ph = frac(time * 0.9);
+    ctx.save(); ctx.globalAlpha = ph < 0.8 ? 1 : (1 - ph) * 5;
+    crewDrop(ctx, -0.95 - ph * 0.25, -0.5 + ph * 0.35, 0.22, '#bfeaff', '#2f79ad');
+    ctx.restore();
+  }
+  if (q.shout > 0.2) {
+    ctx.beginPath();
+    for (let i = 0; i < 3; i++) {
+      const an = -0.55 + i * 0.5, L = 0.28 + 0.12 * frac(time * 7 + i * 0.37), r0 = 0.5;
+      const cx = 1.0 + Math.cos(an) * r0, cy = 0.5 + Math.sin(an) * r0;
+      ctx.moveTo(cx, cy); ctx.lineTo(cx + Math.cos(an) * L, cy + Math.sin(an) * L);
+    }
+    ctx.strokeStyle = P.ink; ctx.lineWidth = 0.15; ctx.stroke();
+  }
+  ctx.restore();
+  if (q.abL === 2) crewArms(ctx, P, q, 1, P.furD);
+  if (q.acorn) drawCrewAcorn(ctx, q.acx, q.acy, V.acR, q.acRot);
+  if (q.afL === 2) crewArms(ctx, P, q, 2, P.fur);
+  if (q.crumbs) {
+    ctx.beginPath();
+    for (let i = 0; i < 3; i++) {
+      const ph = frac(time * 1.4 + i / 3), cx = q.acx - 0.02 + (hash(i, Math.floor(time * 1.4 + i / 3)) - 0.5) * 0.08 + ph * 0.03, cy = q.acy + 0.06 + ph * ph * 0.24;
+      ctx.moveTo(cx + 0.016, cy); ctx.arc(cx, cy, 0.016, 0, TAU);
+    }
+    ctx.fillStyle = '#a5622c'; ctx.fill();
+  }
+  if (q.sparkle > 0) crewSparkle(ctx, q.spX, q.spY, 0.085 * q.sparkle, time * 2);
+  ctx.restore();
+  if (q.dust) {
+    ctx.beginPath();
+    for (let i = 0; i < 2; i++) {
+      const ph = frac(time * 2.6 + i * 0.5), r = 0.025 + ph * 0.05;
+      const cx = -0.16 - ph * 0.16 - i * 0.04, cy = -0.03 - ph * 0.05;
+      ctx.moveTo(cx + r, cy); ctx.arc(cx, cy, r, 0, TAU);
+    }
+    ctx.fillStyle = 'rgba(214,190,150,0.75)'; ctx.fill();
+  }
+  if (q.note) crewNote(ctx, 0.22, -0.66, time);
+  ctx.restore();
+}
+
+// UI icon: one crew member centred and scaled to fit. Per pose: the frame to show (t, time) and the
+// measured bounds of each variant [x0, y0, x1, y1] (crew metres, all frames of the pose).
+const CREW_ICON = {
+  idle:   [0,    0.28, [-0.4, -0.75, 0.26, 0],     [-0.56, -0.91, 0.32, 0]],
+  nibble: [0.5,  0.3,  [-0.4, -0.72, 0.3, 0.02],   [-0.56, -0.89, 0.33, 0.02]],
+  cheer:  [0.23, 0.4,  [-0.48, -0.88, 0.39, 0],    [-0.63, -1.08, 0.48, 0]],
+  shout:  [0.6,  0.2,  [-0.49, -0.72, 0.47, 0.01], [-0.63, -0.91, 0.48, 0.02]],
+  push:   [0,    0.1,  [-0.43, -0.74, 0.49, 0],    [-0.46, -0.96, 0.52, 0.02]],
+  tumble: [0.35, 0.3,  [-0.39, -0.82, 0.39, 0.1],  [-0.39, -0.84, 0.39, 0.1]],
+  salute: [0.6,  0.6,  [-0.49, -0.75, 0.33, 0.02], [-0.64, -0.85, 0.31, 0.03]],
+  scared: [0.3,  0.25, [-0.53, -0.69, 0.27, 0.03], [-0.68, -0.86, 0.25, 0.02]],
+  cling:  [0,    0.0,  [-0.51, -0.09, 0.28, 0.75], [-0.63, -0.28, 0.35, 0.77]],
+  dance:  [0.3,  0.3,  [-0.43, -1.06, 0.4, 0.01],  [-0.57, -1.06, 0.4, 0.01]],
+  cry:    [0.3,  0.15, [-0.34, -0.75, 0.36, 0],    [-0.48, -0.94, 0.38, 0]],
+  flex:   [0.3,  0.3,  [-0.47, -0.74, 0.43, 0],    [-0.61, -0.89, 0.47, 0.01]],
+  sit:    [0.3,  0.3,  [-0.42, -0.61, 0.29, 0.11], [-0.58, -0.78, 0.34, 0.11]],
+  peek:   [0.3,  0.3,  [-0.4, -0.7, 0.5, 0.05],    [-0.53, -0.93, 0.52, 0.02]],
+};
+export function drawCrewIcon(canvas, team, variant, pose = 'cheer') {
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const w = canvas.width, h = canvas.height;
+  ctx.save();
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.clearRect(0, 0, w, h);
+  if (!CREW_ICON[pose]) pose = 'idle';
+  const v = variant ? 1 : 0, A = CREW_ICON[pose], B = A[2 + v];
+  const k = Math.min(w / (B[2] - B[0]), h / (B[3] - B[1])) * 0.94;
+  ctx.setTransform(k, 0, 0, k, w / 2 - (B[0] + B[2]) / 2 * k, h / 2 - (B[1] + B[3]) / 2 * k);
+  drawCrew(ctx, 0, 0, { team: team ? 1 : 0, variant: v, facing: 1, pose, t: A[0], time: A[1], blink: 0 });
   ctx.restore();
 }

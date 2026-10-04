@@ -117,11 +117,10 @@ function drawOG() {
   home(1150, 505, 1, -1);
   ground(-60, 360, 520);
   ground(860, 1260, 505);
-  // sea
-  g.fillStyle = 'rgba(40,140,220,0.9)';
-  g.fillRect(0, 590, W, 40);
-  g.fillStyle = '#e8f8ff';
-  g.fillRect(0, 588, W, 4);
+  // the cloud sea under the islands
+  g.fillStyle = '#ffffff';
+  for (let x = -20; x < W + 60; x += 70) { g.beginPath(); g.arc(x, 600 + Math.sin(x * 0.05) * 8, 46 + (x % 3) * 6, 0, 7); g.fill(); }
+  g.fillRect(0, 600, W, 40);
   const Z = 62;
   const world = (x, y, fn) => { g.save(); g.translate(x, y); g.scale(Z, Z); fn(); g.restore(); };
   // captains
@@ -134,6 +133,17 @@ function drawOG() {
   world(1060, 505 - 0.75 * Z, () => {
     Art.drawCommander(g, 0, 0, { team: 1, facing: -1, time: 1.1, hp: 1, mood: 'scared' });
   });
+  // the 깡단: one on each hat, one running behind each cart
+  if (Art.drawCrew) {
+    world(150, 520 - 0.75 * Z, () => {
+      Art.drawCrew(g, -1.3, 0.75, { team: 0, variant: 1, facing: 1, pose: 'cheer', t: 0.25, time: 0.4 });
+      Art.drawCrew(g, -0.08, -1.46, { team: 0, variant: 0, facing: 1, pose: 'shout', t: 0.3, time: 0.4 });
+    });
+    world(1060, 505 - 0.75 * Z, () => {
+      Art.drawCrew(g, 1.3, 0.75, { team: 1, variant: 1, facing: -1, pose: 'scared', t: 0.3, time: 0.9 });
+      Art.drawCrew(g, 0.08, -1.46, { team: 1, variant: 0, facing: -1, pose: 'sit', t: 0.3, time: 0.9 });
+    });
+  }
   // forts
   const block = (x, y, m, w, h, a = 0, shape = 'box', r = 0) => world(x, y, () => Art.drawBlock(g, { material: m, shape, x: 0, y: 0, angle: a, w, h, r, hp01: 1, seed: (x * 7 + y) | 0 }));
   block(900, 505 - 62, 'wood', 0.26, 2.0);
@@ -162,7 +172,7 @@ function drawOG() {
   world(1085, 215, () => Art.drawNut(g, 'walnut', 0, 0, 0.42, 0, { state: 'fly', time: 0.2, flip: true, pound: true }));
   // logo
   g.save();
-  g.translate(W / 2, 150);
+  g.translate(W / 2, 128);
   g.rotate(-0.05);
   g.textAlign = 'center';
   g.textBaseline = 'middle';
@@ -189,7 +199,7 @@ function drawOG() {
   g.font = '30px Jua';
   const tag = '작아도 깡! 친구랑 각자 폰으로 1:1 도토리 새총 대결';
   const tw = g.measureText(tag).width + 48;
-  g.translate(W / 2, 285);
+  g.translate(W / 2, 300);
   g.rotate(0.02);
   g.fillStyle = '#2b1a12';
   g.beginPath(); g.roundRect(-tw / 2, -26, tw, 52, 26); g.fill();
@@ -240,6 +250,10 @@ function drawSplash() {
     g.translate(x, S / 2 + 520);
     g.scale(170, 170);
     Art.drawCommander(g, 0, 0, { team, facing, time: 0.4 + team, hp: 1, mood: 'aim', pouch: null });
+    if (Art.drawCrew) {
+      Art.drawCrew(g, -facing * 1.3, 0.75, { team, variant: 1, facing, pose: 'cheer', t: 0.25, time: 0.4 + team });
+      Art.drawCrew(g, -facing * 0.08, -1.46, { team, variant: 0, facing, pose: 'sit', t: 0.3, time: 0.4 + team });
+    }
     g.restore();
   };
   cap(S / 2 - 620, 0, 1);
@@ -248,8 +262,8 @@ function drawSplash() {
 }
 
 window.makeAssets = async () => {
-  await document.fonts.load('150px "Black Han Sans"');
-  await document.fonts.load('30px Jua');
+  await document.fonts.load('150px "Black Han Sans"', '도토리깡!');
+  await document.fonts.load('30px Jua', '작아도 깡! 친구랑 각자 폰으로 1:1 도토리 새총 대결');
   const out = {};
   const ic = document.getElementById('icon');
   drawIcon(false);

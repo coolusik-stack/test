@@ -524,13 +524,13 @@ function showResult(r) {
   } else if (friend) {
     const won = r.winner === me;
     title = pre + (won ? '승리!' : '패배…');
-    sub = won ? (fell ? '친구를 구름 아래로 떨어뜨렸어요!' : `친구를 이겼어요! 남은 체력 ${r.players[me].hp}`)
+    sub = won ? (fell ? '친구를 구름 아래로 떨어뜨렸어요! 도토리는 몽땅 우리 거!' : `친구 도토리까지 몽땅 우리 거! 남은 체력 ${r.players[me].hp}`)
       : done ? (fell ? '구름 아래로 떨어졌어요… 복수전 한 판?' : '친구가 이겼어요. 복수전 한 판?') : fell ? '구름 아래로 떨어졌지만, 아직 끝나지 않았어요!' : '아직 끝나지 않았어요!';
     if (done) { if (sw === me) record.fw++; else record.fl++; }
   } else if (cpu) {
     title = pre + (r.isAIWin ? '패배…' : '승리!');
-    sub = r.isAIWin ? (fell ? '구름 아래로 떨어졌어요… 다시 도전!' : `CPU ${TEAM[1].name}이 창고를 지켰어요. 다시 도전!`)
-      : fell ? 'CPU를 구름 아래로 떨어뜨렸어요!' : `남은 체력 ${r.players[r.winner].hp}로 도토리 창고를 지켰어요`;
+    sub = r.isAIWin ? (fell ? '구름 아래로 떨어졌어요… 그래도 깡으로 다시 도전!' : `CPU ${TEAM[1].name}이 도토리를 몽땅 가져갔어요. 다시 도전!`)
+      : fell ? 'CPU를 구름 아래로 떨어뜨렸어요! 도토리는 몽땅 우리 거!' : `겨울 도토리는 몽땅 우리 거! 남은 체력 ${r.players[r.winner].hp}`;
     if (done) { if (sw === 1) record.losses++; else record.wins++; }
   } else {
     title = `${pre}${r.winner + 1}P 승리!`;

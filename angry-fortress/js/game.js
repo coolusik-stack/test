@@ -1988,7 +1988,7 @@ export class Game {
     if (p.dead) return;
     const pos = p.body.getPosition();
     const z = this.cam.zoom;
-    const x = pos.x, y = -pos.y - 2.35;
+    const x = pos.x, y = -pos.y - 2.6; // above the 깡이 sitting on the hat
     const w = 1.7, h = 0.2;
     ctx.save();
     ctx.fillStyle = 'rgba(30,20,20,0.55)';
@@ -2025,7 +2025,7 @@ export class Game {
     const pop = m.t < 0.18 ? m.t / 0.18 : m.t > 2.1 ? Math.max(0, (2.4 - m.t) / 0.3) : 1;
     const s = (0.6 + 0.4 * pop) / z;
     ctx.save();
-    ctx.translate(pos.x + p.facing * 0.2, -pos.y - 3.1 - Math.sin(Math.min(1, m.t * 3)) * 0.3);
+    ctx.translate(pos.x + p.facing * 0.2, -pos.y - 3.35 - Math.sin(Math.min(1, m.t * 3)) * 0.3);
     ctx.scale(s, s);
     ctx.globalAlpha = Math.min(1, pop * 1.4);
     ctx.fillStyle = '#fffaf0';
