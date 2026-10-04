@@ -8,19 +8,19 @@
 | 항목 | 값 |
 |---|---|
 | 번들 ID | `com.coolusikstack.dotorifortress` |
-| 앱 이름 | 도토리 포트리스 |
+| 앱 이름 | 도토리깡 |
 | 최소 iOS | 15.0 |
 | 기기 | iPhone 전용, 가로 화면 고정 |
 | 네이티브 코드 | `ios/App/App/GameViewController.swift` (햅틱 플러그인, 홈 인디케이터 숨김) |
 
-번들 ID를 바꾸려면 `capacitor.config.json`의 `appId`와 Xcode의 Signing & Capabilities → Bundle Identifier를 같이 바꾸세요.
+번들 ID는 사용자에게 보이지 않아서 예전 이름(`dotorifortress`) 그대로 둡니다. 바꾸려면 App Store Connect에 앱을 만들기 전에 `capacitor.config.json`의 `appId`와 Xcode의 Signing & Capabilities → Bundle Identifier를 같이 바꾸세요(앱을 만든 뒤에는 바꿀 수 없습니다).
 
 ## 1. App Store Connect에 앱 만들기 (처음 한 번)
 
 1. [App Store Connect](https://appstoreconnect.apple.com) → 앱 → **+** → 신규 앱
-2. 플랫폼 iOS, 이름 `도토리 포트리스`(스토어 전체에서 이미 쓰는 이름이면 다른 이름으로), 기본 언어 한국어
+2. 플랫폼 iOS, 이름 `도토리깡`(스토어 전체에서 이미 쓰는 이름이면 `도토리깡: 다람쥐 새총 1:1`처럼 뒤에 붙여서), 기본 언어 한국어
 3. 번들 ID: 목록에 없으면 먼저 [Certificates, Identifiers & Profiles](https://developer.apple.com/account/resources/identifiers/list)에서 `com.coolusikstack.dotorifortress`를 등록합니다. Xcode에서 한 번 빌드하면 자동으로 등록되기도 합니다.
-4. SKU는 아무 값이나 넣으면 됩니다(예: `dotori-fortress`).
+4. SKU는 아무 값이나 넣으면 됩니다(예: `dotori-kkang`).
 
 ## 2-A. Mac이 있을 때 (Xcode)
 

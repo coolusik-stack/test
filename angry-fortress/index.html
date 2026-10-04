@@ -3,15 +3,15 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
-<title>도토리 포트리스</title>
-<meta name="description" content="친구와 각자 폰으로 1:1! 볼 가득 도토리를 장전하고 상대 요새를 무너뜨리는 다람쥐 새총 포격 대결. 방 코드 하나로 바로 시작.">
+<title>도토리깡</title>
+<meta name="description" content="작아도 깡 하나는 숲에서 제일! 겨울 도토리를 걸고 친구와 각자 폰으로 붙는 다람쥐 새총 1:1 대결. 방 코드 하나로 바로 시작.">
 <meta name="theme-color" content="#2a78c9">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="도토리 포트리스">
-<meta property="og:title" content="도토리 포트리스">
-<meta property="og:description" content="친구와 각자 폰으로 1:1, 다람쥐들의 도토리 새총 대결! 방 코드로 바로 한 판.">
+<meta name="apple-mobile-web-app-title" content="도토리깡">
+<meta property="og:title" content="도토리깡">
+<meta property="og:description" content="작아도 깡! 겨울 도토리를 걸고 친구와 붙는 다람쥐 새총 1:1. 방 코드로 바로 한 판.">
 <meta property="og:type" content="website">
 <meta property="og:image" content="assets/og.jpg">
 <link rel="manifest" href="manifest.webmanifest">
@@ -48,10 +48,11 @@
 <!-- ============ TITLE ============ -->
 <section id="title" class="screen">
   <div class="title-wrap">
-    <div class="logo" aria-label="도토리 포트리스">
+    <div class="logo" aria-label="도토리깡">
       <span class="logo-top"><svg class="logo-acorn" aria-hidden="true"><use href="#i-acorn"/></svg>도토리</span>
-      <span class="logo-main"><span class="lm-back" aria-hidden="true">포트리스</span><span class="lm-front">포트리스</span></span>
-      <span class="logo-tag">볼 가득 도토리 장전, 요새를 무너뜨려라!</span>
+      <span class="logo-main logo-kkang"><span class="lm-back" aria-hidden="true">깡!</span><span class="lm-front">깡!</span></span>
+      <canvas class="logo-crew" id="logo-crew" width="240" height="240" aria-hidden="true"></canvas>
+      <span class="logo-tag">작아도 깡 하나는 숲에서 제일!</span>
     </div>
     <div class="menu">
       <button class="btn btn-yellow btn-big btn-hero" id="btn-friend"><span class="btn-kicker">각자 폰으로 1:1</span>친구와 대결</button>
@@ -274,6 +275,7 @@
     <div class="result-main">
       <div class="result-head">
         <canvas id="result-face" width="160" height="160"></canvas>
+        <canvas id="result-crew" width="160" height="160" aria-hidden="true"></canvas>
         <div>
           <div class="series-score" id="series-score" hidden><b class="t0">0</b><span>:</span><b class="t1">0</b></div>
           <h2 id="result-title">승리!</h2>

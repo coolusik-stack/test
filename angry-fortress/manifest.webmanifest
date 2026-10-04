@@ -1,7 +1,7 @@
 {
-  "name": "도토리 포트리스",
-  "short_name": "도토리포트",
-  "description": "볼 가득 도토리를 장전하고 상대 요새를 무너뜨려라! 다람쥐들의 턴제 새총 대결",
+  "name": "도토리깡",
+  "short_name": "도토리깡",
+  "description": "작아도 깡 하나는 숲에서 제일! 겨울 도토리를 걸고 붙는 다람쥐 새총 1:1 대결",
   "lang": "ko",
   "start_url": "./index.html",
   "scope": "./",

@@ -113,6 +113,7 @@ export class ForestEvents {
     x += dir * 0.8;
     const y = Math.max(g.terrain.surfaceY(x), WORLD.SEA);
     this.boar = { x, y, vy: 0, dir, t: 0, hit: 0, hitIds: new Set(), air: false };
+    g.crew?.reactAll('boar');
     g._sfx('boar');
     g._hap('boar');
   }
@@ -262,6 +263,7 @@ export class ForestEvents {
       g.fx.burst(pos.x, pos.y, 'star', 8, { speed: 4 });
       g._sfx('pickup');
       g._hap('pickup');
+      g.crew?.react(p, 'drop');
       g.emit('hud');
       this._removeDrop();
     });

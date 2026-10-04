@@ -1,5 +1,5 @@
 /*
- * 엥그리 포트리스 (Angry Fortress) — procedural audio engine.
+ * 도토리깡 — procedural audio engine.
  *
  * Zero external assets: every sound effect and music track is synthesized at
  * runtime with the Web Audio API (oscillators, pre-generated noise buffers,
@@ -1289,6 +1289,15 @@ def('brake', 2.8, 2, 0.04, 2, (v) => {
   v.noise({ k: 'w', a: 0.005, h: 0.06, d: 0.14, g: 0.25, ft: 'bandpass', f: 2600, f1: 1200, glide: 0.2, Q: 2.5 });
   v.noise({ k: 'b', a: 0.003, d: 0.12, g: 0.3, ft: 'lowpass', f: 400 });
   v.tone({ type: 'triangle', f: 300, f1: 180, glide: 0.1, a: 0.002, d: 0.1, g: 0.15 });
+});
+def('kkang', 1.3, 3, 0.03, 2, (v) => {
+  // a tiny squirrel yelling "깡!": a hard k click, a bright nasal "aa" that jumps up, a ringing "ng"
+  v.noise({ k: 'w', a: 0.0005, d: 0.018, g: 0.35, ft: 'highpass', f: 3200 });
+  const nasal = v.filter('bandpass', 1500, 2.5);
+  nasal.connect(v.out);
+  v.tone({ t: 0.012, type: 'sawtooth', f: 820, pts: [[0.05, 1180], [0.17, 900]], a: 0.006, h: 0.1, d: 0.07, g: 0.5, out: nasal, vib: { r: 26, d: 30, delay: 0.06 } });
+  v.tone({ t: 0.012, type: 'triangle', f: 820, pts: [[0.05, 1180], [0.17, 900]], a: 0.006, h: 0.1, d: 0.07, g: 0.22 });
+  v.tone({ t: 0.15, f: 460, f1: 400, glide: 0.1, a: 0.01, d: 0.12, g: 0.18 });
 });
 def('splash_small', 1.4, 1, 0.04, 3, (v) => {
   // "bloop" (bubble resonance rises) + light spray and a few bubbles

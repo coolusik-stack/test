@@ -140,6 +140,29 @@ function tryStartNextOnline() {
   online.hostStart({ ...lobbySettings(), theme }, next);
 }
 
+// A little crew member living in a UI canvas (title logo, result card), animated while visible.
+const crewCanvases = new Map();
+function crewCanvas(cv, team, variant, pose) {
+  if (!cv) return;
+  crewCanvases.set(cv, { team, variant, pose, t0: performance.now() });
+  if (crewCanvases.size === 1) requestAnimationFrame(tickCrewCanvases);
+}
+function tickCrewCanvases(now) {
+  for (const [cv, c] of crewCanvases) {
+    if (!cv.isConnected) { crewCanvases.delete(cv); continue; }
+    if (cv.offsetParent === null) continue; // hidden: skip the work
+    const g = cv.getContext('2d');
+    g.setTransform(1, 0, 0, 1, 0, 0);
+    g.clearRect(0, 0, cv.width, cv.height);
+    if (!Art.drawCrew) continue;
+    const k = cv.height / 1.05; // pixels per metre: a crew member is ~0.65 m tall
+    g.setTransform(k, 0, 0, k, cv.width / 2, cv.height * 0.9);
+    const t = (now - c.t0) / 1000;
+    try { Art.drawCrew(g, 0, 0, { team: c.team, variant: c.variant, facing: 1, pose: c.pose, t: t % 2.4, time: t, blink: (t % 3.7) < 0.12 ? 1 : 0 }); } catch (e) { /* art not ready */ }
+  }
+  if (crewCanvases.size) requestAnimationFrame(tickCrewCanvases);
+}
+
 function goTitle() {
   screen = 'title';
   rotatePaused = false;
@@ -147,6 +170,7 @@ function goTitle() {
   $('#hud').hidden = true;
   $('#netlost').hidden = true;
   renderRejoin();
+  crewCanvas($('#logo-crew'), 0, 0, 'cheer');
   startDemo();
   Sound.music(settings.music ? 'menu' : null);
   renderRecord();
@@ -539,6 +563,9 @@ function showResult(r) {
   const face = $('#result-face');
   face.getContext('2d').clearRect(0, 0, face.width, face.height);
   try { Art.drawCaptainIcon(face, r.winner < 0 ? 0 : r.winner); } catch (e) { /* ignore */ }
+  // the 깡단 next to the winner: dancing when you won, flexing ("다음엔 이긴다!") when you didn't
+  const myTeam = friend ? me : 0;
+  crewCanvas($('#result-crew'), iWon || (!cpu && !friend && r.winner >= 0) ? Math.max(0, r.winner) : myTeam, 0, iWon || (!cpu && !friend) ? 'dance' : 'flex');
   const stars = $$('#stars i');
   const n = r.winner < 0 || (cpu && r.isAIWin) || (friend && r.winner !== me) ? 0 : r.stars;
   stars.forEach((s, i) => s.classList.toggle('on', i < n));
@@ -904,17 +931,17 @@ async function shareCode() {
   const inClaude = !!(window.claude && window.claude.use);
   const web = WEB_URL || (/^https?:$/.test(location.protocol) && !inClaude ? `${location.origin}${location.pathname}` : '');
   const url = web ? `${web}?join=${code}` : '';
-  const text = `도토리 포트리스 한 판 해요! 🐿️ '친구와 대결 → 방 들어가기'에서 코드 ${code}`;
+  const text = `도토리깡 한 판 붙자! 🐿️ '친구와 대결 → 방 들어가기'에서 코드 ${code}`;
   const native = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.Share;
   if (isNativeApp() && native) {
     try {
-      await native.share(url ? { title: '도토리 포트리스', text, url, dialogTitle: '친구에게 코드 알려주기' } : { title: '도토리 포트리스', text, dialogTitle: '친구에게 코드 알려주기' });
+      await native.share(url ? { title: '도토리깡', text, url, dialogTitle: '친구에게 코드 알려주기' } : { title: '도토리깡', text, dialogTitle: '친구에게 코드 알려주기' });
       return;
     } catch (e) { /* cancelled or unavailable: fall through */ }
   }
   try {
     if (navigator.share) {
-      await navigator.share(url ? { title: '도토리 포트리스', text, url } : { title: '도토리 포트리스', text });
+      await navigator.share(url ? { title: '도토리깡', text, url } : { title: '도토리깡', text });
       return;
     }
   } catch (e) {

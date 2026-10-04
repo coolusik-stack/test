@@ -10,6 +10,7 @@ import { planShot } from './ai.js';
 import { Forest } from './obstacles.js';
 import { Haptics } from './haptics.js';
 import { ForestEvents } from './events.js';
+import { Crew } from './crew.js';
 import { clamp, rng, lerp, dist } from './util.js';
 import {
   GRAV, VMAX, WIND_ACC, MAX_PULL, CART_R, HEAD, HP_MAX, STAMINA, STAMINA_PER_M, MOVE_SPEED,
@@ -187,6 +188,7 @@ export class Game {
     this.cam.x = p1.x; this.cam.y = p1.y + 3; this.cam.zoom = this.cam.baseZoom;
     this.cam.tx = this.cam.x; this.cam.ty = this.cam.y; this.cam.tz = this.cam.zoom;
     this.turn = this.opts.firstTurn ?? 0;
+    this.crew = new Crew(this);
   }
 
   _placeStructure(bp, back, facing) {
@@ -416,6 +418,10 @@ export class Game {
     p.moodT = 1.5;
     const enemy = this.players[1 - p.id];
     if (!enemy.dead) { enemy.mood = 'happy'; enemy.moodT = 1.8; }
+    if (dmg >= 6 && this.crew) {
+      this.crew.react(p, 'hurt', { dmg });
+      if (attacker && attacker !== p) this.crew.react(attacker, 'hit');
+    }
     if (p.hp <= 0.01) this._kill(p, false);
   }
 
@@ -448,6 +454,7 @@ export class Game {
   // the clouds. Presentation only (the fall itself is plain physics, judged at the cloud line).
   _startFall(p) {
     p.falling = true;
+    this.crew?.react(p, 'fall');
     p.mood = 'scared';
     p.moodT = 4;
     const pos = p.body.getPosition();
@@ -671,6 +678,7 @@ export class Game {
     this.killcam = null;
     this.killcamUsed = false;
     p.stats.shots++;
+    this.crew?.react(p, 'fire');
     this.currentTrail = [];
     this.shotPower = power;
     this._stretch(null);
@@ -777,10 +785,14 @@ export class Game {
     if (ev.starting || ev.next) this._sfx('alert');
     else this._sfx('turn');
     this.emit('turn', { player: p.id, name: p.name, isAI: p.isAI, remote: p.remote, wind: this.wind, turnNo: this.turnNo, flood, ev });
-    if (!p.isAI && !p.remote && !p.dead) {
+    if (!p.dead) {
       // warn whoever is about to play when the ground under them is giving way
       const f = this._footing(p);
-      if (f.edge || (f.support > 0 && f.support < THIN_GROUND)) {
+      const risky = f.edge || (f.support > 0 && f.support < THIN_GROUND);
+      if (risky) this.crew?.react(p, 'danger');
+      else if (Math.abs(this.wind) >= 8) this.crew?.react(p, 'gust');
+      else this.crew?.react(p, 'turn');
+      if (risky && !p.isAI && !p.remote) {
         this.emit('danger', { edge: f.edge, thin: f.support > 0 && f.support < THIN_GROUND });
         this._hap('edge');
       }
@@ -874,6 +886,7 @@ export class Game {
     this.over = true;
     this.winner = winner;
     this.fallcam = null;
+    for (const p of this.players) this.crew?.react(p, p === winner ? 'win' : 'lose');
     this.setState('over');
     const humanWon = winner && !winner.isAI;
     this._sfx(winner ? (this.opts.mode === 'cpu' && !humanWon ? 'lose' : 'win') : 'lose');
@@ -1292,6 +1305,7 @@ export class Game {
     }
     if (steps === maxSteps) this.acc = 0;
     this._updateActors(dt, realDt);
+    this.crew.update(realDt);
     this.forest.update(dt);
     for (const m of this.emotes) m.t += realDt;
     if (this.emotes.length) this.emotes = this.emotes.filter((m) => m.t < 2.4);
@@ -1455,6 +1469,7 @@ export class Game {
       }
       if (pos.y < WORLD.SEA - 0.3) {
         this._cloudPoof(pos.x, 0.5);
+        if (P === this.lead && P.kind === 'nut' && !P.firstHit && !this.silent) this.crew?.react(P.owner, 'whiff');
         P.dead = true;
         this.killQueue.push(P.body);
       } else if (pos.x < -6 || pos.x > WORLD.W + 6) {
@@ -1739,6 +1754,7 @@ export class Game {
     this.nearMissShown = true;
     const tp = target.body.getPosition();
     this.fx.text(tp.x, tp.y + 2.9, '아깝다!', '#ffffff', 1.1, { life: 1.5 });
+    this.crew?.react(this.players[this.turn], 'miss');
     this._sfx('sigh');
     this._hap('nearMiss');
     target.mood = 'scared';
@@ -1842,8 +1858,10 @@ export class Game {
 
     this.events.drawWorld(ctx, this.time, this._frameDt || 0.016);
 
-    // captains
+    // captains and their 깡단
+    this.crew.drawBack(ctx);
     for (const p of this.players) this._drawCaptain(ctx, p);
+    this.crew.drawFront(ctx);
 
     // projectiles
     for (const P of this.projectiles) {
@@ -1877,6 +1895,7 @@ export class Game {
     for (const p of this.players) this._drawTag(ctx, p);
     for (const m of this.emotes) this._drawEmote(ctx, m);
     this.fx.drawTexts(ctx, cam.zoom);
+    this.crew.drawBubbles(ctx, cam.zoom);
 
     // screen-space overlays
     this.scene.drawAmbient(ctx, W, H, dpr, this.time);
