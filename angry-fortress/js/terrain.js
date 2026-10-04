@@ -680,7 +680,7 @@ function simplifyLoop(l, eps) {
 // theme puts in the middle. Each island is an upside-down mountain: a flat top to stand on, a
 // rocky underside that is thickest in the middle and thins out toward the cliffs at its ends.
 export function buildLandscape(layout, seed) {
-  if (layout.fixed === 'oak') return buildOakFixed(seed);
+  if (layout.fixed) return buildFixed(layout.fixed, seed);
   const { W } = WORLD;
   const r = rng(seed);
   const n1 = noise1D(seed + 11);
@@ -832,28 +832,179 @@ export function buildLandscape(layout, seed) {
   return { heights, under, onIsland, spans, ops, bases, baseH, mid, midH, features };
 }
 
-// ---------- hand-made map: 도토리 숲 ----------
-// A fixed, mirrored layout where every spot means something (see spots.js). Home island, from
-// the outer cliff inward:
-//   fort hill with a dead-end burrow dug into its face (mouth toward the enemy: lobs land on the
-//   roof, flat shots go in and out) · start · lookout hump on the way forward (long aim guide,
-//   nothing to hide behind) · acorn tree (a special nut every turn, right at the front) ·
-//   mushroom pad to the middle island
-// Middle island: one flat crown under the great oak (lookout + tree, point blank with whoever
-// else made the trip) and a pad home at each end.
-// Only small things vary between matches (wind, fort design, decor); the shapes stay put so
-// players can learn the map.
-const OAK = {
-  // top surface of the left half [x, y], cosine-interpolated; mirrored for the right half
-  top: [
-    [2.0, 13.6], [3.2, 16.4], [8.6, 16.4], [9.9, 12.0], [13.6, 12.0], [17.6, 14.0], [19.6, 14.0], [23.6, 12.0], [26.6, 12.0], [27.3, 11.4],
-    [30.6, 14.4], [31.2, 15.4], [36, 15.4],
-  ],
-  // undersides per island (absolute y), cosine-interpolated
-  homeUnder: [[2.1, 13.0], [3.4, 10.6], [6.0, 9.0], [9.6, 8.6], [11.6, 8.4], [15.0, 8.4], [18.6, 8.8], [21.5, 8.8], [24.4, 9.4], [25.9, 10.1], [27.2, 11.3]],
-  midUnder: [[30.7, 14.2], [31.8, 12.6], [34.0, 10.4], [36.0, 8.4]],
-  home: [2.1, 27.2],
-  mid: [30.7, 36],
+// ---------- hand-made maps ----------
+// Fixed, mirrored layouts where every spot means something (see spots.js). Each map is described
+// for its left half (x ≤ 36) and mirrored: the top surface and each island's underside as [x, y]
+// points joined by cosine curves, then carves, crags, spots and landmarks per side. Only small
+// things vary between matches (wind, fort design, decor); the shapes stay put so players can
+// learn them. Slopes a cart has to drive up stay at 1:2 or gentler (steeper ones read as walls).
+const FIXED = {
+  // 도토리 숲 — hide, look, or cross? Home island, from the outer cliff inward: fort hill with a
+  // dead-end burrow dug into its face (mouth toward the enemy: lobs land on the roof, flat shots
+  // go in and out) · start · lookout hump · acorn tree at the front · mushroom pad to the middle
+  // island. Middle island: one flat crown under the great oak and a pad home at each end.
+  oak: {
+    top: [
+      [2.0, 13.6], [3.2, 16.4], [8.6, 16.4], [9.9, 12.0], [13.6, 12.0], [17.6, 14.0], [19.6, 14.0], [23.6, 12.0], [26.6, 12.0], [27.3, 11.4],
+      [30.6, 14.4], [31.2, 15.4], [36, 15.4],
+    ],
+    flat: [[3.4, 8.4], [9.9, 13.6], [17.6, 19.6], [23.6, 26.6], [31.2, 36]],
+    islands: [
+      { a: 2.1, b: 27.2, under: [[2.1, 13.0], [3.4, 10.6], [6.0, 9.0], [9.6, 8.6], [11.6, 8.4], [15.0, 8.4], [18.6, 8.8], [21.5, 8.8], [24.4, 9.4], [25.9, 10.1], [27.2, 11.3]] },
+      { a: 30.7, b: 36, under: [[30.7, 14.2], [31.8, 12.6], [34.0, 10.4], [36.0, 8.4]] },
+    ],
+    base: 11.8, baseH: 12, midH: 15.4,
+    side({ X, span, side, team, ops, spots, forts }) {
+      // the burrow: dug into the face of the fort hill, a dead end big enough for a cart
+      for (let x = 6.4; x <= 10.6 + 0.01; x += 0.4) ops.push({ type: 'sub', x: X(x), y: 13.2, rx: 1.2, ry: 1.2 });
+      // crags hanging under the home island (never under the start or the burrow)
+      ops.push({ type: 'add', x: X(4.2), y: 9.0, rx: 0.8, ry: 1.6 });
+      ops.push({ type: 'add', x: X(4.5), y: 7.9, rx: 0.4, ry: 0.9 });
+      ops.push({ type: 'add', x: X(20.2), y: 8.3, rx: 0.7, ry: 1.1 });
+      spots.push({ kind: 'burrow', team, range: span(6.2, 9.4), sign: X(11.0), floor: 12.0 });
+      spots.push({ kind: 'high', team, range: span(17.8, 19.4), sign: X(20.4) });
+      spots.push({ kind: 'tree', team, range: span(23.6, 25.2), sign: X(23.1) });
+      spots.push({ kind: 'pad', team, range: span(25.4, 26.5), dir: side, to: { x: X(34.4), y: 15.4 }, apex: 19.6 });
+      spots.push({ kind: 'pad', team: -1, range: span(31.3, 32.4), dir: -side, to: { x: X(12.0), y: 12.0 }, apex: 21.2 });
+      forts.push({ back: X(4.6), facing: side });
+    },
+    center({ M, W, ops, spots }) {
+      // the great crag under the middle island
+      ops.push({ type: 'add', x: M, y: 7.0, rx: 1.5, ry: 2.4 });
+      ops.push({ type: 'add', x: M + 0.4, y: 5.2, rx: 0.65, ry: 1.3 });
+      spots.push({ kind: 'crown', team: -1, range: [32.6, W - 32.6], sign: null, signs: [33.0, W - 33.0] });
+    },
+    features: (W, M) => ({
+      trees: [
+        { x: M, kind: 'oak', giant: true, h: 7.6, canopyR: 3.5, hpMul: 2, nuts: 6, hive: true, web: false, room: 3.2 },
+        { x: 24.4, kind: 'oak', h: 4.7, canopyR: 1.85, nuts: 5, hive: false, web: false, room: 1.5 },
+        { x: W - 24.4, kind: 'oak', h: 4.7, canopyR: 1.85, nuts: 5, hive: false, web: false, room: 1.5 },
+      ],
+    }),
+  },
+
+  // 단풍 협곡 — cross, or cut? One landmass split by a bottomless canyon, joined only by a thin
+  // earth bridge. From the outer cliff: fort · a rock floating just over the ground behind the
+  // start (a roof overhead, open on both sides: somewhere to fall back to) · start · the maple
+  // tree · a bluff at the canyon rim (lookout) · the bridge. The bridge is under 2 m thick: stand
+  // on it and the ground cracks; a hit nearby drops it, and once it is gone the two sides can't
+  // reach each other again.
+  maple: {
+    top: [[2.0, 11.2], [3.0, 13.0], [23.5, 13.0], [27.5, 15.0], [30.4, 15.0], [32.0, 14.2], [36, 14.2]],
+    flat: [[3.0, 23.5], [27.5, 30.4], [32.0, 36]],
+    islands: [
+      {
+        a: 2.1, b: 36, calm: [30.4, 36], // the bridge's underside stays even, so its thickness is what it says
+        under: [[2.1, 11.6], [3.4, 10.0], [7, 9.6], [11, 9.4], [15, 9.4], [19, 9.0], [23, 8.6], [27, 8.2], [29.0, 8.6], [30.8, 10.2], [32.0, 12.2], [36, 12.4]],
+      },
+    ],
+    base: 15.0, baseH: 13, midH: 14.2,
+    side({ X, span, side, team, ops, spots, forts }) {
+      // the floating rock: a little sky island hovering a hand's width over a cart's head, reaching
+      // well out toward the enemy so lobs coming down at an angle still land on it
+      ops.push({ type: 'add', x: X(10.0), y: 17.1, rx: 2.8, ry: 1.3 });
+      ops.push({ type: 'add', x: X(10.2), y: 16.2, rx: 1.9, ry: 0.65 });
+      ops.push({ type: 'add', x: X(10.4), y: 15.8, rx: 0.6, ry: 0.35 });
+      ops.push({ type: 'add', x: X(6.0), y: 8.6, rx: 0.9, ry: 1.6 });
+      ops.push({ type: 'add', x: X(6.3), y: 7.2, rx: 0.45, ry: 0.9 });
+      ops.push({ type: 'add', x: X(19.0), y: 7.8, rx: 0.9, ry: 1.5 });
+      ops.push({ type: 'add', x: X(26.0), y: 7.2, rx: 1.0, ry: 1.6 });
+      ops.push({ type: 'add', x: X(26.4), y: 5.8, rx: 0.45, ry: 0.9 });
+      spots.push({
+        kind: 'burrow', team, range: span(7.6, 10.2), sign: X(13.3), floor: 13.0,
+        label: { name: '뜬바위 그늘', desc: '머리 위에 뜬 바위가 위에서 오는 공격을 막아 줘요. 양옆은 뚫려 있어 낮게 쏜 건 그대로 들어와요' },
+      });
+      spots.push({ kind: 'tree', team, range: span(20.5, 22.5), sign: X(19.8), label: { name: '단풍 명당' } });
+      spots.push({ kind: 'high', team, range: span(27.7, 29.5), sign: X(30.0), label: { name: '벼랑 전망대', desc: '조준선이 두 배로 길어져요. 바로 앞은 협곡이에요' } });
+      forts.push({ back: X(3.4), facing: side });
+    },
+    center({ W, spots }) {
+      spots.push({ kind: 'bridge', team: -1, range: [32.4, W - 32.4], sign: null, signs: [31.8, W - 31.8] });
+    },
+    features: (W, M) => ({
+      trees: [21.5, W - 21.5].map((x) => ({ x, kind: 'maple', h: 4.6, canopyR: 1.9, nuts: 5, hive: false, web: false, room: 1.5 })),
+      crates: [{ x: M }], // a nut basket in the middle of the bridge
+    }),
+  },
+
+  // 소나무 언덕 — king of the hill. One ridge from end to end. From the outer cliff: fort · start
+  // · a hollow with a pine tree in it (a nut every turn, but the hill in front gets in the way of
+  // your shots) · the climb · a ledge halfway up (lookout) · the summit under the great pine
+  // (lookout + a nut every turn), three turns of climbing away and in plain view of both sides.
+  pine: {
+    top: [[2.2, 10.8], [3.4, 12.6], [11.0, 12.6], [14.6, 10.8], [16.2, 10.8], [20.2, 12.8], [25.0, 15.2], [28.0, 15.2], [32.6, 17.5], [36, 17.5]],
+    flat: [[3.4, 11.0], [14.6, 16.2], [25.0, 28.0], [32.6, 36]],
+    islands: [{ a: 2.3, b: 36, under: [[2.3, 11.0], [3.6, 9.8], [8, 9.0], [11, 8.9], [14, 8.0], [16, 7.6], [20, 7.6], [26, 7.0], [32, 6.2], [36, 5.8]] }],
+    base: 9.4, baseH: 12.6, midH: 17.5,
+    side({ X, span, side, team, ops, spots, forts }) {
+      ops.push({ type: 'add', x: X(6.0), y: 7.6, rx: 1.0, ry: 1.7 });
+      ops.push({ type: 'add', x: X(6.3), y: 6.0, rx: 0.5, ry: 1.0 });
+      ops.push({ type: 'add', x: X(17.0), y: 5.6, rx: 1.0, ry: 1.7 });
+      ops.push({ type: 'add', x: X(24.0), y: 4.8, rx: 1.1, ry: 1.8 });
+      ops.push({ type: 'add', x: X(24.4), y: 3.4, rx: 0.5, ry: 0.9 });
+      spots.push({ kind: 'tree', team, range: span(14.4, 16.4), sign: X(13.4), label: { name: '솔방울 명당', desc: '내 차례가 시작될 때마다 특수 견과 +1. 움푹 꺼진 데라 앞 오르막이 내 샷을 자주 막아요' } });
+      spots.push({ kind: 'high', team, range: span(25.3, 27.7), sign: X(24.4), label: { name: '전망 턱' } });
+      forts.push({ back: X(4.0), facing: side });
+    },
+    center({ M, W, ops, spots }) {
+      ops.push({ type: 'add', x: M, y: 3.6, rx: 1.4, ry: 2.2 });
+      spots.push({
+        kind: 'crown', team: -1, range: [32.8, W - 32.8], sign: null, signs: [32.3, W - 32.3],
+        label: { name: '솔방울 고지', desc: '조준선 두 배 + 내 차례마다 특수 견과 +1. 양쪽 어디서나 다 보여요' },
+      });
+    },
+    features: (W, M) => ({
+      trees: [
+        { x: M, kind: 'pine', giant: true, h: 7.4, canopyR: 2.6, hpMul: 2, nuts: 6, hive: true, web: false, room: 2.4 },
+        ...[15.4, W - 15.4].map((x) => ({ x, kind: 'pine', h: 4.6, canopyR: 1.8, nuts: 5, hive: false, web: false, room: 1.5 })),
+      ],
+    }),
+  },
+
+  // 반딧불 밤숲 — hop the islands. Home island: fort · start · a glowing mushroom pad that throws
+  // you up to a small floating islet (lookout; thin, so it breaks under you) with a pad at each
+  // end: back home, or down to the middle island. The middle island is split by a rock spire
+  // (a nut basket on top); at its foot is the firefly tree (a nut every turn, flat shots from the
+  // far side hit the spire), with a pad home at the outer edge.
+  night: {
+    top: [[2.4, 12.0], [3.4, 13.6], [15.4, 13.6], [16.6, 12.6], [28.2, 12.0], [29.2, 13.0], [34.8, 13.0], [35.4, 18.4], [36, 19.0]],
+    flat: [[3.4, 15.4], [29.2, 34.8]],
+    islands: [
+      { a: 2.6, b: 16.4, under: [[2.6, 13.0], [3.8, 11.2], [7, 10.0], [11, 9.8], [14, 10.2], [16.4, 12.4]] },
+      { a: 28.6, b: 36, under: [[28.6, 12.2], [30, 10.4], [33, 9.2], [36, 7.2]] },
+    ],
+    base: 9.6, baseH: 13.6, midH: 13.0,
+    side({ X, span, side, team, ops, spots, forts }) {
+      // the floating islet: flat on top, thick in the middle, thin at the ends
+      ops.push({ type: 'add', x: X(22.0), y: 19.0, rx: 3.2, ry: 0.6 });
+      ops.push({ type: 'add', x: X(22.0), y: 18.3, rx: 2.2, ry: 0.8 });
+      ops.push({ type: 'add', x: X(22.3), y: 17.5, rx: 1.1, ry: 0.6 });
+      ops.push({ type: 'add', x: X(22.2), y: 16.8, rx: 0.4, ry: 0.5 });
+      ops.push({ type: 'add', x: X(6.5), y: 8.4, rx: 0.9, ry: 1.4 });
+      ops.push({ type: 'add', x: X(6.8), y: 7.2, rx: 0.45, ry: 0.8 });
+      ops.push({ type: 'add', x: X(32.0), y: 7.6, rx: 0.9, ry: 1.5 });
+      const islet = 21; // look for its top from here down (it floats over the gap)
+      spots.push({ kind: 'pad', team, range: span(13.6, 14.7), dir: side, to: { x: X(21.0), y: 19.55 }, apex: 23.2 });
+      spots.push({ kind: 'pad', team, range: span(19.4, 20.2), dir: -side, to: { x: X(9.6), y: 13.6 }, apex: 23.0, top: islet });
+      spots.push({
+        kind: 'high', team, range: span(20.5, 23.5), sign: X(23.7), top: islet,
+        label: { name: '반딧불 섬', desc: '조준선이 두 배로 길어져요. 작고 얇아서 잘 무너져요' },
+      });
+      spots.push({ kind: 'pad', team, range: span(23.8, 24.6), dir: side, to: { x: X(31.8), y: 13.0 }, apex: 22.6, top: islet });
+      spots.push({ kind: 'pad', team, range: span(29.0, 30.0), dir: -side, to: { x: X(9.6), y: 13.6 }, apex: 25.0 });
+      spots.push({ kind: 'tree', team, range: span(30.8, 33.4), sign: X(33.9), label: { name: '반딧불 명당', desc: '내 차례가 시작될 때마다 특수 견과 +1. 건너편에서 낮게 쏜 건 바위 기둥이 막아 줘요' } });
+      forts.push({ back: X(3.8), facing: side });
+    },
+    center({ M, ops }) {
+      // the spire's overhanging cap
+      ops.push({ type: 'add', x: M, y: 19.0, rx: 1.5, ry: 0.55 });
+      ops.push({ type: 'add', x: M, y: 6.0, rx: 1.2, ry: 2.0 });
+    },
+    features: (W, M) => ({
+      trees: [32.0, W - 32.0].map((x) => ({ x, kind: 'chestnut', h: 4.4, canopyR: 1.8, nuts: 5, hive: false, web: false, room: 1.5 })),
+      crates: [{ x: M }], // on top of the spire
+    }),
+  },
 };
 
 function cosInterp(pts, x) {
@@ -868,66 +1019,46 @@ function cosInterp(pts, x) {
   return pts[pts.length - 1][1];
 }
 
-function buildOakFixed(seed) {
+function buildFixed(id, seed) {
+  const def = FIXED[id];
   const { W } = WORLD;
   const M = W / 2;
   const n1 = noise1D(seed + 11), nU = noise1D(seed + 37);
   const mirror = (x) => (x <= M ? x : W - x);
   // keep spots and paths dead flat; let the rest of the grass undulate a little
-  const flatZones = [[3.4, 8.4], [9.9, 13.6], [17.6, 19.6], [23.6, 26.6], [31.2, 36]];
   const heights = (x) => {
     const mx = mirror(x);
-    let h = cosInterp(OAK.top, mx);
-    if (!flatZones.some(([a, b]) => mx > a - 0.2 && mx < b + 0.2)) h += n1(x * 0.5) * 0.12;
+    let h = cosInterp(def.top, mx);
+    if (!def.flat.some(([a, b]) => mx > a - 0.2 && mx < b + 0.2)) h += n1(x * 0.5) * 0.12;
     return h;
   };
+  // an island that reaches the middle is one island, mirrored onto itself
+  const islandAt = (mx) => def.islands.find((i) => mx > i.a && (i.b >= M || mx < i.b));
   const under = (x) => {
     const mx = mirror(x);
-    let pts = null;
-    if (mx > OAK.home[0] && mx < OAK.home[1]) pts = OAK.homeUnder;
-    else if (mx > OAK.mid[0]) pts = OAK.midUnder;
-    if (!pts) return Infinity;
-    return cosInterp(pts, mx) + nU(x * 0.6) * 0.35;
+    const isl = islandAt(mx);
+    if (!isl) return Infinity;
+    const calm = isl.calm && mx > isl.calm[0] && mx < isl.calm[1] ? 0.15 : 1;
+    return cosInterp(isl.under, mx) + nU(x * 0.6) * 0.35 * calm;
   };
   const onIsland = (x) => under(x) < Infinity;
-  const spans = [
-    { a: OAK.home[0], b: OAK.home[1], D: 3.6, p: 0.5 },
-    { a: OAK.mid[0], b: W - OAK.mid[0], D: 7, p: 0.6 },
-    { a: W - OAK.home[1], b: W - OAK.home[0], D: 3.6, p: 0.5 },
-  ];
-  const ops = [];
-  for (const side of [1, -1]) {
-    const X = (x) => (side > 0 ? x : W - x);
-    // the burrow: dug into the face of the fort hill, a dead end big enough for a cart
-    for (let x = 6.4; x <= 10.6 + 0.01; x += 0.4) ops.push({ type: 'sub', x: X(x), y: 13.2, rx: 1.2, ry: 1.2 });
-    // crags hanging under the home island (never under the start or the burrow)
-    ops.push({ type: 'add', x: X(4.2), y: 9.0, rx: 0.8, ry: 1.6 });
-    ops.push({ type: 'add', x: X(4.5), y: 7.9, rx: 0.4, ry: 0.9 });
-    ops.push({ type: 'add', x: X(20.2), y: 8.3, rx: 0.7, ry: 1.1 });
+  const spans = [];
+  for (const i of def.islands) {
+    if (i.b >= M) spans.push({ a: i.a, b: W - i.a });
+    else spans.push({ a: i.a, b: i.b }, { a: W - i.b, b: W - i.a });
   }
-  // the great crag under the middle island
-  ops.push({ type: 'add', x: M, y: 7.0, rx: 1.5, ry: 2.4 });
-  ops.push({ type: 'add', x: M + 0.4, y: 5.2, rx: 0.65, ry: 1.3 });
-
-  // what each spot does lives in spots.js; here is just where they are
-  const spots = [];
-  const forts = [];
+  spans.sort((p, q) => p.a - q.a);
+  // where each spot is (what it does lives in spots.js)
+  const ops = [], spots = [], forts = [];
   for (const side of [1, -1]) {
     const X = (x) => (side > 0 ? x : W - x);
     const span = (a, b) => (side > 0 ? [a, b] : [W - b, W - a]);
-    const team = side > 0 ? 0 : 1;
-    spots.push({ kind: 'burrow', team, range: span(6.2, 9.4), sign: X(11.0) });
-    spots.push({ kind: 'high', team, range: span(17.8, 19.4), sign: X(20.4) });
-    spots.push({ kind: 'tree', team, range: span(23.6, 25.2), sign: X(23.1) });
-    spots.push({ kind: 'pad', team, range: span(25.4, 26.5), dir: side, to: { x: X(34.4), y: 15.4 }, apex: 19.6 });
-    spots.push({ kind: 'pad', team: -1, range: span(31.3, 32.4), dir: -side, to: { x: X(12.0), y: 12.0 }, apex: 21.2 });
-    forts.push({ back: X(4.6), facing: side });
+    def.side({ X, span, side, team: side > 0 ? 0 : 1, ops, spots, forts });
   }
-  spots.push({ kind: 'crown', team: -1, range: [32.6, W - 32.6], sign: null, signs: [33.0, W - 33.0] });
+  def.center({ M, W, ops, spots });
   return {
-    heights, under, onIsland, spans, ops, bases: [11.8, W - 11.8], baseH: [12, 12], mid: M, midH: 15.4,
-    features: { giant: { x: M }, homeTrees: [{ x: 24.4 }, { x: W - 24.4 }], fixed: true },
-    spots, forts, fixed: 'oak',
+    heights, under, onIsland, spans, ops, bases: [def.base, W - def.base], baseH: [def.baseH, def.baseH], mid: M, midH: def.midH,
+    features: { ...def.features(W, M), fixed: true }, spots, forts, fixed: id,
   };
 }
 

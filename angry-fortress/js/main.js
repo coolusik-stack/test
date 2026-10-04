@@ -9,7 +9,7 @@ import { AMMO, HP_MAX, STAMINA, TEAM, WEB_URL } from './config.js';
 import { Online } from './online.js';
 import { makeCode, cleanCode } from './net.js';
 import { Haptics, isNativeApp } from './haptics.js';
-import { SPOT_INFO } from './spots.js';
+import { infoOf } from './spots.js';
 
 const $ = (sel) => document.querySelector(sel);
 const $$ = (sel) => [...document.querySelectorAll(sel)];
@@ -717,11 +717,11 @@ function drawMapPreview(cv, id) {
       g.fill();
       continue;
     }
-    const y = s.kind === 'burrow' ? toY(12.4) : toY(land.heights(x)) - 9;
+    const y = s.floor != null ? toY(s.floor + 0.4) : s.top != null ? toY(s.top - 1.4) - 9 : toY(land.heights(x)) - 9;
     g.font = '11px "Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif';
     g.textAlign = 'center';
     g.textBaseline = 'middle';
-    g.fillText(SPOT_INFO[s.kind].icon, x * sx, y);
+    g.fillText(infoOf(s).icon, x * sx, y);
   }
 }
 

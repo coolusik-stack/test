@@ -65,8 +65,9 @@ export class Forest {
     this.terrainVersion = g.terrain.version;
   }
 
-  // Each map's landmark: the giant oak over the tunnel, the canyon bridge, the ridge boulders,
-  // the floating islands' baskets and the valley's bounce mushrooms. Always mirrored.
+  // Each map's landmarks: the trees and baskets of a hand-made map, or (on a generated one) the
+  // giant oak over the tunnel, the canyon bridge, the ridge boulders, the floating islands'
+  // baskets and the valley's bounce mushrooms. Always mirrored.
   _placeFeatures(f) {
     const g = this.g, t = g.terrain;
     if (f.spire) this.taken.push([f.spire.x - 1.8, f.spire.x + 1.8]);
@@ -75,6 +76,11 @@ export class Forest {
       this._placeTree(f.giant.x, 'oak', { force: true, giant: true, h: 7.6, canopyR: 3.5, hp: TREE.hp * 2, nuts: 6, hive: true, web: false });
       this.taken.push([f.giant.x - 3.2, f.giant.x + 3.2]);
     }
+    // a hand-made map's trees, exactly where they were designed to stand
+    for (const o of f.trees || []) {
+      this._placeTree(o.x, o.kind, { ...o, force: true, hp: TREE.hp * (o.hpMul || 1) });
+      this.taken.push([o.x - o.room, o.x + o.room]);
+    }
     if (f.bridge) {
       const b = f.bridge;
       const y = Math.max(t.surfaceY(b.x - b.span / 2 + 0.3), t.surfaceY(b.x + b.span / 2 - 0.3));
@@ -82,16 +88,11 @@ export class Forest {
       g._makeBlock('crate', 'box', b.x, y + 0.5 + 0.31, 0.76, 0.6, 0); // a basket right in the middle
       this.taken.push([b.x - b.span / 2 - 0.6, b.x + b.span / 2 + 0.6]);
     }
-    // the acorn tree on each home island's 명당
-    for (const o of f.homeTrees || []) {
-      this._placeTree(o.x, 'oak', { force: true, h: 4.7, canopyR: 1.85, nuts: 5, hive: false, web: false });
-      this.taken.push([o.x - 1.5, o.x + 1.5]);
-    }
     for (const o of f.boulders || []) {
       g._makeBlock('stone', 'circle', o.x, t.surfaceY(o.x) + 0.72, 0, 0, 0.7);
       this.taken.push([o.x - 1.3, o.x + 1.3]);
     }
-    for (const o of f.islands || []) g._makeBlock('crate', 'box', o.x, t.surfaceY(o.x) + 0.32, 0.76, 0.6, 0);
+    for (const o of [...(f.islands || []), ...(f.crates || [])]) g._makeBlock('crate', 'box', o.x, t.surfaceY(o.x) + 0.32, 0.76, 0.6, 0);
     for (const o of f.bounce || []) {
       const b = { x: o.x, ground: t.surfaceY(o.x), seed: this.r.int(1, 9999), flash: 0 };
       this._bumperBody(b);

@@ -39,8 +39,8 @@ export const THEMES = {
   maple: {
     id: 'maple',
     name: '단풍 협곡',
-    desc: '끝없는 낭떠러지 위 통나무 다리',
-    layout: { mid: 'gorge', baseMin: 11, baseMax: 13.5, midMin: 13, midMax: 14.5, rough: 0.8 },
+    desc: '뜬바위 그늘·벼랑 전망대, 협곡을 잇는 얇은 흙다리',
+    layout: { fixed: 'maple' },
     sky: ['#f39b5c', '#ffcf94', '#fff1d6'],
     sun: { x: 0.24, y: 0.22, color: '#fff3d0', glow: 'rgba(255,214,140,0.6)' },
     rays: 'rgba(255,225,170,0.12)',
@@ -70,8 +70,8 @@ export const THEMES = {
   pine: {
     id: 'pine',
     name: '소나무 언덕',
-    desc: '구름 위 긴 능선과 아슬아슬한 바위',
-    layout: { mid: 'hill', baseMin: 12, baseMax: 14, midMin: 19, midMax: 20.5, rough: 1.0, ledges: 3.6 },
+    desc: '솔방울 명당·전망 턱, 꼭대기 고지를 차지하라',
+    layout: { fixed: 'pine' },
     sky: ['#86b4cf', '#c3dde6', '#eef6ef'],
     sun: { x: 0.7, y: 0.2, color: '#fffbe8', glow: 'rgba(255,250,230,0.5)' },
     rays: 'rgba(255,255,240,0.09)',
@@ -100,8 +100,8 @@ export const THEMES = {
   night: {
     id: 'night',
     name: '반딧불 밤숲',
-    desc: '조각난 하늘섬과 통통 버섯',
-    layout: { mid: 'valley', baseMin: 13, baseMax: 15, midMin: 10, midMax: 11, rough: 1.0, spire: true, islands: 8 },
+    desc: '버섯 트램펄린으로 떠 있는 섬을 건너뛰기',
+    layout: { fixed: 'night' },
     sky: ['#101a3c', '#233a6b', '#3e5f8a'],
     sun: { x: 0.62, y: 0.16, color: '#fff4d6', glow: 'rgba(200,220,255,0.28)', moon: true },
     rays: null,

@@ -11,7 +11,7 @@ import { Forest } from './obstacles.js';
 import { Haptics } from './haptics.js';
 import { ForestEvents } from './events.js';
 import { Crew } from './crew.js';
-import { PAD_COST, POCKET, SPOT_INFO, spotsAt, hasSpot, padAt, padLaunch, drawSpots } from './spots.js';
+import { PAD_COST, POCKET, infoOf, spotsAt, hasSpot, padAt, padLaunch, drawSpots } from './spots.js';
 import { clamp, rng, lerp, dist } from './util.js';
 import {
   GRAV, VMAX, WIND_ACC, MAX_PULL, CART_R, HEAD, HP_MAX, STAMINA, STAMINA_PER_M, MOVE_SPEED,
@@ -1830,7 +1830,7 @@ export class Game {
     const pos = p.body.getPosition();
     const s = spotsAt(this.land, pos.x).find((q) => q.kind !== 'pad');
     if (!s) return;
-    const info = SPOT_INFO[s.kind];
+    const info = infoOf(s);
     this.fx.text(pos.x, pos.y + 2.9, `${info.icon} ${info.name} 차지!`, info.color, 0.7, { life: 1.8 });
     this._sfx('select', { vol: 0.5 });
   }
@@ -1844,7 +1844,7 @@ export class Game {
     if (key === p.spotKey) return;
     p.spotKey = key;
     if (s) {
-      const info = SPOT_INFO[s.kind];
+      const info = infoOf(s);
       this.emit('spot', { text: `${info.icon} ${info.name}: ${info.desc}` });
       this._sfx('select', { vol: 0.5 });
     }

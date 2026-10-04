@@ -1,13 +1,15 @@
 // Spots on a hand-made map: places worth standing on, each with an upside and a catch.
-//   high   전망대        the aim guide reaches twice as far; no cover, a cliff behind
-//   burrow 다람쥐 굴     a tunnel under the fort: lobs land on the roof (the terrain does the work,
-//                        plus blasts lose most of their bite through solid ground); only flat
-//                        shots get in or out, and a drilled roof is a hole
-//   tree   도토리 명당   a special nut every time your turn starts here; out in front, and the
-//                        tree drops its nuts on whoever stands under it
-//   crown  대왕참나무 고지  the middle island's top: lookout + tree, closest to the enemy
+//   high   전망대        the aim guide reaches twice as far; no cover
+//   burrow 다람쥐 굴     ground overhead: lobs land on the roof (the terrain does the work, plus
+//                        blasts lose most of their bite through solid ground); only flat shots
+//                        get in or out, and a drilled roof is a hole
+//   tree   명당          a special nut every time your turn starts here; the tree overhead gets in
+//                        the way of your own lobs and drops its nuts on whoever stands under it
+//   crown  고지          lookout + tree in one, out in the open
+//   bridge 다리          the one way across; thin, so a hit nearby can drop it (and you)
 //   pad    버섯 트램펄린  drive onto it to bounce across to the next island
-// Where they are comes from the landscape (land.spots); what they do is applied by Game.
+// Where they are comes from the landscape (land.spots); what they do is applied by Game. A spot
+// may carry its own `label` ({icon, name, desc}) so each map can dress the same kind its own way.
 import { GRAV, CART_R } from './config.js';
 import { clamp } from './util.js';
 
@@ -19,8 +21,14 @@ export const SPOT_INFO = {
   burrow: { icon: '🛡️', name: '다람쥐 굴', desc: '위에서 오는 공격을 막아 줘요. 낮게 쏜 것만 드나들어요', color: '#c79a6a' },
   tree: { icon: '🌰', name: '도토리 명당', desc: '내 차례가 시작될 때마다 특수 견과 +1', color: '#ffd24d' },
   crown: { icon: '👑', name: '대왕참나무 고지', desc: '조준선 두 배 + 내 차례마다 특수 견과 +1', color: '#ffb02e' },
+  bridge: { icon: '🌉', name: '흙다리', desc: '건너편으로 가는 유일한 길. 얇아서 근처에 맞으면 무너져요', color: '#ffa25e' },
   pad: { icon: '🍄', name: '버섯 트램펄린', desc: '올라타면 건너편 섬으로 슝!', color: '#ff7a8a' },
 };
+
+// What a spot looks like to players: its kind's defaults, dressed in the map's own words.
+export function infoOf(s) {
+  return s.label ? { ...SPOT_INFO[s.kind], ...s.label } : SPOT_INFO[s.kind];
+}
 
 export function spotsAt(land, x) {
   if (!land || !land.spots) return [];
@@ -57,7 +65,7 @@ export function drawSpots(ctx, game, view) {
   for (const s of land.spots) {
     const [a, b] = s.range;
     if (b < view.x0 - 2 || a > view.x1 + 2) continue;
-    const info = SPOT_INFO[s.kind];
+    const info = infoOf(s);
     if (s.kind === 'pad') { drawPad(ctx, game, s); continue; }
     // the strip follows the ground (and vanishes where the ground has been blown away)
     const inside = cx >= a && cx <= b;
@@ -71,25 +79,26 @@ export function drawSpots(ctx, game, view) {
     ctx.beginPath();
     let pen = false;
     for (let x = a; x <= b + 0.001; x += 0.2) {
-      const y = s.kind === 'burrow' ? burrowFloor(ter, x) : ter.surfaceY(x);
+      const y = s.floor != null ? floorAt(ter, x, s.floor) : ter.surfaceY(x, s.top ?? undefined);
       if (y < 0) { pen = false; continue; }
       if (pen) ctx.lineTo(x, -y - 0.06); else ctx.moveTo(x, -y - 0.06);
       pen = true;
     }
     ctx.stroke();
     ctx.restore();
-    for (const sx of s.signs || (s.sign != null ? [s.sign] : [])) drawSign(ctx, sx, info, ter, z, inside, t);
+    for (const sx of s.signs || (s.sign != null ? [s.sign] : [])) drawSign(ctx, sx, info, ter, z, inside, t, s.top);
   }
 }
 
-// inside the burrow the floor is under the roof, not the top surface
-function burrowFloor(ter, x) {
-  for (let y = 12.6; y > 10; y -= 0.1) if (ter.solid(x, y)) return y + 0.05;
+// under a roof the floor is not the top surface: look down from just above where it was built
+function floorAt(ter, x, floor) {
+  if (ter.solid(x, floor + 0.6)) return -1; // the roof came down
+  for (let y = floor + 0.6; y > floor - 2; y -= 0.1) if (ter.solid(x, y)) return y + 0.05;
   return -1;
 }
 
-function drawSign(ctx, sx, info, ter, z, active, t) {
-  const gy = ter.surfaceY(sx);
+function drawSign(ctx, sx, info, ter, z, active, t, top) {
+  const gy = ter.surfaceY(sx, top ?? undefined);
   if (gy < 0) return;
   const bob = active ? Math.sin(t * 6) * 0.04 : 0;
   ctx.save();
@@ -121,7 +130,7 @@ function drawSign(ctx, sx, info, ter, z, active, t) {
 // A wide bouncy toadstool lying flat on the ground; squashes when someone bounces off it.
 function drawPad(ctx, game, s) {
   const x = (s.range[0] + s.range[1]) / 2;
-  const gy = game.terrain.surfaceY(x);
+  const gy = game.terrain.surfaceY(x, s.top ?? undefined);
   if (gy < 0) return;
   s.squash = Math.max(0, (s.squash || 0) - (game._frameDt || 0.016) * 3);
   const k = s.squash, wob = Math.sin(game.time * 30) * k;

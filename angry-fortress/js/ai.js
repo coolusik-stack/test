@@ -262,26 +262,25 @@ function searchShots(game, me, { windK = 1, at = null, coarse = false } = {}) {
     return top + near;
   };
 
-  // coarse grid, then refine around the three most promising spots
+  // coarse grid, then refine around the most promising spots (three; one for a quick look)
   const coarseList = [];
   const dDeg = coarse ? 5 : 3, dPw = coarse ? 0.07 : 0.04;
   for (let deg = 10; deg <= 82; deg += dDeg) {
     for (let pw = 0.32; pw <= 1.0001; pw += dPw) coarseList.push({ deg, pw, score: evalShot(deg, pw) });
   }
-  if (!coarse) {
-    coarseList.sort((a, b) => b.score - a.score);
-    const seeds = [];
-    for (const c of coarseList) {
-      if (seeds.length >= 3) break;
-      if (seeds.every((q) => Math.abs(q.deg - c.deg) > 4 || Math.abs(q.pw - c.pw) > 0.06)) seeds.push(c);
-    }
-    for (const c of seeds) {
-      for (let deg = c.deg - 3; deg <= c.deg + 3.001; deg += 0.75) {
-        if (deg < 5 || deg > 86) continue;
-        for (let pw = c.pw - 0.04; pw <= c.pw + 0.0401; pw += 0.01) {
-          if (pw < 0.25 || pw > 1) continue;
-          evalShot(deg, pw);
-        }
+  coarseList.sort((a, b) => b.score - a.score);
+  const seeds = [];
+  for (const c of coarseList) {
+    if (seeds.length >= (coarse ? 1 : 3)) break;
+    if (seeds.every((q) => Math.abs(q.deg - c.deg) > 4 || Math.abs(q.pw - c.pw) > 0.06)) seeds.push(c);
+  }
+  const span = coarse ? 4 : 3, step = coarse ? 1 : 0.75, pwSpan = coarse ? 0.05 : 0.04, pwStep = coarse ? 0.0125 : 0.01;
+  for (const c of seeds) {
+    for (let deg = c.deg - span; deg <= c.deg + span + 0.001; deg += step) {
+      if (deg < 5 || deg > 86) continue;
+      for (let pw = c.pw - pwSpan; pw <= c.pw + pwSpan + 0.0001; pw += pwStep) {
+        if (pw < 0.25 || pw > 1) continue;
+        evalShot(deg, pw);
       }
     }
   }
@@ -294,10 +293,11 @@ function searchShots(game, me, { windK = 1, at = null, coarse = false } = {}) {
 // A generator so the work spreads over a few ticks: each yield is one place looked at.
 // Returns { x, dir } to drive to, or null to stay put.
 const MOVE = {
-  // chance: thinks about moving at all; notice: sees the ground cracking under it
-  easy: { chance: 0.4, notice: 0.35, noise: 9, spots: 0.5, look: 3 },
-  normal: { chance: 0.75, notice: 0.7, noise: 4, spots: 0.85, look: 5 },
-  hard: { chance: 1, notice: 1, noise: 1.2, spots: 1, look: 6 },
+  // chance: thinks about moving at all; notice: sees the ground cracking under it; goal: sets
+  // its heart on a spot several turns away (the summit, the islet, the far lookout)
+  easy: { chance: 0.4, notice: 0.35, goal: 0.25, noise: 9, spots: 0.5, look: 3 },
+  normal: { chance: 0.75, notice: 0.7, goal: 0.5, noise: 4, spots: 0.85, look: 5 },
+  hard: { chance: 1, notice: 1, goal: 0.7, noise: 1.2, spots: 1, look: 6 },
 };
 
 export function* planMove(game, me, difficulty) {
@@ -347,9 +347,30 @@ export function* planMove(game, me, difficulty) {
     high: 6,
     crown: 6 + (openPocket ? 7 : 0),
     tree: openPocket ? 8 : 0,
-    burrow: 6 + 10 * hurt,
+    burrow: 5 + 8 * hurt,
   }[kind] || 0);
+  const ex = game.players[1 - me.id].body.getPosition().x;
   const island = (x) => (land.spans || []).findIndex((sp) => x > sp.a && x < sp.b);
+  // how far a place is by cart: along the ground, plus a hop for every island change
+  const far = (a, b) => Math.abs(a - b) + (island(a) !== island(b) ? 6 : 0);
+
+  // a spot several turns away worth heading for (kept between turns, given up after a while)
+  const goals = (game.aiGoals ||= {});
+  let goal = goals[me.id];
+  const inGoal = (x) => goal && x >= goal.s.range[0] && x <= goal.s.range[1];
+  const alive = (s) => ter.surfaceY((s.range[0] + s.range[1]) / 2, s.top ?? undefined) > WORLD.SEA + 0.5;
+  if (goal && (inGoal(x0) || ++goal.turns > 5 || !alive(goal.s))) goal = goals[me.id] = null;
+  const settled = spotsAt(land, x0).some((s) => s.kind !== 'pad' && worth(s.kind) > 0);
+  if (!goal && land.spots && Math.random() < prof.goal * (settled ? 0.5 : 1)) {
+    let best = null;
+    for (const s of land.spots) {
+      if (s.kind === 'pad' || x0 >= s.range[0] && x0 <= s.range[1] || !alive(s)) continue;
+      const gx = x0 < s.range[0] ? s.range[0] + 0.8 : s.range[1] - 0.8;
+      const v = worth(s.kind) + 3 - 0.15 * far(x0, gx) + (Math.random() - 0.5) * 6;
+      if (!best || v > best.v) best = { v, s, x: gx };
+    }
+    if (best && best.v > 2) goal = goals[me.id] = { s: best.s, x: best.x, turns: 0 };
+  }
   const quick = (c) => {
     let v = 0;
     const th = Math.min(...[-0.45, 0, 0.45].map((dx) => ter.thicknessBelow(c.x + dx, c.foot + 0.1)));
@@ -359,9 +380,13 @@ export function* planMove(game, me, difficulty) {
     if (edge < 1.8) v -= (1.8 - edge) * 7;
     const here = spotsAt(land, c.x).filter((s) => s.kind !== 'pad');
     for (const s of here) {
-      if (s.kind === 'burrow' && !game._covered(c.x, c.foot + 3.2, c.x, c.foot + 1)) continue; // roof gone
+      if (s.kind === 'burrow' && !(game._covered(c.x, c.foot + 4.2, c.x, c.foot + 1) && game._covered(c.x + Math.sign(ex - c.x) * 3, c.foot + 4.2, c.x, c.foot + 1))) continue; // roof gone (or never reached this far)
       v += worth(s.kind);
     }
+    // ground rising in front (a hollow's far side, the spire, a ridge) takes the flat shots
+    if ([2.5, 3.5, 4.5].some((d) => ter.solid(c.x + Math.sign(ex - c.x) * d, c.foot + 1.9))) v += (2 + 3 * hurt) * prof.spots;
+    // every metre closer to the goal counts (and more than the walk costs)
+    if (goal) v += (far(x0, goal.x) - far(c.x, goal.x)) * 1.5;
     // a step toward somewhere good next turn (on this island, or across a pad from it)
     if (land.spots) {
       let next = 0;
@@ -392,7 +417,7 @@ export function* planMove(game, me, difficulty) {
   for (const c of short) {
     const { best } = searchShots(game, me, { at: { x: c.x, y: c.foot + CART_R }, coarse: true });
     c.atk = Math.max(-10, Math.min(60, best ? best.dmg : -10));
-    c.score = c.q + c.atk * 0.6;
+    c.score = c.q + c.atk * (goal ? 0.35 : 0.6); // on the way somewhere, today's angle matters less
     yield;
   }
   if (Math.random() > prof.chance && (stay.q > -20 || Math.random() > prof.notice)) return null; // not this turn
