@@ -9,6 +9,7 @@ import { AMMO, HP_MAX, STAMINA, TEAM, WEB_URL } from './config.js';
 import { Online } from './online.js';
 import { makeCode, cleanCode } from './net.js';
 import { Haptics, isNativeApp } from './haptics.js';
+import { SPOT_INFO } from './spots.js';
 
 const $ = (sel) => document.querySelector(sel);
 const $$ = (sel) => [...document.querySelectorAll(sel)];
@@ -313,6 +314,9 @@ function onGameEvent(evt, data) {
       break;
     case 'cliff':
       hint('낭떠러지! 더 가면 떨어져요', 1.6);
+      break;
+    case 'spot':
+      hint(data.text, 3.2);
       break;
     case 'hud':
       renderSlots();
@@ -702,6 +706,22 @@ function drawMapPreview(cv, id) {
     g.arc(bx * sx, toY(land.heights(bx)) - 5, 5, 0, Math.PI * 2);
     g.fill();
     g.stroke();
+  }
+  // hand-made maps: where the good spots are
+  for (const s of land.spots || []) {
+    const x = (s.range[0] + s.range[1]) / 2;
+    if (s.kind === 'pad') {
+      g.fillStyle = '#ff5a6e';
+      g.beginPath();
+      g.ellipse(x * sx, toY(land.heights(x)) - 1, 4, 3, 0, Math.PI, Math.PI * 2);
+      g.fill();
+      continue;
+    }
+    const y = s.kind === 'burrow' ? toY(12.4) : toY(land.heights(x)) - 9;
+    g.font = '11px "Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif';
+    g.textAlign = 'center';
+    g.textBaseline = 'middle';
+    g.fillText(SPOT_INFO[s.kind].icon, x * sx, y);
   }
 }
 

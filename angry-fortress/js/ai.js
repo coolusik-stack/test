@@ -1,9 +1,10 @@
 // CPU opponent: brute-force ballistic search over angle × power using the same
 // integrator as the physics engine, then scores each landing per bird type. Besides damage it
 // weighs how much ground a shot takes out from under the other captain: on floating islands,
-// digging someone out is a win.
-import { GRAV, VMAX, WIND_ACC, AMMO, POUND_SPEED, CART_R, HEAD, THIN_GROUND, CRUMBLE } from './config.js';
+// digging someone out is a win. Before it shoots it may drive somewhere better (planMove).
+import { GRAV, VMAX, WIND_ACC, AMMO, POUND_SPEED, CART_R, HEAD, THIN_GROUND, CRUMBLE, CLIFF_STOP, STAMINA_PER_M, CLIMB_COST, SUPPLY } from './config.js';
 import { WORLD } from './terrain.js';
+import { hasSpot, spotsAt, padAt, PAD_COST, POCKET } from './spots.js';
 
 const H = 1 / 60;
 // sa/sp: angle (deg) and power error; learn: error floor as the CPU zeroes in over its shots.
@@ -22,16 +23,43 @@ function gauss() {
 
 export function planShot(game, me, difficulty) {
   const prof = PROFILE[difficulty] || PROFILE.normal;
+  const windK = prof.wind[0] + Math.random() * (prof.wind[1] - prof.wind[0]);
+  const { best, closest, dir } = searchShots(game, me, { windK });
+  let plan = best && best.dmg > 2 ? best : closest || { angle: dir > 0 ? 0.8 : Math.PI - 0.8, power: 0.75, type: 'acorn', abilityAt: null };
+  // if we are just chipping at the fort, a bomb helps clear it
+  if ((!best || best.dmg <= 2) && me.ammo.burr > 0 && Math.random() < prof.special) {
+    plan = { ...plan, type: 'burr', abilityAt: null };
+  }
+  // less skilled CPUs don't always use specials
+  if (plan.type !== 'acorn' && Math.random() > prof.special) plan = { ...plan, type: 'acorn', abilityAt: null };
+
+  // human-like error that shrinks as the CPU "learns" the range; a lookout steadies the hand
+  let learn = Math.max(prof.learn, 1.35 - 0.15 * me.stats.shots);
+  if (hasSpot(game.land, me.body.getPosition().x, 'high', 'crown')) learn *= 0.6;
+  const angErr = ((gauss() * prof.sa * Math.PI) / 180) * learn;
+  const pwErr = gauss() * prof.sp * learn;
+  return {
+    type: plan.type,
+    angle: plan.angle + angErr * (dir > 0 ? 1 : -1),
+    power: Math.min(1, Math.max(0.2, plan.power + pwErr)),
+    abilityAt: plan.abilityAt,
+  };
+}
+
+// Brute-force ballistic search for the best shot. `at` pretends the cart stands somewhere else
+// (the move planner asks "what could I hit from over there?"); `coarse` skips the refine pass.
+function searchShots(game, me, { windK = 1, at = null, coarse = false } = {}) {
   const enemy = game.players[1 - me.id];
   const ep = enemy.body.getPosition();
-  const mp = me.body.getPosition();
+  const real = me.body.getPosition();
+  const mp = at || { x: real.x, y: real.y };
   const dir = Math.sign(ep.x - mp.x) || -1;
   const saved = me.facing;
   me.facing = dir;
-  const rest = game.restPos(me);
+  const r0 = game.restPos(me);
   me.facing = saved;
+  const rest = { x: r0.x - real.x + mp.x, y: r0.y - real.y + mp.y };
 
-  const windK = prof.wind[0] + Math.random() * (prof.wind[1] - prof.wind[0]);
   const wax = game.wind * WIND_ACC * windK;
   const terrain = game.terrain;
 
@@ -148,6 +176,7 @@ export function planShot(game, me, difficulty) {
     const d = Math.max(0, Math.min(Math.hypot(x - ep.x, y - ep.y) - CART_R * 0.6, Math.hypot(x - ep.x, y - ep.y - HEAD.y) - HEAD.r * 0.6));
     const self = Math.max(0, Math.hypot(x - mp.x, y - mp.y) - CART_R * 0.6);
     let v = d < spec.r ? spec.dmg * Math.pow(1 - d / spec.r, 0.8) : 0;
+    if (v > 0 && game._covered(x, y, ep.x, ep.y + 0.35)) v *= 0.35; // they sit under a roof of solid ground
     if (self < spec.r + 0.8) v -= 60;
     return v;
   };
@@ -234,42 +263,157 @@ export function planShot(game, me, difficulty) {
   };
 
   // coarse grid, then refine around the three most promising spots
-  const coarse = [];
-  for (let deg = 10; deg <= 82; deg += 3) {
-    for (let pw = 0.32; pw <= 1.0001; pw += 0.04) coarse.push({ deg, pw, score: evalShot(deg, pw) });
+  const coarseList = [];
+  const dDeg = coarse ? 5 : 3, dPw = coarse ? 0.07 : 0.04;
+  for (let deg = 10; deg <= 82; deg += dDeg) {
+    for (let pw = 0.32; pw <= 1.0001; pw += dPw) coarseList.push({ deg, pw, score: evalShot(deg, pw) });
   }
-  coarse.sort((a, b) => b.score - a.score);
-  const seeds = [];
-  for (const c of coarse) {
-    if (seeds.length >= 3) break;
-    if (seeds.every((q) => Math.abs(q.deg - c.deg) > 4 || Math.abs(q.pw - c.pw) > 0.06)) seeds.push(c);
-  }
-  for (const c of seeds) {
-    for (let deg = c.deg - 3; deg <= c.deg + 3.001; deg += 0.75) {
-      if (deg < 5 || deg > 86) continue;
-      for (let pw = c.pw - 0.04; pw <= c.pw + 0.0401; pw += 0.01) {
-        if (pw < 0.25 || pw > 1) continue;
-        evalShot(deg, pw);
+  if (!coarse) {
+    coarseList.sort((a, b) => b.score - a.score);
+    const seeds = [];
+    for (const c of coarseList) {
+      if (seeds.length >= 3) break;
+      if (seeds.every((q) => Math.abs(q.deg - c.deg) > 4 || Math.abs(q.pw - c.pw) > 0.06)) seeds.push(c);
+    }
+    for (const c of seeds) {
+      for (let deg = c.deg - 3; deg <= c.deg + 3.001; deg += 0.75) {
+        if (deg < 5 || deg > 86) continue;
+        for (let pw = c.pw - 0.04; pw <= c.pw + 0.0401; pw += 0.01) {
+          if (pw < 0.25 || pw > 1) continue;
+          evalShot(deg, pw);
+        }
       }
     }
   }
+  return { best, closest, dir };
+}
 
-  let plan = best && best.dmg > 2 ? best : closest || { angle: dir > 0 ? 0.8 : Math.PI - 0.8, power: 0.75, type: 'acorn', abilityAt: null };
-  // if we are just chipping at the fort, a bomb helps clear it
-  if ((!best || best.dmg <= 2) && me.ammo.burr > 0 && Math.random() < prof.special) {
-    plan = { ...plan, type: 'burr', abilityAt: null };
+// ------------------------------------------------------------------ positioning
+// Before it shoots, the CPU may drive somewhere better: off cracking ground and away from the
+// edge, up to a lookout, into the burrow, under the nut tree, or across a mushroom pad.
+// A generator so the work spreads over a few ticks: each yield is one place looked at.
+// Returns { x, dir } to drive to, or null to stay put.
+const MOVE = {
+  // chance: thinks about moving at all; notice: sees the ground cracking under it
+  easy: { chance: 0.4, notice: 0.35, noise: 9, spots: 0.5, look: 3 },
+  normal: { chance: 0.75, notice: 0.7, noise: 4, spots: 0.85, look: 5 },
+  hard: { chance: 1, notice: 1, noise: 1.2, spots: 1, look: 6 },
+};
+
+export function* planMove(game, me, difficulty) {
+  const prof = MOVE[difficulty] || MOVE.normal;
+  const ter = game.terrain, land = game.land;
+  const pos = me.body.getPosition();
+  const x0 = pos.x, foot0 = pos.y - CART_R;
+
+  // 1. where the cart can get to this turn, walking the ground the way the cart drives it
+  const cands = [{ x: x0, foot: foot0, dist: 0, dir: 0, pad: false }];
+  for (const dir of [-1, 1]) {
+    let x = x0, foot = foot0, stam = me.stamina, dist = 0, pad = false, since = 0;
+    for (let guard = 0; guard < 500 && stam > STAMINA_PER_M * 0.5; guard++) {
+      const p = padAt(land, x, dir);
+      if (p) {
+        // one bounce at most, and only when there is stamina left to pay for it
+        if (pad || stam < PAD_COST) break;
+        stam -= PAD_COST;
+        pad = true;
+        x = p.to.x;
+        foot = ter.surfaceY(x, p.to.y + 1.5);
+        if (foot < 0) break;
+        cands.push({ x, foot, dist, dir, pad });
+        since = 0;
+        continue;
+      }
+      const nx = x + dir * 0.25;
+      if (nx < 1 || nx > WORLD.W - 1) break;
+      if (ter.solid(nx, foot + 0.35)) break; // a wall (or a slope too steep to climb)
+      const gy = ter.surfaceY(nx, foot + 0.35);
+      if (gy < WORLD.SEA + 0.3 || foot - gy > CLIFF_STOP) break; // the cart would brake here
+      stam -= (0.25 + CLIMB_COST * Math.max(0, gy - foot)) * STAMINA_PER_M; // as the cart pays it
+      x = nx;
+      foot = gy;
+      dist += 0.25;
+      since += 0.25;
+      if (since >= 0.5) { cands.push({ x, foot, dist, dir, pad }); since = 0; }
+    }
   }
-  // less skilled CPUs don't always use specials
-  if (plan.type !== 'acorn' && Math.random() > prof.special) plan = { ...plan, type: 'acorn', abilityAt: null };
+  yield;
 
-  // human-like error that shrinks as the CPU "learns" the range
-  const learn = Math.max(prof.learn, 1.35 - 0.15 * me.stats.shots);
-  const angErr = ((gauss() * prof.sa * Math.PI) / 180) * learn;
-  const pwErr = gauss() * prof.sp * learn;
-  return {
-    type: plan.type,
-    angle: plan.angle + angErr * (dir > 0 ? 1 : -1),
-    power: Math.min(1, Math.max(0.2, plan.power + pwErr)),
-    abilityAt: plan.abilityAt,
+  // 2. a quick look at every place: will the ground hold, is it near an edge, what spot is it
+  const openPocket = SUPPLY.some((t) => (me.ammo[t] || 0) < POCKET);
+  const hurt = Math.max(0, (60 - me.hp) / 60); // low on health: hide more
+  // what standing on each kind of spot is worth for one turn, in rough points of damage
+  const worth = (kind) => prof.spots * ({
+    high: 6,
+    crown: 6 + (openPocket ? 7 : 0),
+    tree: openPocket ? 8 : 0,
+    burrow: 6 + 10 * hurt,
+  }[kind] || 0);
+  const island = (x) => (land.spans || []).findIndex((sp) => x > sp.a && x < sp.b);
+  const quick = (c) => {
+    let v = 0;
+    const th = Math.min(...[-0.45, 0, 0.45].map((dx) => ter.thicknessBelow(c.x + dx, c.foot + 0.1)));
+    if (th < CRUMBLE) v -= 45;
+    else if (th < THIN_GROUND) v -= (THIN_GROUND - th) * 14;
+    const edge = edgeDist(ter, c.x, c.foot);
+    if (edge < 1.8) v -= (1.8 - edge) * 7;
+    const here = spotsAt(land, c.x).filter((s) => s.kind !== 'pad');
+    for (const s of here) {
+      if (s.kind === 'burrow' && !game._covered(c.x, c.foot + 3.2, c.x, c.foot + 1)) continue; // roof gone
+      v += worth(s.kind);
+    }
+    // a step toward somewhere good next turn (on this island, or across a pad from it)
+    if (land.spots) {
+      let next = 0;
+      const isl = island(c.x);
+      for (const s of land.spots) {
+        if (here.includes(s)) continue;
+        const mid = (s.range[0] + s.range[1]) / 2;
+        if (s.kind === 'pad') {
+          if (island(mid) !== isl || Math.abs(mid - c.x) > 7) continue;
+          for (const t of spotsAt(land, s.to.x)) if (t.kind !== 'pad') next = Math.max(next, worth(t.kind) * 0.3);
+        } else if (island(mid) === isl && Math.abs(mid - c.x) < 7.5) next = Math.max(next, worth(s.kind) * 0.4);
+      }
+      v += next;
+    }
+    v -= c.dist * 0.35 + (c.pad ? 1.5 : 0);
+    return v;
   };
+  for (const c of cands) c.q = quick(c) + (c.dist ? (Math.random() - 0.5) * prof.noise : 0);
+
+  // 3. the most promising few get a proper look: what could the CPU hit from there?
+  const stay = cands[0];
+  const pool = cands.slice(1).sort((a, b) => b.q - a.q);
+  const short = [stay];
+  for (const c of pool) {
+    if (short.length >= prof.look) break;
+    if (short.every((s) => Math.abs(s.x - c.x) > 1.2)) short.push(c);
+  }
+  for (const c of short) {
+    const { best } = searchShots(game, me, { at: { x: c.x, y: c.foot + CART_R }, coarse: true });
+    c.atk = Math.max(-10, Math.min(60, best ? best.dmg : -10));
+    c.score = c.q + c.atk * 0.6;
+    yield;
+  }
+  if (Math.random() > prof.chance && (stay.q > -20 || Math.random() > prof.notice)) return null; // not this turn
+  let pick = stay;
+  for (const c of short) if (c.score > pick.score) pick = c;
+  if (pick === stay || pick.score < stay.score + 3) return null;
+  return { x: pick.x, dir: pick.dir, pad: pick.pad };
+}
+
+// How far along the ground to the nearest drop the cart would not survive (or a wall).
+function edgeDist(ter, x, foot) {
+  let near = 9;
+  for (const dir of [-1, 1]) {
+    let f = foot;
+    for (let d = 0.25; d <= 2; d += 0.25) {
+      const nx = x + dir * d;
+      if (ter.solid(nx, f + 0.35)) break;
+      const gy = ter.surfaceY(nx, f + 0.35);
+      if (gy < WORLD.SEA + 0.3 || f - gy > 1.2) { near = Math.min(near, d); break; }
+      f = gy;
+    }
+  }
+  return near;
 }

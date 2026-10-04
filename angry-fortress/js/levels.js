@@ -9,8 +9,8 @@ export const THEMES = {
   oak: {
     id: 'oak',
     name: '도토리 숲',
-    desc: '거대 참나무가 선 두 층 하늘섬',
-    layout: { mid: 'mesa', baseMin: 11, baseMax: 12.5, midMin: 19, midMax: 20, rough: 0.9, tunnel: true },
+    desc: '전망대·굴·명당·트램펄린, 대왕참나무 고지',
+    layout: { fixed: 'oak' },
     sky: ['#5fb6ea', '#a8dcf5', '#e9f8e8'],
     sun: { x: 0.78, y: 0.16, color: '#fff7cf', glow: 'rgba(255,246,200,0.6)' },
     rays: 'rgba(255,250,215,0.10)',

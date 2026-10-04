@@ -680,6 +680,7 @@ function simplifyLoop(l, eps) {
 // theme puts in the middle. Each island is an upside-down mountain: a flat top to stand on, a
 // rocky underside that is thickest in the middle and thins out toward the cliffs at its ends.
 export function buildLandscape(layout, seed) {
+  if (layout.fixed === 'oak') return buildOakFixed(seed);
   const { W } = WORLD;
   const r = rng(seed);
   const n1 = noise1D(seed + 11);
@@ -829,6 +830,105 @@ export function buildLandscape(layout, seed) {
     features.bounce = [{ x: mid - 3.4 }, { x: mid + 3.4 }];
   }
   return { heights, under, onIsland, spans, ops, bases, baseH, mid, midH, features };
+}
+
+// ---------- hand-made map: 도토리 숲 ----------
+// A fixed, mirrored layout where every spot means something (see spots.js). Home island, from
+// the outer cliff inward:
+//   fort hill with a dead-end burrow dug into its face (mouth toward the enemy: lobs land on the
+//   roof, flat shots go in and out) · start · lookout hump on the way forward (long aim guide,
+//   nothing to hide behind) · acorn tree (a special nut every turn, right at the front) ·
+//   mushroom pad to the middle island
+// Middle island: one flat crown under the great oak (lookout + tree, point blank with whoever
+// else made the trip) and a pad home at each end.
+// Only small things vary between matches (wind, fort design, decor); the shapes stay put so
+// players can learn the map.
+const OAK = {
+  // top surface of the left half [x, y], cosine-interpolated; mirrored for the right half
+  top: [
+    [2.0, 13.6], [3.2, 16.4], [8.6, 16.4], [9.9, 12.0], [13.6, 12.0], [17.6, 14.0], [19.6, 14.0], [23.6, 12.0], [26.6, 12.0], [27.3, 11.4],
+    [30.6, 14.4], [31.2, 15.4], [36, 15.4],
+  ],
+  // undersides per island (absolute y), cosine-interpolated
+  homeUnder: [[2.1, 13.0], [3.4, 10.6], [6.0, 9.0], [9.6, 8.6], [11.6, 8.4], [15.0, 8.4], [18.6, 8.8], [21.5, 8.8], [24.4, 9.4], [25.9, 10.1], [27.2, 11.3]],
+  midUnder: [[30.7, 14.2], [31.8, 12.6], [34.0, 10.4], [36.0, 8.4]],
+  home: [2.1, 27.2],
+  mid: [30.7, 36],
+};
+
+function cosInterp(pts, x) {
+  if (x <= pts[0][0]) return pts[0][1];
+  for (let k = 1; k < pts.length; k++) {
+    if (x <= pts[k][0]) {
+      const [x0, y0] = pts[k - 1], [x1, y1] = pts[k];
+      const t = (x - x0) / (x1 - x0);
+      return lerp(y0, y1, (1 - Math.cos(t * Math.PI)) / 2);
+    }
+  }
+  return pts[pts.length - 1][1];
+}
+
+function buildOakFixed(seed) {
+  const { W } = WORLD;
+  const M = W / 2;
+  const n1 = noise1D(seed + 11), nU = noise1D(seed + 37);
+  const mirror = (x) => (x <= M ? x : W - x);
+  // keep spots and paths dead flat; let the rest of the grass undulate a little
+  const flatZones = [[3.4, 8.4], [9.9, 13.6], [17.6, 19.6], [23.6, 26.6], [31.2, 36]];
+  const heights = (x) => {
+    const mx = mirror(x);
+    let h = cosInterp(OAK.top, mx);
+    if (!flatZones.some(([a, b]) => mx > a - 0.2 && mx < b + 0.2)) h += n1(x * 0.5) * 0.12;
+    return h;
+  };
+  const under = (x) => {
+    const mx = mirror(x);
+    let pts = null;
+    if (mx > OAK.home[0] && mx < OAK.home[1]) pts = OAK.homeUnder;
+    else if (mx > OAK.mid[0]) pts = OAK.midUnder;
+    if (!pts) return Infinity;
+    return cosInterp(pts, mx) + nU(x * 0.6) * 0.35;
+  };
+  const onIsland = (x) => under(x) < Infinity;
+  const spans = [
+    { a: OAK.home[0], b: OAK.home[1], D: 3.6, p: 0.5 },
+    { a: OAK.mid[0], b: W - OAK.mid[0], D: 7, p: 0.6 },
+    { a: W - OAK.home[1], b: W - OAK.home[0], D: 3.6, p: 0.5 },
+  ];
+  const ops = [];
+  for (const side of [1, -1]) {
+    const X = (x) => (side > 0 ? x : W - x);
+    // the burrow: dug into the face of the fort hill, a dead end big enough for a cart
+    for (let x = 6.4; x <= 10.6 + 0.01; x += 0.4) ops.push({ type: 'sub', x: X(x), y: 13.2, rx: 1.2, ry: 1.2 });
+    // crags hanging under the home island (never under the start or the burrow)
+    ops.push({ type: 'add', x: X(4.2), y: 9.0, rx: 0.8, ry: 1.6 });
+    ops.push({ type: 'add', x: X(4.5), y: 7.9, rx: 0.4, ry: 0.9 });
+    ops.push({ type: 'add', x: X(20.2), y: 8.3, rx: 0.7, ry: 1.1 });
+  }
+  // the great crag under the middle island
+  ops.push({ type: 'add', x: M, y: 7.0, rx: 1.5, ry: 2.4 });
+  ops.push({ type: 'add', x: M + 0.4, y: 5.2, rx: 0.65, ry: 1.3 });
+
+  // what each spot does lives in spots.js; here is just where they are
+  const spots = [];
+  const forts = [];
+  for (const side of [1, -1]) {
+    const X = (x) => (side > 0 ? x : W - x);
+    const span = (a, b) => (side > 0 ? [a, b] : [W - b, W - a]);
+    const team = side > 0 ? 0 : 1;
+    spots.push({ kind: 'burrow', team, range: span(6.2, 9.4), sign: X(11.0) });
+    spots.push({ kind: 'high', team, range: span(17.8, 19.4), sign: X(20.4) });
+    spots.push({ kind: 'tree', team, range: span(23.6, 25.2), sign: X(23.1) });
+    spots.push({ kind: 'pad', team, range: span(25.4, 26.5), dir: side, to: { x: X(34.4), y: 15.4 }, apex: 19.6 });
+    spots.push({ kind: 'pad', team: -1, range: span(31.3, 32.4), dir: -side, to: { x: X(12.0), y: 12.0 }, apex: 21.2 });
+    forts.push({ back: X(4.6), facing: side });
+  }
+  spots.push({ kind: 'crown', team: -1, range: [32.6, W - 32.6], sign: null, signs: [33.0, W - 33.0] });
+  return {
+    heights, under, onIsland, spans, ops, bases: [11.8, W - 11.8], baseH: [12, 12], mid: M, midH: 15.4,
+    features: { giant: { x: M }, homeTrees: [{ x: 24.4 }, { x: W - 24.4 }], fixed: true },
+    spots, forts, fixed: 'oak',
+  };
 }
 
 // Tileable dirt texture as a CanvasPattern mapped at 64px per meter.

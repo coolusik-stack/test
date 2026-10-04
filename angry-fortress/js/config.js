@@ -10,6 +10,7 @@ export const HEAD = { y: 0.75, r: 0.55 };
 export const HP_MAX = 100;
 export const STAMINA = 100;
 export const STAMINA_PER_M = 12;
+export const CLIMB_COST = 0.6; // extra gauge per metre climbed, as a fraction of a metre driven
 export const MOVE_SPEED = 2.4;
 
 export const MAT = {

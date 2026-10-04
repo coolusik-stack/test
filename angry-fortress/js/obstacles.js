@@ -39,6 +39,11 @@ export class Forest {
     const kinds = g.theme.trees || ['oak'];
     const f = land.features || {};
     this._placeFeatures(f);
+    if (f.fixed) {
+      // a hand-made map: everything that matters is already where it was designed to be
+      this.terrainVersion = g.terrain.version;
+      return;
+    }
     // Mirrored pairs keep the two halves fair; a centre piece is optional.
     const pairOrSingle = (place, count, minD = 1.5) => {
       const mid = W / 2;
@@ -76,6 +81,11 @@ export class Forest {
       g._makeBlock('log', 'box', b.x, y + 0.25, b.span, 0.46, 0);
       g._makeBlock('crate', 'box', b.x, y + 0.5 + 0.31, 0.76, 0.6, 0); // a basket right in the middle
       this.taken.push([b.x - b.span / 2 - 0.6, b.x + b.span / 2 + 0.6]);
+    }
+    // the acorn tree on each home island's 명당
+    for (const o of f.homeTrees || []) {
+      this._placeTree(o.x, 'oak', { force: true, h: 4.7, canopyR: 1.85, nuts: 5, hive: false, web: false });
+      this.taken.push([o.x - 1.5, o.x + 1.5]);
     }
     for (const o of f.boulders || []) {
       g._makeBlock('stone', 'circle', o.x, t.surfaceY(o.x) + 0.72, 0, 0, 0.7);
@@ -151,7 +161,8 @@ export class Forest {
     const g = this.g;
     const trunkH = tree.h - tree.canopyR * 0.35;
     tree.body = g.world.createBody({ type: 'static', position: V(tree.x, tree.ground) });
-    tree.body.createFixture(planck.Box(0.32, trunkH / 2 + 0.2, V(0, trunkH / 2 - 0.2), 0), { friction: 0.8 });
+    // standing trunks stop nuts and blocks, but carts drive past in front of them
+    tree.body.createFixture(planck.Box(0.32, trunkH / 2 + 0.2, V(0, trunkH / 2 - 0.2), 0), { friction: 0.8, filterCategoryBits: 0x0002 });
     tree.body.setUserData({ kind: 'tree', ref: tree });
     tree.canopy = g.world.createBody({ type: 'static', position: V(tree.x, tree.ground + tree.h) });
     tree.canopy.createFixture(planck.Circle(tree.canopyR * 0.85), { isSensor: true });

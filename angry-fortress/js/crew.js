@@ -30,6 +30,7 @@ const LINES = {
   whiff: ['어디 쏜 거야?!', '구름 맛있겠다…', '바람 탓이야!', '안 보였어!'],
   hurry: ['빨리 쏴~!', '깡 언제 해?', '졸려…', '쏴! 쏴!'],
   gust: ['바람 장난 아니야!', '모자 날아가!', '으으 추워!'],
+  pad: ['슝~!', '날아라 깡!', '꽉 잡아!', '우와아아!'],
 };
 
 export class Crew {
@@ -111,6 +112,11 @@ export class Crew {
         this._pose(run, 'peek', 1.6);
         this._pose(hat, 'cry', 1.2, { pose: 'flex', hold: 0.9 });
         say(Math.random() < 0.5 ? hat : run, 'whiff', 0.8);
+        break;
+      case 'pad':
+        this._pose(hat, 'cheer', 1.6);
+        this._pose(run, 'cling', 1.6);
+        say(hat);
         break;
       case 'gust':
         this._pose(hat, 'scared', 1.4);

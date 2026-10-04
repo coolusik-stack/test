@@ -6,16 +6,17 @@ import { FX } from './fx.js';
 import { Camera } from './camera.js';
 import * as Art from './art.js';
 import Sound from './audio.js';
-import { planShot } from './ai.js';
+import { planShot, planMove } from './ai.js';
 import { Forest } from './obstacles.js';
 import { Haptics } from './haptics.js';
 import { ForestEvents } from './events.js';
 import { Crew } from './crew.js';
+import { PAD_COST, POCKET, SPOT_INFO, spotsAt, hasSpot, padAt, padLaunch, drawSpots } from './spots.js';
 import { clamp, rng, lerp, dist } from './util.js';
 import {
   GRAV, VMAX, WIND_ACC, MAX_PULL, CART_R, HEAD, HP_MAX, STAMINA, STAMINA_PER_M, MOVE_SPEED,
   MAT, AMMO, KERNEL, POUND_SPEED, HIVE_BLAST, SUPPLY, WIND_LEVELS, TEAM, HIT_K, HIT_CAP, FLOOD_TURN, FLOOD_STEP,
-  CLIFF_STOP, THIN_GROUND, CRUMBLE,
+  CLIFF_STOP, THIN_GROUND, CRUMBLE, CLIMB_COST,
 } from './config.js';
 
 const planck = window.planck;
@@ -163,7 +164,8 @@ export class Game {
     const twist = r.pick(['leaf', 'wood', 'leaf', 'mushroom']);
     const fort = { ...base, blocks: base.blocks.map((b) => (b.swap && r() < 0.5 ? { ...b, m: twist } : b)) };
     for (const p of this.players) {
-      const back = p.body.getPosition().x + p.facing * 3.0;
+      const fixed = land.forts && land.forts[p.id];
+      const back = fixed ? fixed.back : p.body.getPosition().x + p.facing * 3.0;
       this._placeStructure(fort, back, p.facing);
     }
     // trees, webs, dandelions, props and nut baskets across the middle
@@ -238,7 +240,7 @@ export class Game {
         const p = s.ref;
         const vy = -p.body.getLinearVelocity().y;
         if (vy > 6) this._sfx('land', { vol: clamp(vy / 14, 0.3, 1) });
-        if (vy > 7.5 && !p.dead && this.simT - (p.projHitT ?? -9) > 0.3) {
+        if (vy > 7.5 && !p.dead && !p.padFlight && this.simT - (p.projHitT ?? -9) > 0.3) { // a pad bounce lands soft
           const dmg = (vy - 7.5) * 2.5;
           const attacker = this.state === 'flight' || this.state === 'settle' ? this.players[this.turn] : null;
           this.pendingFalls.push({ p, dmg, attacker: attacker === p ? null : attacker });
@@ -530,7 +532,9 @@ export class Game {
       const pos = p.body.getPosition();
       const d = Math.max(0, Math.min(dist(x, y, pos.x, pos.y) - CART_R * 0.6, dist(x, y, pos.x, pos.y + HEAD.y) - HEAD.r * 0.6));
       if (d < r) {
-        const k = 1 - d / r;
+        // behind a wall of earth (a burrow roof, a ridge) a blast loses most of its bite
+        const cover = this._covered(x, y, pos.x, pos.y + 0.35) ? 0.35 : 1;
+        const k = (1 - d / r) * cover;
         this._hurt(p, dmg * Math.pow(k, 0.8), owner);
         const dx = pos.x - x, dy = pos.y - y + 0.6;
         const l = Math.hypot(dx, dy) || 1;
@@ -648,7 +652,7 @@ export class Game {
   launch(power, angle) {
     // angle: radians in world space (0 = right, ccw)
     const p = this.players[this.turn];
-    if (p.dead || this.state !== 'aim' || p.remote) return;
+    if (p.dead || this.state !== 'aim' || p.remote || p.padFlight) return;
     const type = p.sel;
     if (p.ammo[type] <= 0) return;
     // the shot starts from a canonical rebuild so the friend's phone can replay it exactly
@@ -765,9 +769,12 @@ export class Game {
     this.wind = this.windMax ? Math.round((r() * 2 - 1) * this.windMax) : 0;
     this.event = this.events.kindFor(this.turnNo);
     const eventFirst = this.events.onTurnStart(this.turnNo); // gust, wet carts, the drop; true = the boar runs now
+    this._spotReward(p);
     if (Math.abs(this.wind - prev) >= 3) this._sfx('wind', { vol: 0.6 });
     p.stamina = STAMINA;
     p.moveDir = 0;
+    this.aiMoved = false;
+    this.aiMoveGen = this.aiMove = null;
     this.turnTimer = this.opts.timer || 0;
     let flood = null;
     if (this.turnNo > FLOOD_TURN) {
@@ -800,6 +807,24 @@ export class Game {
     if (p.isAI) {
       this.aiPlan = null;
     }
+  }
+
+  // Standing on a 명당 (the acorn tree, the great oak's crown) when your turn starts: a special nut.
+  // Seeded by the turn, so both phones hand out the same nut.
+  _spotReward(p) {
+    if (p.dead || !this.land.spots) return;
+    const pos = p.body.getPosition();
+    if (!hasSpot(this.land, pos.x, 'tree', 'crown') || Math.abs(p.body.getLinearVelocity().y) > 1) return;
+    const r = rng(((this.seed ^ 0x7ee5) + Math.imul(this.turnNo, 977)) >>> 0);
+    const open = SUPPLY.filter((t) => (p.ammo[t] || 0) < POCKET);
+    if (!open.length) return;
+    const type = open[Math.floor(r() * open.length)];
+    p.ammo[type] = (p.ammo[type] || 0) + 1;
+    this.fx.burst(pos.x, pos.y + 2.2, 'nutbit', 6, { speed: 3 });
+    this.fx.text(pos.x, pos.y + 2.9, `명당! +1 ${Art.AMMO_INFO[type].name}`, '#ffe45c', 0.85, { life: 1.8 });
+    this._sfx('pickup', { vol: 0.8 });
+    this.crew?.react(p, 'drop');
+    this.emit('hud');
   }
 
   endTurn() {
@@ -1036,8 +1061,8 @@ export class Game {
   _captainBody(p, x, y, awake = true) {
     // heavy cart: direct hits hurt but shouldn't shove the captain off the island
     const body = this.world.createBody({ type: 'dynamic', position: V(x, y), fixedRotation: true, linearDamping: this.event === 'rain' ? 0.08 : 0.35, awake });
-    body.createFixture(planck.Circle(CART_R), { density: 5.0, friction: 1.2, restitution: 0.02 });
-    body.createFixture(planck.Circle(V(0, HEAD.y), HEAD.r), { density: 0.6, friction: 0.6, restitution: 0.05 });
+    body.createFixture(planck.Circle(CART_R), { density: 5.0, friction: 1.2, restitution: 0.02, filterMaskBits: 0xfffd });
+    body.createFixture(planck.Circle(V(0, HEAD.y), HEAD.r), { density: 0.6, friction: 0.6, restitution: 0.05, filterMaskBits: 0xfffd });
     body.setUserData({ kind: 'captain', ref: p });
     p.body = body;
     return body;
@@ -1138,7 +1163,7 @@ export class Game {
 
   canControl() {
     const p = this.players[this.turn];
-    return this.state === 'aim' && !p.isAI && !p.remote && !p.dead && !this.paused;
+    return this.state === 'aim' && !p.isAI && !p.remote && !p.dead && !this.paused && !p.padFlight;
   }
 
   pointerDown(id, sx, sy) {
@@ -1395,10 +1420,29 @@ export class Game {
   // Driving the cart (only the phone whose turn it is ever does this).
   _tickControls(dt) {
     for (const p of this.players) {
-      const moving = p === this.players[this.turn] && this.state === 'aim' && p.moveDir && p.stamina > 0 && !p.dead && !p.remote;
       const v = p.body.getLinearVelocity();
+      if (p.padFlight) {
+        // bouncing across: land once the cart has come down and stopped falling
+        p.padFlight.t += dt;
+        if (p.padFlight.t > 0.3 && Math.abs(v.y) < 1 && this._touching(p)) {
+          p.padFlight = null;
+          p.body.setLinearDamping(this.event === 'rain' ? 0.08 : 0.35);
+          p.body.setLinearVelocity(V(v.x * 0.2, v.y));
+          const pos = p.body.getPosition();
+          this.fx.burst(pos.x, pos.y - CART_R, 'dust', 8, { speed: 2.5 });
+          this._sfx('land', { vol: 0.7 });
+          this._hap('dent');
+        }
+        continue;
+      }
+      const moving = p === this.players[this.turn] && (this.state === 'aim' || this.state === 'ai-move') && p.moveDir && p.stamina > 0 && !p.dead && !p.remote;
       if (moving) {
         const grounded = Math.abs(v.y) < 2.5;
+        const pad = grounded && p.stamina >= PAD_COST ? padAt(this.land, p.body.getPosition().x, p.moveDir) : null;
+        if (pad) {
+          this._padJump(p, pad);
+          continue;
+        }
         if (grounded && this._cliffAhead(p)) {
           // the cart digs its heels in at the edge instead of driving off into the clouds
           p.body.setLinearVelocity(V(0, v.y));
@@ -1413,9 +1457,11 @@ export class Game {
           continue;
         }
         if (grounded) {
-          p.body.setLinearVelocity(V(p.moveDir * MOVE_SPEED, v.y));
-          p.stamina = Math.max(0, p.stamina - Math.abs(v.x) * dt * STAMINA_PER_M);
-          p.wheel += v.x * dt / 0.28;
+          const vx = v.x, vy = v.y; // what the cart actually did last step (v is live)
+          p.body.setLinearVelocity(V(p.moveDir * MOVE_SPEED, vy));
+          // the gauge pays for ground covered, plus a bit for every metre climbed
+          p.stamina = Math.max(0, p.stamina - (Math.abs(vx) + CLIMB_COST * Math.max(0, vy)) * dt * STAMINA_PER_M);
+          p.wheel += vx * dt / 0.28;
           p.moveSoundT -= dt;
           if (p.moveSoundT <= 0) { p.moveSoundT = 0.26; this._sfx('move', { vol: 0.5 }); }
           if (Math.random() < 0.3) {
@@ -1429,6 +1475,43 @@ export class Game {
         p.moving = false;
       }
     }
+  }
+
+  _touching(p) {
+    for (let ce = p.body.getContactList(); ce; ce = ce.next) if (ce.contact.isTouching()) return true;
+    return false;
+  }
+
+  // Is there solid ground between a blast and a captain? (Ignores the ends, where the blast sits
+  // in its own crater and the cart sits on its own ground.)
+  _covered(ax, ay, bx, by) {
+    const d = Math.hypot(bx - ax, by - ay);
+    const n = Math.floor((d - 0.95) / 0.2);
+    for (let i = 0; i < n; i++) {
+      const k = (0.45 + i * 0.2) / d;
+      if (this.terrain.solid(ax + (bx - ax) * k, ay + (by - ay) * k)) return true;
+    }
+    return false;
+  }
+
+  // Boing: a mushroom pad throws the cart across to the next island.
+  _padJump(p, pad) {
+    const pos = p.body.getPosition();
+    const v = padLaunch(pad, pos.x, pos.y);
+    p.stamina -= PAD_COST;
+    p.body.setLinearDamping(0);
+    p.body.setLinearVelocity(V(v.vx, v.vy));
+    p.padFlight = { t: 0 };
+    p.moveDir = 0;
+    p.moving = false;
+    p.facing = pad.dir;
+    pad.squash = 1;
+    this.fx.burst(pos.x, pos.y - CART_R, 'dust', 6, { speed: 3 });
+    this._sfx('boing', { vol: 1, pitch: 0.75 });
+    this._sfx('whoosh', { vol: 0.5 });
+    this._hap('launch', 0.6);
+    this.crew?.react(p, 'pad');
+    this.emit('pad');
   }
 
   // Is the ground about to end in front of a moving cart (a drop into the clouds, or one deep
@@ -1495,7 +1578,7 @@ export class Game {
       this._netFinish();
       return;
     }
-    if (!p.remote && (this.players[0].dead || this.players[1].dead) && (this.state === 'intro' || this.state === 'aim' || this.state === 'ai-think' || this.state === 'ai-aim' || this.state === 'event')) {
+    if (!p.remote && (this.players[0].dead || this.players[1].dead) && (this.state === 'intro' || this.state === 'aim' || this.state === 'ai-think' || this.state === 'ai-move' || this.state === 'ai-aim' || this.state === 'event')) {
       // e.g. drove off a cliff, or sank while the turn banner was up: the turn is over
       this.aim = null;
       p.moveDir = 0;
@@ -1518,7 +1601,7 @@ export class Game {
         break;
       }
       case 'aim': {
-        if (this.turnTimer > 0) {
+        if (this.turnTimer > 0 && !p.padFlight) {
           this.turnTimer -= realDt;
           const sec = Math.ceil(this.turnTimer);
           if (sec <= 5 && sec !== this.lastTickSec && sec > 0) {
@@ -1531,6 +1614,21 @@ export class Game {
         break;
       }
       case 'ai-think': {
+        if (!this.aiMoved) {
+          // first a look around: is there a better place to shoot from? (a few ticks of thinking)
+          this.aiMoveGen ||= planMove(this, p, this.opts.difficulty || 'normal');
+          const r = this.aiMoveGen.next();
+          if (!r.done) break;
+          this.aiMoveGen = null;
+          this.aiMoved = true;
+          if (r.value && !p.dead) {
+            const x = p.body.getPosition().x;
+            this.aiMove = { ...r.value, lastX: x, still: 0, flew: false };
+            p.moveDir = p.facing = r.value.dir;
+            this.setState('ai-move');
+            break;
+          }
+        }
         if (!this.aiPlan && this.stateT > 0.5) {
           this.aiPlan = planShot(this, p, this.opts.difficulty || 'normal');
           p.sel = this.aiPlan.type;
@@ -1541,6 +1639,25 @@ export class Game {
           this.setState('ai-aim');
           this.aimAI = { t: 0 };
         }
+        break;
+      }
+      case 'ai-move': {
+        // drive to the chosen place; stop there, when out of stamina, at a cliff or when stuck
+        const m = this.aiMove;
+        if (p.padFlight) { m.flew = true; p.moveDir = 0; break; }
+        const pos = p.body.getPosition();
+        let done = (m.x - pos.x) * m.dir <= 0.12 || p.stamina <= 0 || this.stateT > 9;
+        if (m.flew) { m.flew = false; m.still = 0; } // just landed off a pad: keep going
+        else if (!p.moveDir) done = true; // braked at a cliff
+        if (Math.abs(pos.x - m.lastX) < 0.01) m.still += dt; else m.still = 0;
+        m.lastX = pos.x;
+        if (m.still > 0.7) done = true;
+        if (done) {
+          p.moveDir = 0;
+          this.aiMove = null;
+          this._aiArrived(p);
+          this.setState('ai-think');
+        } else p.moveDir = m.dir;
         break;
       }
       case 'ai-aim': {
@@ -1652,6 +1769,7 @@ export class Game {
     }
     this._tension(realDt);
     this._watchFooting(realDt);
+    this._watchSpot();
   }
 
   // The make-or-break moments: a nut closing in on the other captain slows time (and zooms in when
@@ -1706,6 +1824,32 @@ export class Game {
     if (this.fallcam && (this.fallcam.t -= realDt) <= 0) this.fallcam = null;
   }
 
+  // The CPU drove somewhere: say so in the world when that somewhere is a spot.
+  _aiArrived(p) {
+    if (this.silent || p.dead) return;
+    const pos = p.body.getPosition();
+    const s = spotsAt(this.land, pos.x).find((q) => q.kind !== 'pad');
+    if (!s) return;
+    const info = SPOT_INFO[s.kind];
+    this.fx.text(pos.x, pos.y + 2.9, `${info.icon} ${info.name} 차지!`, info.color, 0.7, { life: 1.8 });
+    this._sfx('select', { vol: 0.5 });
+  }
+
+  // Tell whoever is about to shoot what the spot under them does, when they step onto one.
+  _watchSpot() {
+    const p = this.players[this.turn];
+    if (!this.land.spots || this.silent || p.dead || p.isAI || p.remote || this.state !== 'aim' || p.padFlight) return;
+    const s = spotsAt(this.land, p.body.getPosition().x).find((q) => q.kind !== 'pad');
+    const key = s ? s.kind : '';
+    if (key === p.spotKey) return;
+    p.spotKey = key;
+    if (s) {
+      const info = SPOT_INFO[s.kind];
+      this.emit('spot', { text: `${info.icon} ${info.name}: ${info.desc}` });
+      this._sfx('select', { vol: 0.5 });
+    }
+  }
+
   // Who is about to drop, who stands on cracking ground, who teeters at a cliff. Looks only.
   _watchFooting(realDt) {
     const live = this.damageOn && !this.silent && this.state !== 'intro';
@@ -1716,7 +1860,7 @@ export class Game {
         if (v.y > -1) { p.falling = false; if (this.fallcam && this.fallcam.p === p) this.fallcam = null; }
         continue;
       }
-      if (live && v.y < -3.5) {
+      if (live && v.y < -3.5 && !p.padFlight) {
         const by = pos.y - CART_R - 0.05;
         if ([-0.5, 0, 0.5].every((dx) => this.terrain.surfaceY(pos.x + dx, by) < WORLD.SEA + 0.3)) {
           this._startFall(p);
@@ -1791,6 +1935,18 @@ export class Game {
       return;
     }
     if (this.cam.manual > 0 && this.state !== 'flight') return;
+    const cur = this.players[this.turn];
+    if (cur.padFlight && !cur.dead) {
+      // a bounce across the gap: keep the cart and the far island in frame
+      const pos = cur.body.getPosition(), v = cur.body.getLinearVelocity();
+      this.cam.focus(pos.x + v.x * 0.5, Math.max(pos.y, 13) + 0.5, this.cam.baseZoom * 0.8, 4);
+      return;
+    }
+    if (this.state === 'ai-move' && this.aiMove && !cur.dead) {
+      const pos = cur.body.getPosition();
+      this.cam.focus(pos.x + this.aiMove.dir * 3, pos.y + 1.2, this.cam.baseZoom, 3);
+      return;
+    }
     if (this.state === 'flight' && this.lead && !this.lead.dead) {
       if (this.cam.manual > 0) this.cam.manual = 0;
       const pos = this.lead.body.getPosition();
@@ -1858,7 +2014,8 @@ export class Game {
 
     this.events.drawWorld(ctx, this.time, this._frameDt || 0.016);
 
-    // captains and their 깡단
+    // spots (strips, signs, pads), then captains and their 깡단
+    drawSpots(ctx, this, view);
     this.crew.drawBack(ctx);
     for (const p of this.players) this._drawCaptain(ctx, p);
     this.crew.drawFront(ctx);
@@ -1929,7 +2086,7 @@ export class Game {
       const pull = this.aim.power * MAX_PULL;
       pouch = { x: a.rest.x - Math.cos(this.aim.angle) * pull, y: a.rest.y + Math.sin(this.aim.angle) * pull };
     }
-    const showAmmo = isCur && !p.dead && (this.state === 'aim' || this.state === 'ai-think' || this.state === 'ai-aim' || this.state === 'intro' || this.state === 'remote');
+    const showAmmo = isCur && !p.dead && (this.state === 'aim' || this.state === 'ai-think' || this.state === 'ai-move' || this.state === 'ai-aim' || this.state === 'intro' || this.state === 'remote');
     Art.drawCommander(ctx, x, y, {
       team: p.team, facing: p.facing, time: this.time + p.id * 1.7, blink: p.blink > 0 ? 1 : 0,
       hurt: p.hurtT, hp: p.hp / HP_MAX, moving: p.moving, wheelAngle: p.wheel, dead: p.dead,
@@ -2001,7 +2158,7 @@ export class Game {
       ctx.fill();
     }
     // turn arrow
-    if (p === this.players[this.turn] && (this.state === 'aim' || this.state === 'ai-think' || this.state === 'ai-aim' || this.state === 'remote')) {
+    if (p === this.players[this.turn] && (this.state === 'aim' || this.state === 'ai-think' || this.state === 'ai-move' || this.state === 'ai-aim' || this.state === 'remote')) {
       const bob = Math.sin(this.time * 5) * 0.12;
       ctx.fillStyle = TEAM[p.team].color;
       ctx.strokeStyle = '#fff';
@@ -2055,8 +2212,9 @@ export class Game {
     let x = rest.x, y = rest.y;
     const showGuide = this.opts.guide !== false && !a.ai;
     if (showGuide && a.power > 0.1) {
-      // Only the first part of the arc (no wind): skill still matters.
-      const steps = 34;
+      // Only the first part of the arc (no wind): skill still matters. A lookout shows twice as much.
+      const far = hasSpot(this.land, p.body.getPosition().x, 'high', 'crown');
+      const steps = far ? 68 : 34;
       const h = 1 / 60;
       let n = 0;
       // stop the guide where it would clip terrain or a nearby block (e.g. your own wall)
@@ -2086,7 +2244,7 @@ export class Game {
         }
         return false;
       };
-      for (let i = 0; i < 60 * 1.05 && n < steps; i++) {
+      for (let i = 0; i < 60 * (far ? 2.1 : 1.05) && n < steps; i++) {
         vy -= GRAV * h;
         x += vx * h;
         y += vy * h;
