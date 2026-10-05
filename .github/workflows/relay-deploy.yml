@@ -1,0 +1,86 @@
+# 도토리깡: the friend-match relay (angry-fortress/relay, Cloudflare Workers + Durable Objects,
+# free plan). Phones on mobile data meet through it when a direct link can't be made.
+# Every change to the relay is first tested in Cloudflare's own runtime (`wrangler dev`), then
+# deployed when the repository has CLOUDFLARE_API_TOKEN (with "Workers Scripts: Edit") and
+# CLOUDFLARE_ACCOUNT_ID secrets. Without them the test still runs and the deploy says so and stops.
+# Release tags (v*) deploy it too, from web-deploy.yml, right before the web build. The web and
+# iOS builds find the relay's address on their own (scripts/site-env.mjs).
+name: Relay
+
+on:
+  push:
+    paths: ['angry-fortress/relay/**', '.github/workflows/relay-deploy.yml']
+    tags: ['relay-v*']
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: angry-fortress
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install
+        run: |
+          npm ci --ignore-scripts
+          cd relay && npm ci --no-audit --no-fund
+
+      - name: Protocol test on the local Node relay
+        run: node relay/test.mjs
+
+      - name: Protocol test in Cloudflare's runtime (wrangler dev)
+        run: |
+          cd relay
+          npx wrangler dev --port 8787 --ip 127.0.0.1 > "$RUNNER_TEMP/wrangler.log" 2>&1 &
+          for i in $(seq 1 60); do curl -sf http://127.0.0.1:8787/health && break; sleep 1; done
+          node test.mjs ws://127.0.0.1:8787 || { cat "$RUNNER_TEMP/wrangler.log"; exit 1; }
+
+  deploy:
+    needs: test
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: angry-fortress/relay
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Secrets present?
+        id: ready
+        run: |
+          if [ -z "$CLOUDFLARE_API_TOKEN" ] || [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then
+            echo "::notice::No Cloudflare secrets yet, so the relay was not deployed (see angry-fortress/LAUNCH.md)."
+            echo "ok=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ok=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Deploy
+        if: steps.ready.outputs.ok == 'true'
+        run: |
+          npm ci --no-audit --no-fund
+          npx wrangler deploy
+
+      - name: Check it answers
+        if: steps.ready.outputs.ok == 'true'
+        working-directory: angry-fortress
+        run: |
+          sleep 5
+          node scripts/site-env.mjs > "$RUNNER_TEMP/site.env"
+          . "$RUNNER_TEMP/site.env"
+          if [ -z "$RELAY_URL" ]; then echo "::error::The relay was deployed but does not answer."; exit 1; fi
+          node relay/test.mjs "$RELAY_URL"
+          echo "### 친구 대결 중계 서버: $RELAY_URL ✅" >> "$GITHUB_STEP_SUMMARY"

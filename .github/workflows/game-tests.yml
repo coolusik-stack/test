@@ -33,7 +33,7 @@ jobs:
           npx playwright install --with-deps chromium
 
       - name: Syntax
-        run: for f in js/*.js scripts/*.mjs tests/*.mjs tests/suites/*.mjs; do node --check "$f"; done
+        run: for f in js/*.js scripts/*.mjs tests/*.mjs tests/suites/*.mjs relay/*.mjs relay/src/*.js; do node --check "$f"; done
 
       - name: Pre-launch check
         run: npm run preflight

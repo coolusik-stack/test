@@ -1,8 +1,9 @@
 # 도토리깡: puts the web version online on Cloudflare Pages (free), after the tests pass.
 # Runs for every release tag (`v1.2.3`, made by `npm run release`) and for `web-v*` tags.
 # Not GitHub Pages on purpose: this repository's Pages already serves a different site.
-# Needs two repository secrets (see angry-fortress/LAUNCH.md): CLOUDFLARE_API_TOKEN (permission
-# "Cloudflare Pages: Edit") and CLOUDFLARE_ACCOUNT_ID. Without them the job just says so and stops.
+# Needs two repository secrets (see angry-fortress/LAUNCH.md): CLOUDFLARE_API_TOKEN (permissions
+# "Cloudflare Pages: Edit", "Workers Scripts: Edit") and CLOUDFLARE_ACCOUNT_ID. Without them the
+# job just says so and stops. The build points friend matches at the relay (relay-deploy.yml).
 name: Web deploy
 
 on:
@@ -41,9 +42,24 @@ jobs:
             echo "ok=true" >> "$GITHUB_OUTPUT"
           fi
 
+      - name: Relay first (so this build can point at it)
+        if: steps.ready.outputs.ok == 'true'
+        run: |
+          cd relay
+          npm ci --no-audit --no-fund
+          npx wrangler deploy
+          sleep 5
+
       - name: Build
         if: steps.ready.outputs.ok == 'true'
-        run: node scripts/build-www.mjs
+        env:
+          WEB_URL: ${{ vars.WEB_URL }}
+          RELAY_URL: ${{ vars.RELAY_URL }}
+        run: |
+          # the web version's address (invite links) and the friend-match relay
+          node scripts/site-env.mjs > "$RUNNER_TEMP/site.env"
+          set -a; . "$RUNNER_TEMP/site.env"; set +a
+          node scripts/build-www.mjs
 
       - name: Deploy
         if: steps.ready.outputs.ok == 'true'

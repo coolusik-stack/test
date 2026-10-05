@@ -1,0 +1,51 @@
+// Friend match through our relay server (relay/, here the local Node copy of it): the protocol
+// checks, then two phones playing, and mid-match the relay cuts every connection without a word
+// (like both phones losing signal). Both must find each other again and finish in step.
+import { startRelay } from '../../relay/local.mjs';
+import { relayProtocolTest } from '../../relay/test.mjs';
+import { pairUp, playTurns, drift } from './friend.mjs';
+
+export default {
+  name: 'relay',
+  what: '중계 서버로 친구 대결, 도중에 연결이 끊겨도 다시 이어짐',
+  async run(t) {
+    const relay = await startRelay(0);
+    try {
+      for (const f of await relayProtocolTest(relay.url)) t.check(false, 'protocol: ' + f);
+
+      const context = await t.browser.newContext({ viewport: { width: 844, height: 390 }, isMobile: true, hasTouch: true });
+      await context.addInitScript(() => { window.__afNetDebug = true; });
+      const query = `?relay=${encodeURIComponent(relay.url)}`;
+      const A = await t.page({ context, query });
+      const B = await t.page({ context, query });
+      const code = await pairUp(A, B);
+      t.check(await A.evaluate(() => window.__af.online.link.kind) === 'relay', 'host did not use the relay');
+      t.check(await B.evaluate(() => window.__af.online.link.kind) === 'relay', 'guest did not use the relay');
+
+      let cut = 0, overlay = false, back = 0;
+      const want = t.quick ? 4 : 6;
+      const { turns, mismatches } = await playTurns(A, B, want, async (n) => {
+        if (n !== 2) return;
+        relay.drop();
+        cut = Date.now();
+        // the "connection lost" cover shows, then both phones find each other again
+        overlay = await A.waitForFunction(() => !document.querySelector('#netlost').hidden, null, { timeout: 8000 }).then(() => true, () => false);
+        await A.waitForFunction(() => window.__af.online.status === 'paired' && document.querySelector('#netlost').hidden, null, { timeout: 20000 });
+        await B.waitForFunction(() => window.__af.online.status === 'paired', null, { timeout: 20000 });
+        back = Date.now() - cut;
+      });
+      t.check(cut > 0, 'the match never got far enough to cut the connection');
+      t.check(overlay, 'no "connection lost" cover when the link broke');
+      t.check(turns >= Math.min(want, 4), `only ${turns} turns were played`);
+      t.check(!mismatches, `${mismatches} of ${turns} turns ended with different state on the two phones`);
+      for (const [tag, P] of [['host', A], ['guest', B]]) {
+        const n = await drift(P);
+        t.check(!n, `${tag}: ${n} replays drifted from the shooter's result`);
+      }
+      t.note(`${turns} turns over the relay, room ${code}, back together ${(back / 1000).toFixed(1)}s after the cut`);
+      await t.shot(A, 'host');
+    } finally {
+      await relay.close();
+    }
+  },
+};

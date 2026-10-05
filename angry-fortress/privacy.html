@@ -28,8 +28,9 @@
 
   <h2>친구와 대결할 때</h2>
   <ul>
-    <li>두 기기를 연결하려고 4자리 방 코드와 임시 연결 정보(IP 주소 등 네트워크 주소)를 연결 중계 서버(PeerJS 공개 서버)와 연결 보조 서버(Google STUN)에 보냅니다. 이 정보는 연결을 맺는 데만 쓰입니다.</li>
-    <li>대결 중 게임 상태(대장 위치, 발사 값, 이모티콘 등)는 두 기기 사이에서 직접 오가며, 개발자는 이를 받거나 저장하지 않습니다.</li>
+    <li>두 기기는 4자리 방 코드로 만납니다. 대결 중 게임 상태(대장 위치, 발사 값, 이모티콘 등)는 도토리깡 연결 서버(Cloudflare에서 운영)를 거쳐 상대 기기로 바로 전달되며, 서버는 이를 저장하지 않고 대결이 끝나면 아무것도 남지 않습니다.</li>
+    <li>연결 서버를 쓸 수 없을 때는 두 기기가 직접 연결합니다. 이때 방 코드와 임시 연결 정보(IP 주소 등 네트워크 주소)가 연결 중개 서버(PeerJS 공개 서버)와 연결 보조 서버(Google STUN)에 전달되며, 연결을 맺는 데만 쓰입니다.</li>
+    <li>인터넷 연결의 특성상 연결 서버와 Cloudflare는 접속하는 기기의 IP 주소를 볼 수 있지만, 개발자는 이를 기록하거나 다른 목적으로 쓰지 않습니다.</li>
   </ul>
 
   <h2>아동의 개인정보</h2>
@@ -44,7 +45,7 @@
   <p class="muted">Effective: September 27, 2026</p>
   <p>Dotori Kkang does not collect or store personal information such as names, email addresses, phone numbers, location, contacts or device identifiers. There are no accounts, ads or analytics.</p>
   <p>Settings, win/loss records and tutorial progress are stored only on your device and are deleted with the app.</p>
-  <p>When you play a friend match, a 4-letter room code and temporary connection information (such as your IP address) are sent to a connection broker (the public PeerJS server) and a connectivity helper (Google STUN) solely to connect the two devices. Game data during the match travels directly between the two devices; the developer does not receive or store it.</p>
+  <p>In a friend match the two devices meet with a 4-letter room code. Game data during the match (captain positions, shots, emotes) passes through the Dotori Kkang relay server (run on Cloudflare) straight to the other device; the relay does not store it and keeps nothing after the match. When the relay can't be used, the devices connect directly, and the room code and temporary connection information (such as your IP address) are sent to a connection broker (the public PeerJS server) and a connectivity helper (Google STUN) solely to connect them. Like any internet service, the relay and Cloudflare can see the IP address of a connecting device; the developer does not log it or use it for anything else.</p>
   <p>Contact: <strong>[contact email]</strong></p>
 </main>
 </body>

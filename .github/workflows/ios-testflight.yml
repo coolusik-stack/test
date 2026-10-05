@@ -46,8 +46,17 @@ jobs:
           xcodebuild -version
 
       - name: Web build + Capacitor sync
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          PROJECT: ${{ vars.CF_PAGES_PROJECT || 'dotori-kkang' }}
+          WEB_URL: ${{ vars.WEB_URL }}
+          RELAY_URL: ${{ vars.RELAY_URL }}
         run: |
           npm ci
+          # the web version's address (invite links) and the friend-match relay, when set up
+          node scripts/site-env.mjs > "$RUNNER_TEMP/site.env"
+          set -a; . "$RUNNER_TEMP/site.env"; set +a
           npm run build
           npx cap sync ios
 

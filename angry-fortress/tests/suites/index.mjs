@@ -5,6 +5,7 @@ import walk from './walk.mjs';
 import shots from './shots.mjs';
 import lockstep from './lockstep.mjs';
 import online from './online.mjs';
+import relay from './relay.mjs';
 import cpu from './cpu.mjs';
 
-export const SUITES = [boot, ui, walk, shots, lockstep, online, cpu];
+export const SUITES = [boot, ui, walk, shots, lockstep, online, relay, cpu];

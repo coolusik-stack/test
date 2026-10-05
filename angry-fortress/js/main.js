@@ -11,6 +11,7 @@ import { makeCode, cleanCode } from './net.js';
 import { Haptics, isNativeApp } from './haptics.js';
 import { infoOf } from './spots.js';
 import { VERSION } from './version.js';
+import { site, loadSite } from './site.js';
 
 const $ = (sel) => document.querySelector(sel);
 const $$ = (sel) => [...document.querySelectorAll(sel)];
@@ -813,6 +814,7 @@ function openLink(role, code, resume) {
     if (o !== online) return;
     if (o.status === 'taken' && role === 'host' && !resume && hostTries++ < 4) { openLink('host', makeCode()); return; }
     if (o.status === 'taken' && resume && hostTries++ < 6) { setTimeout(() => { if (o === online) openLink(role, code, true); }, 2500); return; }
+    if (o.status === 'full') { lobbyStatus('이 방에는 벌써 두 명이 있어요. 코드를 다시 확인해 주세요', true); return; }
     console.warn('online link failed', e);
     lobbyStatus('연결할 수 없어요. 인터넷 연결을 확인하거나, 폰 하나로 번갈아 대결을 해 보세요.', true);
   });
@@ -950,7 +952,7 @@ async function shareCode() {
   if (!online) return;
   const code = online.code;
   const inClaude = !!(window.claude && window.claude.use);
-  const web = WEB_URL || (/^https?:$/.test(location.protocol) && !inClaude ? `${location.origin}${location.pathname}` : '');
+  const web = WEB_URL || site.web || (/^https?:$/.test(location.protocol) && !inClaude ? `${location.origin}${location.pathname}` : '');
   const url = web ? `${web}?join=${code}` : '';
   const text = `도토리깡 한 판 붙자! 🐿️ '친구와 대결 → 방 들어가기'에서 코드 ${code}`;
   const native = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.Share;
@@ -1302,6 +1304,7 @@ async function boot() {
     await Promise.race([document.fonts.ready, new Promise((r) => setTimeout(r, 1500))]);
   } catch (e) { /* fonts optional */ }
   goTitle();
+  if (!window.claude) loadSite();
   const join = cleanCode(new URLSearchParams(location.search).get('join') || '');
   if (join.length === 4) {
     goLobby('enter');

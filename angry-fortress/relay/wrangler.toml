@@ -1,0 +1,18 @@
+# 도토리깡 friend-match relay. Deployed by .github/workflows/relay-deploy.yml (or `npx wrangler deploy`
+# in this folder). Its address is https://dotori-relay.<your-workers-subdomain>.workers.dev
+name = "dotori-relay"
+main = "src/worker.js"
+compatibility_date = "2025-09-01"
+workers_dev = true
+
+[[durable_objects.bindings]]
+name = "ROOMS"
+class_name = "Room"
+
+# SQLite-backed Durable Objects are the ones the free plan includes.
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["Room"]
+
+[observability]
+enabled = true
