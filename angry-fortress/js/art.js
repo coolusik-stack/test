@@ -683,17 +683,119 @@ function drawCaptainHead(ctx, team, P, o, gx, gy, time, lw) {
   ctx.fillStyle = 'rgba(255,110,140,' + (0.45 + 0.25 * q).toFixed(2) + ')'; ctx.fill();
   ctx.strokeStyle = P.line; ctx.lineWidth = lw; ctx.stroke(head);
   captainFaceFeatures(ctx, P, o, time);
-  // hat: acorn cap with a team-coloured band
-  if (o.hat !== false) drawCaptainHat(ctx, P, lw, o.dead);
+  // hat: acorn cap with a team-coloured band, or whatever the 깡단 옷장 put on
+  if (o.hat !== false) drawCaptainHat(ctx, P, lw, o.dead, o.hatId);
 }
-function drawCaptainHat(ctx, P, lw, askew) {
+function drawCaptainHat(ctx, P, lw, askew, id) {
   ctx.save();
   if (askew) { ctx.translate(-0.22, -0.06); ctx.rotate(-0.38); }
+  const hat = HATS[id];
+  if (hat) hat(ctx, P, lw);
+  else {
+    const cap = P2('cap:cap', capPath);
+    ctx.fillStyle = '#9c6c3c'; ctx.fill(cap);
+    ctx.fillStyle = P.team; ctx.fill(P2('cap:band', bandPath));
+    ctx.strokeStyle = P.line; ctx.lineWidth = lw; ctx.stroke(P2('cap:hatOL', hatOutlinePath));
+  }
+  ctx.restore();
+}
+
+// 깡단 옷장 hats, in head units (head radius ~1, facing +x, y down; the head's top is at y -0.98)
+const HATS = {
+  leaf(ctx, P, lw) {
+    ctx.beginPath(); ctx.moveTo(0.66, -1.16); ctx.quadraticCurveTo(0.86, -1.3, 0.84, -1.5);
+    ctx.strokeStyle = P.line; ctx.lineWidth = lw * 2.2; ctx.lineCap = 'round'; ctx.stroke();
+    ctx.strokeStyle = '#5a8a2a'; ctx.lineWidth = lw * 0.9; ctx.stroke();
+    ctx.beginPath(); leafShapeAt(ctx, -0.06, -1.04, 0.8, 0.34, -0.16);
+    ctx.fillStyle = '#74c64e'; ctx.fill();
+    ctx.save(); ctx.clip();
+    ctx.beginPath(); ctx.rect(-1, -0.98, 2, 0.6); ctx.fillStyle = '#4f9f32'; ctx.fill();
+    ctx.restore();
+    ctx.strokeStyle = '#1f4a10'; ctx.lineWidth = lw;
+    ctx.beginPath(); leafShapeAt(ctx, -0.06, -1.04, 0.8, 0.34, -0.16); ctx.stroke();
+    ctx.beginPath(); leafVeinsAt(ctx, -0.06, -1.04, 0.8, 0.34, -0.16); ctx.lineWidth = lw * 0.6; ctx.stroke();
+  },
+  mushroom(ctx, P, lw) {
+    const dome = P2('hat:mush', (p) => {
+      p.moveTo(-1.02, -0.6); p.bezierCurveTo(-1.04, -1.58, 0.98, -1.66, 0.97, -0.64);
+      p.quadraticCurveTo(-0.02, -0.4, -1.02, -0.6); p.closePath();
+    });
+    ctx.fillStyle = '#e8432e'; ctx.fill(dome);
+    ctx.save(); ctx.clip(dome);
+    ctx.beginPath(); ctx.ellipse(0, -0.52, 1.2, 0.26, 0, 0, TAU); ctx.fillStyle = '#b8291a'; ctx.fill();
+    ctx.restore();
+    ctx.beginPath();
+    for (const [x, y, r] of [[-0.48, -1.02, 0.16], [0.14, -1.28, 0.13], [0.56, -0.94, 0.12], [-0.06, -0.88, 0.08], [-0.8, -0.74, 0.07]]) { ctx.moveTo(x + r, y); ctx.arc(x, y, r, 0, TAU); }
+    ctx.fillStyle = '#fff8ec'; ctx.fill();
+    ctx.strokeStyle = '#4a0a08'; ctx.lineWidth = lw; ctx.stroke(dome);
+  },
+  straw(ctx, P, lw) {
+    ctx.beginPath(); ctx.ellipse(-0.02, -0.68, 1.22, 0.22, -0.05, 0, TAU);
+    ctx.fillStyle = '#f2cf6b'; ctx.fill(); ctx.strokeStyle = '#6a4210'; ctx.lineWidth = lw; ctx.stroke();
+    const crown = P2('hat:straw', (p) => {
+      p.moveTo(-0.6, -0.72); p.bezierCurveTo(-0.64, -1.4, 0.56, -1.44, 0.58, -0.76);
+      p.quadraticCurveTo(-0.01, -0.62, -0.6, -0.72); p.closePath();
+    });
+    ctx.fillStyle = '#ecc55a'; ctx.fill(crown);
+    ctx.save(); ctx.clip(crown);
+    ctx.beginPath(); ctx.rect(-0.8, -1.0, 1.6, 0.16); ctx.fillStyle = P.team; ctx.fill();
+    ctx.beginPath();
+    for (let i = -3; i <= 3; i++) { ctx.moveTo(i * 0.18, -1.4); ctx.lineTo(i * 0.18 + 0.06, -1.02); }
+    ctx.strokeStyle = 'rgba(150,100,20,0.45)'; ctx.lineWidth = lw * 0.6; ctx.stroke();
+    ctx.restore();
+    ctx.strokeStyle = '#6a4210'; ctx.lineWidth = lw; ctx.stroke(crown);
+  },
+  pinecone(ctx, P, lw) {
+    const dome = P2('hat:pine', (p) => {
+      p.moveTo(-0.93, -0.56); p.bezierCurveTo(-0.97, -1.44, 0.86, -1.48, 0.86, -0.62);
+      p.quadraticCurveTo(-0.03, -0.4, -0.93, -0.56); p.closePath();
+    });
+    ctx.beginPath(); ctx.moveTo(-0.06, -1.3); ctx.lineTo(0.04, -1.62); ctx.lineTo(0.16, -1.3); ctx.closePath();
+    ctx.fillStyle = '#7a4a22'; ctx.fill(); ctx.strokeStyle = '#3a1e08'; ctx.lineWidth = lw; ctx.stroke();
+    ctx.fillStyle = '#a2683a'; ctx.fill(dome);
+    ctx.save(); ctx.clip(dome);
+    ctx.beginPath();
+    for (const [y, off] of [[-0.62, 0], [-0.86, 0.14], [-1.1, 0], [-1.32, 0.14]]) {
+      for (let x = -1.1 + off; x < 1.1; x += 0.28) { ctx.moveTo(x - 0.14, y - 0.1); ctx.quadraticCurveTo(x, y + 0.08, x + 0.14, y - 0.1); }
+    }
+    ctx.strokeStyle = '#5e3615'; ctx.lineWidth = lw * 0.8; ctx.stroke();
+    ctx.restore();
+    ctx.strokeStyle = '#3a1e08'; ctx.lineWidth = lw; ctx.stroke(dome);
+  },
+  crown(ctx, P, lw) {
+    ctx.save(); ctx.rotate(-0.06);
+    const c = P2('hat:crown', (p) => {
+      p.moveTo(-0.72, -0.66); p.lineTo(0.7, -0.76); p.lineTo(0.74, -1.08); p.lineTo(0.44, -0.9); p.lineTo(0.26, -1.34);
+      p.lineTo(0.04, -0.94); p.lineTo(-0.2, -1.36); p.lineTo(-0.4, -0.92); p.lineTo(-0.74, -1.12); p.closePath();
+    });
+    ctx.fillStyle = '#ffd23f'; ctx.fill(c);
+    ctx.save(); ctx.clip(c);
+    ctx.beginPath(); ctx.rect(-0.9, -0.86, 1.8, 0.24); ctx.fillStyle = '#eaa50e'; ctx.fill();
+    ctx.restore();
+    ctx.strokeStyle = '#5a3a06'; ctx.lineWidth = lw; ctx.lineJoin = 'round'; ctx.stroke(c);
+    ctx.beginPath();
+    for (const [x, y] of [[0.26, -1.34], [-0.2, -1.36], [-0.74, -1.12], [0.74, -1.08]]) { ctx.moveTo(x + 0.08, y); ctx.arc(x, y, 0.08, 0, TAU); }
+    ctx.fillStyle = '#fff3b0'; ctx.fill(); ctx.stroke();
+    ctx.beginPath(); ctx.ellipse(0.0, -0.76, 0.1, 0.08, 0, 0, TAU); ctx.fillStyle = '#e8432e'; ctx.fill(); ctx.stroke();
+    ctx.restore();
+  },
+  ribbon(ctx, P, lw) {
+    // the acorn cap with a big team-coloured bow on top
+    HATS_BASE(ctx, P, lw);
+    ctx.save(); ctx.translate(0.02, -1.22); ctx.rotate(-0.12);
+    ctx.beginPath();
+    ctx.moveTo(0, 0); ctx.bezierCurveTo(-0.3, -0.34, -0.62, -0.12, -0.52, 0.12); ctx.bezierCurveTo(-0.42, 0.3, -0.16, 0.14, 0, 0);
+    ctx.moveTo(0, 0); ctx.bezierCurveTo(0.3, -0.34, 0.62, -0.12, 0.52, 0.12); ctx.bezierCurveTo(0.42, 0.3, 0.16, 0.14, 0, 0);
+    ctx.fillStyle = '#ff6fa8'; ctx.fill(); ctx.strokeStyle = '#6a1036'; ctx.lineWidth = lw; ctx.stroke();
+    ctx.beginPath(); ctx.ellipse(0, 0, 0.11, 0.1, 0, 0, TAU); ctx.fillStyle = '#ff9cc4'; ctx.fill(); ctx.stroke();
+    ctx.restore();
+  },
+};
+function HATS_BASE(ctx, P, lw) {
   const cap = P2('cap:cap', capPath);
   ctx.fillStyle = '#9c6c3c'; ctx.fill(cap);
   ctx.fillStyle = P.team; ctx.fill(P2('cap:band', bandPath));
   ctx.strokeStyle = P.line; ctx.lineWidth = lw; ctx.stroke(P2('cap:hatOL', hatOutlinePath));
-  ctx.restore();
 }
 
 // --- tail: one clean two-tone S-curl (commander-local metres), cached as Path2D
@@ -766,20 +868,39 @@ function tubOutlinePath(p) {
 }
 const WHEELS = [[-0.44, 0.47], [0.42, 0.47]], WHEEL_R = 0.28;
 function wheelsPath(p) { for (const w of WHEELS) { p.moveTo(w[0] + WHEEL_R, w[1]); p.arc(w[0], w[1], WHEEL_R, 0, TAU); } }
-function drawTubCart(ctx, lw, wheelAng, bounce) {
+// cart paints from the 깡단 옷장
+const CART_PAINT = {
+  wood: TUB,
+  red: { c: '#e45b3c', d: '#b8391f', line: '#4a160a', wheel: '#7a4426', hub: '#4a2810' },
+  sky: { c: '#68c0f2', d: '#3b8fcb', line: '#163a5a', wheel: '#a06e40', hub: '#5a3a1c' },
+  leaf: { c: '#86d062', d: '#4f9c35', line: '#1f4a10', wheel: '#a06e40', hub: '#5a3a1c' },
+  gold: { c: '#f6c935', d: '#cf9a12', line: '#5a3a06', wheel: '#b07a1a', hub: '#6a4408', shine: true },
+  berry: { c: '#e2437a', d: '#b02558', line: '#4a0a24', wheel: '#7a4426', hub: '#4a2810', dots: true },
+};
+function drawTubCart(ctx, lw, wheelAng, bounce, paint) {
+  const T = CART_PAINT[paint] || TUB;
   ctx.save(); ctx.translate(0, bounce);
-  ctx.fillStyle = TUB.c; ctx.fill(P2('cart:tub', (p) => { tubPath(p); rimPath(p); }));
-  ctx.fillStyle = TUB.d; ctx.fill(P2('cart:shade', tubShadePath));
-  ctx.strokeStyle = TUB.line; ctx.lineWidth = lw; ctx.stroke(P2('cart:ol', tubOutlinePath));
+  ctx.fillStyle = T.c; ctx.fill(P2('cart:tub', (p) => { tubPath(p); rimPath(p); }));
+  ctx.fillStyle = T.d; ctx.fill(P2('cart:shade', tubShadePath));
+  if (T.dots) {
+    ctx.beginPath();
+    for (const [x, y] of [[-0.42, -0.06], [0.0, 0.12], [0.4, -0.08], [-0.2, 0.28], [0.26, 0.3]]) { ctx.moveTo(x + 0.05, y); ctx.arc(x, y, 0.05, 0, TAU); }
+    ctx.fillStyle = '#ffe3ef'; ctx.fill();
+  }
+  if (T.shine) {
+    ctx.beginPath(); ctx.moveTo(-0.5, -0.12); ctx.lineTo(-0.36, -0.12); ctx.lineTo(-0.5, 0.3); ctx.lineTo(-0.6, 0.3); ctx.closePath();
+    ctx.fillStyle = 'rgba(255,255,230,0.75)'; ctx.fill();
+  }
+  ctx.strokeStyle = T.line; ctx.lineWidth = lw; ctx.stroke(P2('cart:ol', tubOutlinePath));
   ctx.restore();
   // plain wheels (cross spokes show the rotation)
   const wp = P2('cart:wheels', wheelsPath);
-  ctx.fillStyle = TUB.wheel; ctx.fill(wp);
+  ctx.fillStyle = T.wheel; ctx.fill(wp);
   ctx.beginPath();
   const c = Math.cos(wheelAng) * WHEEL_R * 0.8, s = Math.sin(wheelAng) * WHEEL_R * 0.8;
   for (const w of WHEELS) { ctx.moveTo(w[0] - c, w[1] - s); ctx.lineTo(w[0] + c, w[1] + s); ctx.moveTo(w[0] + s, w[1] - c); ctx.lineTo(w[0] - s, w[1] + c); }
-  ctx.strokeStyle = TUB.hub; ctx.lineWidth = 0.07; ctx.stroke();
-  ctx.strokeStyle = TUB.line; ctx.lineWidth = lw; ctx.stroke(wp);
+  ctx.strokeStyle = T.hub; ctx.lineWidth = 0.07; ctx.stroke();
+  ctx.strokeStyle = T.line; ctx.lineWidth = lw; ctx.stroke(wp);
 }
 function drawPaws(ctx, P, lw, pose, time, dx, dy) {
   ctx.beginPath();
@@ -867,7 +988,8 @@ export function drawCommander(ctx, x, y, s, drawAmmo) {
   ctx.translate(HEAD_X + shake, HEAD_Y + cy0);
   if (dead) { ctx.translate(0, 0.5); ctx.rotate(-0.28); ctx.translate(0, -0.5); }
   ctx.scale(HEAD_K * (1 - breath * 0.5), HEAD_K * (1 + breath));
-  const ho = { eye: fo.eye, blink: fo.blink, tilt: fo.tilt, browUp: fo.browUp, mouth: fo.mouth, puff: fo.puff, llx: fo.llx, lly: fo.lly, dead };
+  const look = s.look || EMPTY;
+  const ho = { eye: fo.eye, blink: fo.blink, tilt: fo.tilt, browUp: fo.browUp, mouth: fo.mouth, puff: fo.puff, llx: fo.llx, lly: fo.lly, dead, hatId: look.hat };
   const hlw = lw / HEAD_K;
   drawCaptainHead(ctx, team, P, ho, gxLocal, LIGHT_Y, time, hlw);
   if (fo.bandage) drawSimpleBandage(ctx, hlw);
@@ -875,7 +997,7 @@ export function drawCommander(ctx, x, y, s, drawAmmo) {
   if (fo.stars) drawSimpleStars(ctx, time);
   ctx.restore();
   // tub, paws, wheels
-  drawTubCart(ctx, lw, wheelAng * f, bounce);
+  drawTubCart(ctx, lw, wheelAng * f, bounce, look.cart);
   drawPaws(ctx, P, lw, fo.paw, time, shake, bounce + capBounce * 0.4);
   ctx.restore();
 
@@ -3300,7 +3422,7 @@ export function drawAmmoIcon(canvas, type) {
   ctx.restore();
 }
 
-export function drawCaptainIcon(canvas, team) {
+export function drawCaptainIcon(canvas, team, look) {
   if (!canvas) return;
   const ctx = canvas.getContext('2d');
   const w = canvas.width, h = canvas.height;
@@ -3312,9 +3434,80 @@ export function drawCaptainIcon(canvas, team) {
   // head unit -> px; fits ears (and the long tufts), hat and cheeks
   const k = m / (tm ? 3.2 : 2.95);
   ctx.setTransform(k, 0, 0, k, w / 2 - 0.05 * m, h / 2 + (tm ? 0.5 : 0.36) * k);
-  const o = { eye: 'open', blink: 0, tilt: 1, browUp: 0, mouth: 'w', puff: 0, llx: 0.5, lly: 0.1 };
+  const o = { eye: 'open', blink: 0, tilt: 1, browUp: 0, mouth: 'w', puff: 0, llx: 0.5, lly: 0.1, hatId: look && look.hat };
   drawCaptainHead(ctx, tm, CAPT[tm], o, LIGHT_X, LIGHT_Y, 0.5, CAP_LW / HEAD_K * 1.1);
   ctx.restore();
+}
+
+// A whole captain in a UI canvas (the 깡단 옷장 preview): cart, tail, head and sling, no ammo.
+export function drawCaptainFigure(canvas, team, look, time = 0) {
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const w = canvas.width, h = canvas.height;
+  ctx.save();
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.clearRect(0, 0, w, h);
+  const k = Math.min(w / 3.4, h / 3.3);
+  ctx.setTransform(k, 0, 0, k, w * 0.56, h * 0.72);
+  drawCommander(ctx, 0, 0, { team, facing: 1, time, look, mood: 'happy' });
+  ctx.restore();
+}
+
+// One 깡단 옷장 item as a little picture: a hat on the captain's head, a cart, or a trail.
+export function drawLookIcon(canvas, kind, id, team = 0) {
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const w = canvas.width, h = canvas.height;
+  ctx.save();
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.clearRect(0, 0, w, h);
+  const m = Math.min(w, h);
+  if (kind === 'hat') {
+    ctx.restore();
+    drawCaptainIcon(canvas, team, { hat: id });
+    return;
+  }
+  if (kind === 'cart') {
+    const k = m / 2.0;
+    ctx.setTransform(k, 0, 0, k, w / 2, h * 0.42);
+    drawTubCart(ctx, CAP_LW * 1.2, 0.4, 0, id);
+  } else {
+    const k = m / 3.2;
+    ctx.setTransform(k, 0, 0, k, w / 2, h / 2);
+    for (let i = 0; i < 7; i++) {
+      const u = i / 6, x = -1.3 + u * 2.6, y = 0.7 - Math.sin(u * PI) * 1.3;
+      drawTrailMark(ctx, id, x, y, i % 3 === 0 ? 0.26 : 0.17, i, 1);
+    }
+  }
+  ctx.restore();
+}
+
+const RAINBOW = ['#ff5d5d', '#ffa23a', '#ffd83a', '#6ee06a', '#4fb8ff', '#a77bff'];
+// One mark of a nut's trail at (x, y), size s (metres). i: its place along the trail.
+export function drawTrailMark(ctx, kind, x, y, s, i, alpha) {
+  ctx.globalAlpha = alpha;
+  ctx.beginPath();
+  if (kind === 'leaf') {
+    leafShapeAt(ctx, x, y, s * 1.3, s * 0.55, i * 1.1);
+    ctx.fillStyle = i % 2 ? '#8fd45e' : '#5fb03a';
+  } else if (kind === 'star') {
+    starPath(ctx, x, y, s * 1.35, s * 0.6, 5, i * 0.5);
+    ctx.fillStyle = i % 2 ? '#fff6b0' : '#ffd23f';
+  } else if (kind === 'heart') {
+    const r = s * 0.62;
+    ctx.moveTo(x, y + r * 1.4);
+    ctx.bezierCurveTo(x - r * 2.2, y, x - r * 1.1, y - r * 1.6, x, y - r * 0.5);
+    ctx.bezierCurveTo(x + r * 1.1, y - r * 1.6, x + r * 2.2, y, x, y + r * 1.4);
+    ctx.fillStyle = i % 2 ? '#ff9cc4' : '#ff5d8f';
+  } else if (kind === 'rainbow') {
+    ctx.arc(x, y, s * 1.05, 0, TAU);
+    ctx.fillStyle = RAINBOW[i % RAINBOW.length];
+  } else {
+    ctx.arc(x, y, s, 0, TAU);
+    ctx.fillStyle = '#ffffff';
+  }
+  ctx.fill();
+  ctx.globalAlpha = 1;
 }
 
 // =====================================================================

@@ -13,6 +13,7 @@ import { ForestEvents } from './events.js';
 import { Crew } from './crew.js';
 import { PAD_COST, POCKET, infoOf, spotsAt, hasSpot, padAt, padLaunch, drawSpots } from './spots.js';
 import { clamp, rng, lerp, dist } from './util.js';
+import { cleanLook } from './looks.js';
 import {
   GRAV, VMAX, WIND_ACC, MAX_PULL, CART_R, HEAD, HP_MAX, STAMINA, STAMINA_PER_M, MOVE_SPEED,
   MAT, AMMO, KERNEL, POUND_SPEED, HIVE_BLAST, SUPPLY, WIND_LEVELS, TEAM, HIT_K, HIT_CAP, FLOOD_TURN, FLOOD_STEP,
@@ -146,7 +147,8 @@ export class Game {
         moveSoundT: 0,
         mood: 'normal',
         moodT: 0,
-        stats: { shots: 0, hits: 0, dmg: 0, blocks: 0 },
+        stats: { shots: 0, hits: 0, dmg: 0, blocks: 0, specials: 0 },
+        look: cleanLook(this.opts.looks && this.opts.looks[i]), // 깡단 옷장 (drawn only)
       };
       this._captainBody(p, x, y);
       return p;
@@ -682,6 +684,7 @@ export class Game {
     this.killcam = null;
     this.killcamUsed = false;
     p.stats.shots++;
+    if (type !== 'acorn') p.stats.specials++;
     this.crew?.react(p, 'fire');
     this.currentTrail = [];
     this.shotPower = power;
@@ -1982,20 +1985,12 @@ export class Game {
     const cur = this.players[this.turn];
     // previous shot trail
     if ((this.state === 'aim' || this.state === 'ai-aim' || this.state === 'remote') && cur.lastTrail.length) {
-      ctx.fillStyle = 'rgba(255,255,255,0.55)';
-      for (const d of cur.lastTrail) {
-        ctx.beginPath();
-        ctx.arc(d.x, -d.y, d.s, 0, TAU);
-        ctx.fill();
-      }
+      const kind = cur.look.trail;
+      cur.lastTrail.forEach((d, i) => Art.drawTrailMark(ctx, kind, d.x, -d.y, d.s, i, kind === 'dots' ? 0.55 : 0.45));
     }
     if (this.state === 'flight' || this.state === 'settle') {
-      ctx.fillStyle = 'rgba(255,255,255,0.8)';
-      for (const d of this.currentTrail) {
-        ctx.beginPath();
-        ctx.arc(d.x, -d.y, d.s, 0, TAU);
-        ctx.fill();
-      }
+      const kind = cur.look.trail;
+      this.currentTrail.forEach((d, i) => Art.drawTrailMark(ctx, kind, d.x, -d.y, d.s, i, 0.8));
     }
 
     // blocks
@@ -2090,7 +2085,7 @@ export class Game {
     Art.drawCommander(ctx, x, y, {
       team: p.team, facing: p.facing, time: this.time + p.id * 1.7, blink: p.blink > 0 ? 1 : 0,
       hurt: p.hurtT, hp: p.hp / HP_MAX, moving: p.moving, wheelAngle: p.wheel, dead: p.dead,
-      pouch, aimPower: aiming ? this.aim.power : 0, mood: aiming ? 'aim' : p.mood,
+      pouch, aimPower: aiming ? this.aim.power : 0, mood: aiming ? 'aim' : p.mood, look: p.look,
     }, showAmmo ? (c) => {
       const a = Art.slingAnchors(x, y, p.facing);
       const px = pouch ? pouch.x : a.rest.x, py = pouch ? pouch.y : a.rest.y;

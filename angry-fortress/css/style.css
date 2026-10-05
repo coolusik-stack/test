@@ -810,6 +810,91 @@ svg { width: 1em; height: 1em; fill: currentColor; flex: none; }
 .btn-rejoin { align-self: center; }
 .btn-train { align-self: center; flex-direction: column; gap: 0; animation: hero-glow 1.6s ease-in-out infinite; }
 
+/* ---------- 깡단 원정 ---------- */
+.star-total {
+  flex: none;
+  min-width: 40px;
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: var(--ink);
+  color: var(--yellow);
+  font-size: 16px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.camp-panel { max-width: 640px; display: flex; flex-direction: column; gap: 8px; }
+.camp-grid { display: flex; flex-direction: column; gap: 6px; }
+.camp-row { display: grid; grid-template-columns: 6.4em repeat(3, minmax(0, 1fr)); align-items: center; gap: 8px; }
+.camp-map { font-size: 16px; color: var(--ink); line-height: 1.15; }
+.stage {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 46px;
+  padding: 4px 8px;
+  border: 3px solid var(--ink);
+  border-radius: 14px;
+  background: linear-gradient(180deg, #fffaf0, var(--cream-2));
+  box-shadow: 0 3px 0 var(--ink);
+  font-size: 18px;
+}
+.stage b { font-family: var(--display); font-weight: 400; font-size: 22px; }
+.stage .tile-stars { color: var(--yellow-2); letter-spacing: -1px; -webkit-text-stroke: 0.6px var(--ink); font-size: 15px; }
+.stage .tile-stars i { font-style: normal; color: rgba(43, 26, 18, 0.25); -webkit-text-stroke: 0; }
+.stage.boss { background: linear-gradient(180deg, #fff27a, #ffc22b); }
+.stage.next { animation: hero-glow 1.6s ease-in-out infinite; box-shadow: 0 0 0 3px #fff, 0 3px 0 var(--ink); }
+.stage:disabled { filter: grayscale(0.8); opacity: 0.55; }
+.stage:active:not(:disabled) { transform: translateY(2px); box-shadow: 0 1px 0 var(--ink); }
+.camp-foot { justify-content: center; margin-top: 4px; }
+.stage-panel { max-width: 440px; }
+.stage-head { display: flex; align-items: center; gap: 12px; }
+.stage-head canvas { width: 84px; height: 84px; flex: none; }
+.stage-head h2 { text-align: left; margin: 0; font-size: clamp(24px, 3.4vw, 30px); }
+.stage-foe-name { margin: 2px 0 0; font-size: 16px; }
+.stage-rule { margin: 2px 0 0; font-size: 13px; color: var(--ink-soft); }
+.goals { list-style: none; margin: 0; padding: 8px 12px; border-radius: 14px; background: rgba(255, 250, 235, 0.7); display: flex; flex-direction: column; gap: 4px; }
+.goals li { display: flex; align-items: center; gap: 8px; font-size: 15px; color: var(--ink-soft); }
+.goals li::before { content: '★'; font-size: 20px; color: rgba(43, 26, 18, 0.22); }
+.goals li.got { color: var(--ink); }
+.goals li.got::before { color: var(--yellow-2); -webkit-text-stroke: 0.8px var(--ink); }
+.goals li.new::after { content: 'NEW'; margin-left: auto; padding: 0 6px; border-radius: 6px; background: var(--red); color: #fff; font-size: 11px; }
+.unlock-note { margin: 0; padding: 6px 12px; border-radius: 12px; background: var(--ink); color: #fff; font-size: 14px; text-align: center; }
+.unlock-note b { color: var(--yellow); font-weight: 400; }
+
+/* ---------- 깡단 옷장 ---------- */
+.closet-panel { max-width: 760px; display: flex; flex-direction: column; gap: 8px; }
+.closet-body { display: grid; grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr); gap: 14px; align-items: start; }
+.closet-preview { width: 100%; aspect-ratio: 360 / 330; border-radius: 18px; border: 3px solid var(--ink); background: radial-gradient(circle at 50% 70%, #fff6dc, #9fdcff 75%); }
+.closet-side { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.closet-tabs { flex: none; }
+.closet-items { display: grid; grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); gap: 8px; }
+.look {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 4px 4px 6px;
+  border: 3px solid var(--ink);
+  border-radius: 14px;
+  background: var(--cream);
+  box-shadow: 0 3px 0 var(--ink);
+  font-size: 13px;
+  line-height: 1.15;
+}
+.look canvas { width: 56px; height: 56px; }
+.look small { font-size: 11px; color: var(--ink-soft); }
+.look.on { background: linear-gradient(180deg, #ffe879, var(--yellow-2)); transform: translateY(-3px); box-shadow: 0 0 0 3px #fff, 0 6px 0 var(--ink); }
+.look.locked canvas { filter: grayscale(1) brightness(0.7); opacity: 0.6; }
+.look.locked small { color: var(--red-2); }
+.closet-note { margin: 0; font-size: 13px; color: var(--ink-soft); text-align: center; }
+@media (max-height: 430px) {
+  .closet-items { grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); }
+  .look canvas { width: 44px; height: 44px; }
+}
+
 /* ---------- friend stepped away ---------- */
 .away-pill {
   position: absolute;

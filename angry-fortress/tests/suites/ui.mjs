@@ -1,4 +1,4 @@
-// A player's path through the screens: CPU setup → battle → aim and shoot with touch-drag →
+// A player's path through the screens: 깡단 원정 → free practice setup → battle → aim and shoot with touch-drag →
 // ability mid-flight → the CPU answers → pause → bomb → win → result → menu → help.
 export default {
   name: 'ui',
@@ -7,6 +7,8 @@ export default {
     const page = await t.page();
     const game = (fn, arg) => page.evaluate(fn, arg);
     await page.click('#btn-solo');
+    await page.waitForSelector('#campaign:not([hidden])');
+    await page.click('#camp-free');
     await page.waitForTimeout(500);
     await page.click('.map[data-id="pine"]');
     await page.click('.seg[data-key="difficulty"] button[data-v="easy"]');

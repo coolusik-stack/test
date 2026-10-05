@@ -4,7 +4,7 @@ import { THEMES, THEME_ORDER } from './levels.js';
 import { buildLandscape, WORLD } from './terrain.js';
 import * as Art from './art.js';
 import Sound from './audio.js';
-import { storage, prefs, clamp } from './util.js';
+import { storage, prefs, clamp, josa } from './util.js';
 import { AMMO, HP_MAX, STAMINA, TEAM, WEB_URL } from './config.js';
 import { Online } from './online.js';
 import { makeCode, cleanCode, keep } from './net.js';
@@ -13,6 +13,9 @@ import { infoOf } from './spots.js';
 import { VERSION } from './version.js';
 import { site, loadSite } from './site.js';
 import { Coach } from './coach.js';
+import * as Camp from './campaign.js';
+import { makeCard, shareCard } from './card.js';
+import { LOOKS, KINDS, DEFAULT_LOOK, cleanLook, isOpen as lookOpen, myLook, setMyLook, newlyOpened } from './looks.js';
 
 const $ = (sel) => document.querySelector(sel);
 const $$ = (sel) => [...document.querySelectorAll(sel)];
@@ -102,7 +105,7 @@ function updateRotateHint() {
 
 // ---------------------------------------------------------------- screens
 function show(id) {
-  for (const s of ['title', 'lobby', 'setup', 'pause', 'settings', 'help', 'result', 'pickmap']) $('#' + s).hidden = s !== id;
+  for (const s of ['title', 'lobby', 'setup', 'pause', 'settings', 'help', 'result', 'pickmap', 'campaign', 'stagecard', 'closet']) $('#' + s).hidden = s !== id;
 }
 
 // ---------------------------------------------------------------- best of 3
@@ -235,7 +238,8 @@ function startDemo() {
   if (game) game.destroy();
   clearTimeout(demoRestartT);
   const theme = THEME_ORDER[Math.floor(Math.random() * THEME_ORDER.length)];
-  const g = new Game(canvas, { demo: true, mode: 'cpu', difficulty: 'normal', theme, wind: 'normal', timer: 0, guide: false }, (evt) => {
+  const pick = () => Object.fromEntries(KINDS.map((k) => [k, LOOKS[k][Math.floor(Math.random() * LOOKS[k].length)].id]));
+  const g = new Game(canvas, { demo: true, mode: 'cpu', difficulty: 'normal', theme, wind: 'normal', timer: 0, guide: false, looks: [pick(), pick()] }, (evt) => {
     if (evt === 'over' && g === game) demoRestartT = setTimeout(() => { if (g === game) startDemo(); }, 2200);
   }, size);
   game = g;
@@ -254,6 +258,7 @@ function startBattle(opts) {
   $('#tip').hidden = true;
   hint('', 0);
   rotatePaused = false;
+  if (!opts.looks) opts = { ...opts, looks: [myLook(), DEFAULT_LOOK] };
   const g = new Game(canvas, { ...opts, seed: opts.seed ?? ((Math.random() * 1e9) | 0) }, (evt, data) => {
     if (g === game) onGameEvent(evt, data); // ignore late events from a replaced match
   }, size);
@@ -261,7 +266,7 @@ function startBattle(opts) {
   if (opts.tutorial) {
     coach ||= new Coach($('#coach'), { onTrained: markTrained });
     coach.start(g);
-    try { Art.drawCaptainIcon($('#coach .coach-face'), 0); } catch (e) { /* art not ready */ }
+    try { Art.drawCaptainIcon($('#coach .coach-face'), 0, myLook()); } catch (e) { /* art not ready */ }
   }
   renderPips();
   roundBanner();
@@ -287,6 +292,191 @@ function buildOpts() {
     guide: settings.guide !== 'off',
     firstTurn: 0,
   };
+}
+
+// ---------------------------------------------------------------- 깡단 원정
+function goCampaign() {
+  screen = 'campaign';
+  show('campaign');
+  $('#hud').hidden = true;
+  if (!game || !game.opts.demo) startDemo();
+  renderCampaign();
+}
+
+function renderCampaign() {
+  const prog = Camp.progress();
+  $('#camp-stars').textContent = `★ ${Camp.totalStars(prog)} / ${Camp.MAX_STARS}`;
+  const grid = $('#camp-grid');
+  grid.innerHTML = '';
+  const next = Camp.STAGES.findIndex((s, i) => Camp.isOpen(prog, i) && !Camp.starCount(prog, s.id));
+  for (const theme of THEME_ORDER) {
+    const row = document.createElement('div');
+    row.className = 'camp-row';
+    const label = document.createElement('span');
+    label.className = 'camp-map';
+    label.textContent = THEMES[theme].name;
+    row.append(label);
+    Camp.STAGES.forEach((s, i) => {
+      if (s.theme !== theme) return;
+      const b = document.createElement('button');
+      const open = Camp.isOpen(prog, i);
+      const got = Camp.starCount(prog, s.id);
+      b.className = 'stage' + (s.boss ? ' boss' : '') + (i === next ? ' next' : '');
+      b.disabled = !open;
+      b.dataset.stage = s.id;
+      b.setAttribute('aria-label', `${Camp.stageName(s)}${open ? `, 별 ${got}개` : ', 잠김'}`);
+      b.innerHTML = `<b>${s.id.split('-')[1]}</b>${open ? `<span class="tile-stars">${'★'.repeat(got)}${'<i>★</i>'.repeat(3 - got)}</span>` : '<span>🔒</span>'}`;
+      b.addEventListener('click', () => { Sound.play('tap'); openStage(s.id); });
+      row.append(b);
+    });
+    grid.append(row);
+  }
+}
+
+let campStage = null;
+function openStage(id) {
+  const s = Camp.stage(id);
+  if (!s) return;
+  campStage = s;
+  const prog = Camp.progress();
+  const best = prog.stars[s.id] || [];
+  $('#stage-name').textContent = Camp.stageName(s);
+  $('#stage-foe-name').textContent = `상대: ${s.foe}`;
+  const wind = { off: '바람 없음', normal: '바람 보통', strong: '강풍' }[s.wind];
+  const cpu = { easy: '쉬움', normal: '보통', hard: '어려움' }[s.difficulty];
+  $('#stage-rule').textContent = `${wind} · CPU ${cpu}${s.boss ? ' · 마지막 대장' : ''}`;
+  renderGoals($('#stage-goals'), Camp.goals(s), best, null);
+  try { Art.drawCaptainIcon($('#stage-foe'), 1, s.look); } catch (e) { /* art not ready */ }
+  screen = 'stagecard';
+  show('stagecard');
+}
+
+function renderGoals(list, goals, best, met) {
+  list.innerHTML = '';
+  goals.forEach((g, i) => {
+    const li = document.createElement('li');
+    li.textContent = g.text;
+    li.classList.toggle('got', !!(best[i] || (met && met[i])));
+    if (met && met[i] && !(best.was && best.was[i])) li.classList.add('new');
+    list.append(li);
+  });
+}
+
+function startStage(s) {
+  tryFullscreen();
+  mode = 'cpu';
+  series = null;
+  nextRound = null;
+  startBattle({ ...Camp.battleOpts(s), names: [TEAM[0].name, s.foe], looks: [myLook(), s.look] });
+  banner(Camp.stageName(s), `${josa(s.foe, '과', '와')} 대결!`, s.boss ? '#ffd21f' : '#fff');
+}
+
+// On the result screen: which goals this match met, stars, and what just opened in the closet.
+function campaignResult(r) {
+  const s = Camp.stage(lastOpts.campaign);
+  if (!s) return null;
+  const was = (Camp.progress().stars[s.id] || [false, false, false]).slice();
+  const j = Camp.judge(s, r);
+  const best = j.best.slice();
+  best.was = was;
+  const list = $('#result-goals');
+  renderGoals(list, Camp.goals(s), best, j.met);
+  list.hidden = false;
+  const opened = newlyOpened(j.before, j.after);
+  if (opened.length) {
+    const note = $('#unlock-note');
+    note.innerHTML = '';
+    note.append('깡단 옷장에 새로 열렸어요: ');
+    const b = document.createElement('b');
+    b.textContent = opened.map((o) => o.name).join(', ');
+    note.append(b);
+    note.hidden = false;
+  }
+  const i = Camp.stageIndex(s.id);
+  const nextS = Camp.STAGES[i + 1];
+  $('#again-label').textContent = r.winner === 0 && nextS ? '다음 단계' : r.winner === 0 ? '다시 하기' : '다시 도전';
+  return j.met.filter(Boolean).length;
+}
+
+// ---------------------------------------------------------------- result card
+let lastCard = null;
+async function shareResultCard() {
+  if (!lastCard || !game) return;
+  const { r, title, sub, me, stars } = lastCard;
+  const P = r.players[me];
+  const w = r.winner < 0 ? me : r.winner;
+  const fell = r.winner >= 0 && r.players[1 - r.winner].fell;
+  const map = THEMES[lastOpts.theme] ? THEMES[lastOpts.theme].name : '';
+  const stage = lastOpts.campaign && Camp.stage(lastOpts.campaign);
+  const url = site.web || WEB_URL || '';
+  const cv = makeCard({
+    title: fell && r.winner === me ? '추락 K.O.!' : title,
+    sub,
+    team: game.players[w].team,
+    look: game.players[w].look,
+    map: stage ? `깡단 원정 · ${Camp.stageName(stage)}` : map,
+    stats: [['명중', P.hits], ['입힌 피해', P.dmg], ['남은 체력', P.hp]],
+    stars,
+    url,
+  });
+  const res = await shareCard(cv, `도토리깡 한 판! 🐿️ 너도 붙어 볼래?${url ? ' ' + url : ''}`);
+  if (res === 'saved') toast('결과 카드를 저장했어요');
+  else if (res === 'failed') toast('결과 카드를 보내지 못했어요');
+}
+
+// ---------------------------------------------------------------- 깡단 옷장
+let closetKind = 'hat';
+let closetBack = 'title';
+function goCloset(from) {
+  closetBack = from || 'title';
+  screen = 'closet';
+  show('closet');
+  $('#hud').hidden = true;
+  renderCloset();
+  const cv = $('#closet-preview');
+  const t0 = performance.now();
+  const tick = (now) => {
+    if (screen !== 'closet') return;
+    try { Art.drawCaptainFigure(cv, 0, myLook(), (now - t0) / 1000); } catch (e) { /* art not ready */ }
+    requestAnimationFrame(tick);
+  };
+  requestAnimationFrame(tick);
+}
+
+function renderCloset() {
+  const stars = Camp.totalStars();
+  const owned = storage.get('af.owned', {});
+  const look = myLook();
+  $('#closet-stars').textContent = `★ ${stars}`;
+  for (const b of $$('#closet-tabs button')) b.classList.toggle('on', b.dataset.k === closetKind);
+  const wrap = $('#closet-items');
+  wrap.innerHTML = '';
+  for (const it of LOOKS[closetKind]) {
+    const open = lookOpen(it, stars, owned);
+    const b = document.createElement('button');
+    b.className = 'look' + (look[closetKind] === it.id ? ' on' : '') + (open ? '' : ' locked');
+    b.dataset.look = it.id;
+    const cv = document.createElement('canvas');
+    cv.width = cv.height = 112;
+    try { Art.drawLookIcon(cv, closetKind, it.id, 0); } catch (e) { /* art not ready */ }
+    const name = document.createElement('span');
+    name.textContent = it.name;
+    const sm = document.createElement('small');
+    sm.textContent = open ? (look[closetKind] === it.id ? '입는 중' : ' ') : it.pack ? '깡단 후원 팩' : `★ ${it.stars}개 필요`;
+    b.append(cv, name, sm);
+    b.addEventListener('click', () => {
+      if (!open) {
+        Sound.play('deny');
+        $('#closet-note').textContent = it.pack ? '깡단 후원 팩에 들어 있는 아이템이에요' : `깡단 원정에서 별 ${it.stars}개를 모으면 열려요 (지금 ${stars}개)`;
+        return;
+      }
+      Sound.play('select');
+      setMyLook({ ...look, [closetKind]: it.id });
+      $('#closet-note').textContent = `${josa(it.name, '을', '를')} 골랐어요`;
+      renderCloset();
+    });
+    wrap.append(b);
+  }
 }
 
 // The first-match tutorial: an easy CPU on 도토리 숲 with no wind, no forest events and a coach.
@@ -453,7 +643,7 @@ function setupHud() {
     const face = card.querySelector('.pface');
     const c = face.getContext('2d');
     c.clearRect(0, 0, face.width, face.height);
-    try { Art.drawCaptainIcon(face, p.team); } catch (e) { /* art not ready */ }
+    try { Art.drawCaptainIcon(face, p.team, p.look); } catch (e) { /* art not ready */ }
     card.classList.remove('dead');
   }
   const wrap = $('#ammo');
@@ -589,6 +779,10 @@ function showResult(r) {
   } else if (lastOpts.tutorial) {
     title = r.isAIWin ? '연습 끝!' : '연습 끝, 승리!';
     sub = r.isAIWin ? '괜찮아요, 금방 늘어요! 이제 친구와 붙어 볼까요?' : fell ? '구름 아래로 떨어뜨리기까지! 이제 친구와 붙어 볼까요?' : '깡 하나는 합격! 이제 친구와 붙어 볼까요?';
+  } else if (lastOpts.campaign) {
+    title = r.isAIWin || r.winner < 0 ? (r.winner < 0 ? '무승부' : '패배…') : '승리!';
+    sub = r.isAIWin ? `${lastOpts.foe}에게 졌어요. 다시 도전!` : r.winner < 0 ? '둘 다 쓰러졌어요!' : fell ? `${josa(lastOpts.foe, '을', '를')} 구름 아래로 떨어뜨렸어요!` : `${josa(lastOpts.foe, '을', '를')} 이겼어요! 남은 체력 ${r.players[0].hp}`;
+    if (r.winner === 0) record.wins++; else if (r.winner === 1) record.losses++;
   } else if (cpu) {
     title = pre + (r.isAIWin ? '패배…' : '승리!');
     sub = r.isAIWin ? (fell ? '구름 아래로 떨어졌어요… 그래도 깡으로 다시 도전!' : `CPU ${TEAM[1].name}이 도토리를 몽땅 가져갔어요. 다시 도전!`)
@@ -619,18 +813,22 @@ function showResult(r) {
     else $('#again-label').textContent = loser < 0 ? '다음 판' : cpu ? '다음 판 · 전장 고르기' : `다음 판 · ${loser + 1}P가 전장 고르기`;
   } else if (wins) $('#again-label').textContent = '새 대결';
   if (lastOpts.tutorial) $('#again-label').textContent = 'CPU와 한 판';
+  let campStars = null;
+  $('#result-goals').hidden = $('#unlock-note').hidden = true;
+  if (lastOpts.campaign) campStars = campaignResult(r);
   const iWon = r.winner >= 0 && (friend ? r.winner === me : cpu ? !r.isAIWin : true);
   if (iWon) Haptics.win(); else Haptics.lose();
   $('#result-title').textContent = title;
   $('#result-sub').textContent = sub;
   const face = $('#result-face');
   face.getContext('2d').clearRect(0, 0, face.width, face.height);
-  try { Art.drawCaptainIcon(face, r.winner < 0 ? 0 : r.winner); } catch (e) { /* ignore */ }
+  try { const w = r.winner < 0 ? 0 : r.winner; Art.drawCaptainIcon(face, w, game && game.players[w] && game.players[w].look); } catch (e) { /* ignore */ }
   // the 깡단 next to the winner: dancing when you won, flexing ("다음엔 이긴다!") when you didn't
   const myTeam = friend ? me : 0;
   crewCanvas($('#result-crew'), iWon || (!cpu && !friend && r.winner >= 0) ? Math.max(0, r.winner) : myTeam, 0, iWon || (!cpu && !friend) ? 'dance' : 'flex');
+  lastCard = { r, title, sub, me: friend ? me : 0, stars: campStars };
   const stars = $$('#stars i');
-  const n = r.winner < 0 || (cpu && r.isAIWin) || (friend && r.winner !== me) ? 0 : r.stars;
+  const n = campStars != null ? campStars : r.winner < 0 || (cpu && r.isAIWin) || (friend && r.winner !== me) ? 0 : r.stars;
   stars.forEach((s, i) => s.classList.toggle('on', i < n));
   for (let i = 0; i < n; i++) setTimeout(() => Sound.play('star', { pitch: 1 + i * 0.12 }), 350 + i * 300);
   const P = r.players;
@@ -867,6 +1065,7 @@ function openLink(role, code, resume) {
   lobbyStatus(role === 'host' ? '방을 여는 중…' : '방을 찾는 중…');
   o.start().then(() => {
     if (o !== online) return;
+    o.set({ look: myLook() });
     if (role === 'host') o.setLobby(lobbySettings());
     renderRoom();
   }).catch((e) => {
@@ -910,7 +1109,7 @@ function renderRoom() {
     const present = i === mine || online.paired;
     side.classList.toggle('empty', !present);
     side.style.setProperty('--team', TEAM[i].color);
-    if (present) { try { Art.drawCaptainIcon(c, i); } catch (e) { /* art not ready */ } }
+    if (present) { try { Art.drawCaptainIcon(c, i, i === mine ? myLook() : cleanLook(online.peer && online.peer.look)); } catch (e) { /* art not ready */ } }
     side.querySelector('b').textContent = i === mine ? '나' : online.paired ? '친구' : '???';
   }
   $('#btn-room-setup').hidden = !host;
@@ -938,6 +1137,8 @@ function onOnline(evt, data) {
     case 'peer':
       if (screen === 'lobby') renderRoom();
       syncNetLost();
+      // the friend's outfit (it may arrive after the match has started)
+      if (data && game && game.online) { const fp = game.players.find((q) => q.remote); if (fp) fp.look = cleanLook(data.look); }
       break;
     case 'match': {
       const { match, needSync } = data;
@@ -947,6 +1148,7 @@ function onOnline(evt, data) {
         mode: 'online', side, names: side === 0 ? ['나', '친구'] : ['친구', '나'], seed: match.seed,
         theme: THEMES[match.theme] ? match.theme : 'oak', wind: match.wind, timer: match.timer,
         guide: settings.guide !== 'off', firstTurn: match.first, difficulty: 'normal',
+        looks: side === 0 ? [myLook(), cleanLook(online.peer && online.peer.look)] : [cleanLook(online.peer && online.peer.look), myLook()],
       });
       online.attach(game, needSync);
       saveSession();
@@ -1096,7 +1298,15 @@ function bind() {
     Haptics.tap();
     fn(e);
   });
-  click('#btn-solo', () => { Sound.play('tap'); goSetup('cpu'); });
+  click('#btn-solo', () => { Sound.play('tap'); goCampaign(); });
+  click('#camp-back', () => { Sound.play('back'); goTitle(); });
+  click('#camp-free', () => { Sound.play('tap'); goSetup('cpu'); });
+  click('#camp-closet', () => { Sound.play('tap'); goCloset('campaign'); });
+  click('#stage-back', () => { Sound.play('back'); goCampaign(); });
+  click('#stage-go', () => { if (!campStage) return; Sound.play('tap'); startStage(campStage); });
+  click('#btn-closet', () => { Sound.play('tap'); goCloset('title'); });
+  click('#closet-back', () => { Sound.play('back'); if (closetBack === 'campaign') goCampaign(); else goTitle(); });
+  for (const b of $$('#closet-tabs button')) b.addEventListener('click', () => { Sound.play('tap'); closetKind = b.dataset.k; renderCloset(); });
   click('#btn-train', () => { Sound.play('tap'); startTutorial(); });
   click('#help-train', () => { Sound.play('tap'); startTutorial(); });
   click('#btn-duo', () => { Sound.play('tap'); goSetup('pvp'); });
@@ -1146,6 +1356,7 @@ function bind() {
   click('#btn-netlost-leave', () => { Sound.play('back'); leaveOnline(); goTitle(); });
   click('#btn-help', () => { Sound.play('tap'); renderHelpBirds(); show('help'); });
   click('#help-close', () => { Sound.play('back'); show('title'); });
+  click('#btn-card', () => { Sound.play('tap'); shareResultCard(); });
   click('#help-x', () => { Sound.play('back'); show('title'); });
   click('#btn-settings', () => { Sound.play('tap'); syncToggles(); show('settings'); });
   click('#settings-close', () => { Sound.play('back'); show('title'); });
@@ -1192,6 +1403,12 @@ function bind() {
   click('#btn-again', () => {
     Sound.play('tap');
     if (lastOpts.tutorial) { goSetup('cpu'); return; }
+    if (lastOpts.campaign) {
+      const i = Camp.stageIndex(lastOpts.campaign);
+      const won = game && game.winner && game.winner.id === 0;
+      startStage(Camp.STAGES[won && Camp.STAGES[i + 1] ? i + 1 : i]);
+      return;
+    }
     if (lastOpts.mode !== 'online') {
       if (nextRound) {
         const loser = nextRound.lastWinner < 0 ? -1 : 1 - nextRound.lastWinner;
@@ -1219,7 +1436,7 @@ function bind() {
     $('#btn-again').disabled = true;
   });
   click('#pick-x', () => { Sound.play('back'); show('result'); });
-  click('#btn-menu', () => { Sound.play('back'); leaveOnline(); goTitle(); });
+  click('#btn-menu', () => { Sound.play('back'); leaveOnline(); if (lastOpts && lastOpts.campaign) goCampaign(); else goTitle(); });
   click('#btn-overview', () => {
     if (!game) return;
     Sound.play('tap');
@@ -1344,7 +1561,7 @@ function applySettings() {
   Sound.setMusic(!!settings.music);
   prefs.vibe = !!settings.vibe;
   if (settings.music) {
-    const track = screen === 'title' || screen === 'setup' ? 'menu' : screen === 'result' ? null : 'battle';
+    const track = ['title', 'setup', 'campaign', 'stagecard', 'closet'].includes(screen) ? 'menu' : screen === 'result' ? null : 'battle';
     if (track) Sound.music(track);
   } else Sound.music(null);
 }

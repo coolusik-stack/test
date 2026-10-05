@@ -73,3 +73,14 @@ export function vibrate(pattern) {
     /* not supported */
   }
 }
+
+// Korean particle after a word: josa('솔솔', '을', '를') → '솔솔을'. Words that end in a vowel take
+// the second form (and for 으로/로, a final ㄹ does too).
+export function josa(word, withFinal, withoutFinal) {
+  const w = String(word || '');
+  const c = w.charCodeAt(w.length - 1);
+  if (!(c >= 0xac00 && c <= 0xd7a3)) return w + withoutFinal;
+  const fin = (c - 0xac00) % 28;
+  const takesFinal = fin !== 0 && !(withFinal === '으로' && fin === 8);
+  return w + (takesFinal ? withFinal : withoutFinal);
+}
