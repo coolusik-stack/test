@@ -1,0 +1,111 @@
+# 도토리깡 for Android (Capacitor). Builds a debug APK on every change to the game, so there is
+# always one to install on a test phone (Actions → this run → Artifacts → dotori-kkang-debug).
+# Release tags (v*, android-v*) also build the Play Store bundle (.aab), signed with the upload key
+# when these repository secrets exist (see angry-fortress/LAUNCH.md):
+#   ANDROID_KEYSTORE_B64, ANDROID_KEYSTORE_PASSWORD, ANDROID_KEY_ALIAS, ANDROID_KEY_PASSWORD
+# and, with PLAY_SERVICE_ACCOUNT_JSON, uploads it to the Play Console's internal testing track.
+name: Android
+
+on:
+  push:
+    branches: ['**']
+    paths: ['angry-fortress/**', '.github/workflows/android.yml']
+    tags: ['v*', 'android-v*']
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: angry-fortress
+    env:
+      ANDROID_VERSION_CODE: ${{ github.run_number }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - uses: android-actions/setup-android@v3
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: angry-fortress/package-lock.json
+
+      - name: Web build + Capacitor sync
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          PROJECT: ${{ vars.CF_PAGES_PROJECT || 'dotori-kkang' }}
+          WEB_URL: ${{ vars.WEB_URL }}
+          RELAY_URL: ${{ vars.RELAY_URL }}
+        run: |
+          npm ci --ignore-scripts
+          node scripts/site-env.mjs > "$RUNNER_TEMP/site.env"
+          set -a; . "$RUNNER_TEMP/site.env"; set +a
+          npm run build
+          npx cap sync android
+
+      - name: Debug APK
+        working-directory: angry-fortress/android
+        run: ./gradlew --no-daemon assembleDebug
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dotori-kkang-debug
+          path: angry-fortress/android/app/build/outputs/apk/debug/*.apk
+          retention-days: 14
+
+      - name: Upload key present?
+        id: key
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          ANDROID_KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_B64 }}
+        run: |
+          if [ -z "$ANDROID_KEYSTORE_B64" ]; then
+            echo "::notice::No Android upload key yet, so no Play Store bundle was built (see angry-fortress/LAUNCH.md)."
+            echo "ok=false" >> "$GITHUB_OUTPUT"
+          else
+            printf '%s' "$ANDROID_KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/upload.jks"
+            echo "ok=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Play Store bundle (.aab)
+        if: steps.key.outputs.ok == 'true'
+        working-directory: angry-fortress/android
+        env:
+          ANDROID_KEYSTORE_PATH: ${{ runner.temp }}/upload.jks
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: ./gradlew --no-daemon bundleRelease
+
+      - uses: actions/upload-artifact@v4
+        if: steps.key.outputs.ok == 'true'
+        with:
+          name: dotori-kkang-release-aab
+          path: angry-fortress/android/app/build/outputs/bundle/release/*.aab
+          retention-days: 30
+
+      - name: Play service account present?
+        id: play
+        if: steps.key.outputs.ok == 'true'
+        env:
+          PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+        run: echo "ok=$([ -n "$PLAY_SERVICE_ACCOUNT_JSON" ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+
+      - name: Upload to Play internal testing
+        if: steps.play.outputs.ok == 'true'
+        uses: r0adkll/upload-google-play@v1
+        with:
+          serviceAccountJsonPlainText: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+          packageName: com.coolusikstack.dotorifortress
+          releaseFiles: angry-fortress/android/app/build/outputs/bundle/release/*.aab
+          track: internal
+          status: completed

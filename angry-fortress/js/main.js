@@ -15,6 +15,7 @@ import { site, loadSite } from './site.js';
 import { Coach } from './coach.js';
 import * as Camp from './campaign.js';
 import { makeCard, shareCard } from './card.js';
+import * as Shop from './shop.js';
 import { LOOKS, KINDS, DEFAULT_LOOK, cleanLook, isOpen as lookOpen, myLook, setMyLook, newlyOpened } from './looks.js';
 
 const $ = (sel) => document.querySelector(sel);
@@ -445,7 +446,8 @@ function goCloset(from) {
 
 function renderCloset() {
   const stars = Camp.totalStars();
-  const owned = storage.get('af.owned', {});
+  const owned = Shop.owned();
+  renderShop();
   const look = myLook();
   $('#closet-stars').textContent = `★ ${stars}`;
   for (const b of $$('#closet-tabs button')) b.classList.toggle('on', b.dataset.k === closetKind);
@@ -467,7 +469,7 @@ function renderCloset() {
     b.addEventListener('click', () => {
       if (!open) {
         Sound.play('deny');
-        $('#closet-note').textContent = it.pack ? '깡단 후원 팩에 들어 있는 아이템이에요' : `깡단 원정에서 별 ${it.stars}개를 모으면 열려요 (지금 ${stars}개)`;
+        $('#closet-note').textContent = it.pack ? (Shop.shopAvailable() ? '깡단 후원 팩에 들어 있는 아이템이에요 (아래에서)' : '깡단 후원 팩 아이템이에요. 앱에서 만날 수 있어요') : `깡단 원정에서 별 ${it.stars}개를 모으면 열려요 (지금 ${stars}개)`;
         return;
       }
       Sound.play('select');
@@ -477,6 +479,43 @@ function renderCloset() {
     });
     wrap.append(b);
   }
+}
+
+// The supporter pack card under the closet (phone apps only).
+async function renderShop() {
+  const card = $('#shop-card');
+  const list = await Shop.catalog();
+  const p = list && list[0];
+  card.hidden = $('#shop-restore').hidden = !p;
+  if (!p) return;
+  $('#shop-name').textContent = p.name;
+  $('#shop-desc').textContent = p.desc;
+  card.classList.toggle('owned', p.owned);
+  const b = $('#shop-buy');
+  b.disabled = p.owned || !p.price;
+  b.textContent = p.owned ? '고마워요!' : p.price || '준비 중';
+  b.dataset.product = p.id;
+}
+
+let shopBusy = false;
+async function buyProduct(id) {
+  if (shopBusy || !id) return;
+  shopBusy = true;
+  $('#shop-buy').disabled = true;
+  const r = await Shop.buy(id);
+  shopBusy = false;
+  if (r === 'bought') { Sound.play('star'); Haptics.win(); toast('고마워요! 후원 팩 아이템이 열렸어요'); }
+  else if (r === 'failed') toast('구매하지 못했어요. 잠시 뒤에 다시 해 주세요');
+  if (screen === 'closet') renderCloset();
+}
+
+async function restorePurchases() {
+  if (shopBusy) return;
+  shopBusy = true;
+  const n = await Shop.restore(true);
+  shopBusy = false;
+  toast(n > 0 ? '구매한 아이템을 되찾았어요' : n === 0 ? '되찾을 구매가 없어요' : '스토어에 연결하지 못했어요');
+  if (screen === 'closet') renderCloset();
 }
 
 // The first-match tutorial: an easy CPU on 도토리 숲 with no wind, no forest events and a coach.
@@ -1305,6 +1344,9 @@ function bind() {
   click('#stage-back', () => { Sound.play('back'); goCampaign(); });
   click('#stage-go', () => { if (!campStage) return; Sound.play('tap'); startStage(campStage); });
   click('#btn-closet', () => { Sound.play('tap'); goCloset('title'); });
+  click('#shop-buy', () => { Sound.play('tap'); buyProduct($('#shop-buy').dataset.product); });
+  click('#shop-restore', () => { Sound.play('tap'); restorePurchases(); });
+  click('#settings-restore', () => { Sound.play('tap'); restorePurchases(); });
   click('#closet-back', () => { Sound.play('back'); if (closetBack === 'campaign') goCampaign(); else goTitle(); });
   for (const b of $$('#closet-tabs button')) b.addEventListener('click', () => { Sound.play('tap'); closetKind = b.dataset.k; renderCloset(); });
   click('#btn-train', () => { Sound.play('tap'); startTutorial(); });
@@ -1358,7 +1400,7 @@ function bind() {
   click('#help-close', () => { Sound.play('back'); show('title'); });
   click('#btn-card', () => { Sound.play('tap'); shareResultCard(); });
   click('#help-x', () => { Sound.play('back'); show('title'); });
-  click('#btn-settings', () => { Sound.play('tap'); syncToggles(); show('settings'); });
+  click('#btn-settings', () => { Sound.play('tap'); syncToggles(); $('#settings-restore').hidden = !Shop.shopAvailable(); show('settings'); });
   click('#settings-close', () => { Sound.play('back'); show('title'); });
   $('#app-version').textContent = `v${VERSION}`;
   click('#setup-back', () => { Sound.play('back'); if (mode === 'online') goLobby('room'); else goTitle(); });
@@ -1534,6 +1576,26 @@ function bind() {
   });
 }
 
+// Android's back button (and gesture): step back through the screens like the on-screen buttons,
+// and leave the app only from the title.
+function hookBackButton() {
+  const App = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.App;
+  if (!App || !isNativeApp()) return;
+  App.addListener('backButton', () => {
+    const shown = (id) => !$('#' + id).hidden;
+    if (shown('help') || shown('settings')) { Sound.play('back'); show('title'); return; }
+    if (screen === 'battle') { pause(true); return; }
+    if (screen === 'paused') { pause(false); return; }
+    if (screen === 'stagecard') { Sound.play('back'); goCampaign(); return; }
+    if (screen === 'closet') { Sound.play('back'); if (closetBack === 'campaign') goCampaign(); else goTitle(); return; }
+    if (screen === 'setup' && mode === 'online') { goLobby('room'); return; }
+    if (screen === 'result') { leaveOnline(); if (lastOpts && lastOpts.campaign) goCampaign(); else goTitle(); return; }
+    if (screen === 'lobby') { const enter = !$('#lobby-enter').hidden; if (online || enter) { leaveOnline(); setPane('choose'); } else goTitle(); return; }
+    if (screen !== 'title') { goTitle(); return; }
+    App.exitApp();
+  });
+}
+
 function pause(on) {
   if (!game) return;
   if (on) {
@@ -1599,6 +1661,8 @@ async function boot() {
   } catch (e) { /* fonts optional */ }
   goTitle();
   if (!window.claude) loadSite();
+  if (Shop.shopAvailable()) Shop.restore(false); // quietly pick up purchases made on another phone
+  hookBackButton();
   const join = cleanCode(new URLSearchParams(location.search).get('join') || '');
   const back = savedSession();
   if (join.length === 4) {

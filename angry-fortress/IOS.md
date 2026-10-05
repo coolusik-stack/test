@@ -86,3 +86,11 @@ Xcode에서 할 일:
 - **Swift 코드는 여기서 컴파일해 보지 못했습니다.** Mac에서 처음 빌드할 때 오류가 나면 그 메시지를 알려 주세요.
 - **친구 대결 연결**: 앱은 우리 중계 서버(`relay/`, Cloudflare)를 거쳐 연결하므로 모바일 데이터끼리도 됩니다. 빌드가 중계 서버 주소를 알려면 Cloudflare 비밀값이 등록되어 있고 Relay 워크플로가 한 번 배포되어 있어야 합니다([LAUNCH.md](LAUNCH.md) 한 번만 할 일 3). 그 전 빌드는 PeerJS 직접 연결(같은 와이파이에서는 잘 되지만 모바일 데이터끼리는 안 될 수 있음)을 씁니다.
 - **친구 초대**: 방 코드를 공유합니다. 앱 링크로 바로 들어오는 딥링크는 아직 없습니다.
+
+## 인앱 구입 (깡단 후원 팩)
+
+- 코드는 `js/shop.js`, 플러그인은 `@capgo/native-purchases`(StoreKit 2, 서버 없이 기기에서 검증).
+- App Store Connect → 앱 → 인앱 구입에서 **비소모성** 상품 `supporter_pack`을 만들어야 앱에 가격이 뜹니다([LAUNCH.md](LAUNCH.md) 한 번만 할 일 7). 만들기 전에는 옷장 카드가 '준비 중'으로 보입니다.
+- TestFlight에서는 실제 돈이 나가지 않는 샌드박스 결제로 시험할 수 있습니다.
+- 첫 인앱 상품은 앱 버전과 **함께** 심사에 제출해야 합니다(버전 페이지의 '인앱 구입' 칸에서 선택). 심사 메모(`store/metadata/review_information/notes.txt`)에 위치를 적어 두었습니다.
+- 공유 시트의 '이미지 저장'을 위해 `Info.plist`에 사진 추가 권한 설명(`NSPhotoLibraryAddUsageDescription`)을 넣어 두었습니다.

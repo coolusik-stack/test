@@ -1,2 +1,4 @@
-친구 대결(각자 폰으로 1:1)은 기기 두 대가 필요합니다. 한 기기로는 타이틀의 '번갈아 대결'(폰 하나로 둘이 번갈아) 또는 'CPU 연습'으로 모든 게임 기능을 확인할 수 있습니다. 로그인이나 계정은 없습니다.
-Online play needs two devices. On one device, "번갈아 대결" (pass-and-play) and "CPU 연습" (vs computer) cover every gameplay feature. No login or account.
+친구 대결(각자 폰으로 1:1)은 기기 두 대가 필요합니다. 한 기기로는 타이틀의 '번갈아 대결'(폰 하나로 둘이 번갈아) 또는 '깡단 원정'(CPU와 12단계, 아래쪽 '자유 연습'도 있음)으로 모든 게임 기능을 확인할 수 있습니다. 처음 켜면 '1분 연습 한 판' 튜토리얼이 있습니다. 로그인이나 계정은 없습니다.
+인앱 구매: '깡단 후원 팩'(비소모성, 꾸미기 아이템 3개)은 타이틀 → 옷 모양 버튼(깡단 옷장) → 아래쪽 후원 팩 카드에서 살 수 있습니다. 구매 복원은 같은 카드 아래 '구매 복원'과 설정(톱니바퀴) → '구매 복원'에 있습니다. 게임 진행에 필요한 것은 없고 모양만 바뀝니다.
+Online play needs two devices. On one device, "번갈아 대결" (pass-and-play) and "깡단 원정" (12 stages vs the computer, with free practice below) cover every gameplay feature; first launch offers a 1-minute tutorial. No login or account.
+In-app purchase: the "깡단 후원 팩" (non-consumable, three cosmetic items) is in Title → shirt button (깡단 옷장) → supporter pack card at the bottom. Restore Purchases is under that card and in Settings (gear) → "구매 복원". Purchases change looks only, never gameplay.

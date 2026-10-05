@@ -14,14 +14,19 @@
     "release": "node scripts/release.mjs",
     "store:shots": "node scripts/store-shots.mjs",
     "balance": "node tests/balance.mjs",
-    "preflight": "node scripts/preflight.mjs"
+    "preflight": "node scripts/preflight.mjs",
+    "android": "node scripts/build-www.mjs && npx cap sync android",
+    "android:key": "node scripts/android-key.mjs"
   },
   "dependencies": {
+    "@capacitor/android": "^8.5.2",
+    "@capacitor/app": "^8.1.2",
     "@capacitor/core": "^8.5.2",
     "@capacitor/filesystem": "^8.1.4",
     "@capacitor/haptics": "^8.0.2",
     "@capacitor/ios": "^8.5.2",
-    "@capacitor/share": "^8.0.2"
+    "@capacitor/share": "^8.0.2",
+    "@capgo/native-purchases": "^8.8.1"
   },
   "devDependencies": {
     "@capacitor/cli": "^8.5.2",
