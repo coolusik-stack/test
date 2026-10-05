@@ -1,3 +1,16 @@
+/* Fonts ship with the game (SIL OFL, see assets/fonts/OFL-*.txt), so the app looks right offline.
+   Subset to everyday Hangul + Latin; anything else falls back to the system font. */
+@font-face {
+  font-family: 'Black Han Sans';
+  src: url('../assets/fonts/BlackHanSans.woff2') format('woff2');
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Jua';
+  src: url('../assets/fonts/Jua.woff2') format('woff2');
+  font-display: swap;
+}
+
 /* 도토리 포트리스 — chunky cartoon UI over a full-bleed canvas. */
 :root {
   --ink: #2b1a12;
@@ -994,3 +1007,5 @@ svg { width: 1em; height: 1em; fill: currentColor; flex: none; }
 .pick-panel { max-width: 640px; display: flex; flex-direction: column; gap: 8px; }
 .pick-sub { margin: -6px 0 4px; text-align: center; font-size: 15px; }
 #pick-maps { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 8px; }
+
+.app-version { display: block; margin-top: 10px; text-align: center; opacity: 0.55; font-size: 12px; }

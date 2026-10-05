@@ -1,5 +1,6 @@
-// Offline cache for the game shell. Bump VERSION when files change.
-const VERSION = 'af-v9';
+// Offline cache for the game shell. Bump VERSION when files change (the web build stamps its own
+// copy with the version and commit, see scripts/build-www.mjs).
+const VERSION = 'af-v10';
 const SHELL = [
   './',
   './index.html',
@@ -24,10 +25,13 @@ const SHELL = [
   './js/crew.js',
   './js/spots.js',
   './js/config.js',
+  './js/version.js',
   './js/util.js',
   './manifest.webmanifest',
   './assets/icon-192.png',
   './assets/icon-512.png',
+  './assets/fonts/BlackHanSans.woff2',
+  './assets/fonts/Jua.woff2',
 ];
 
 self.addEventListener('install', (e) => {
@@ -45,9 +49,7 @@ self.addEventListener('fetch', (e) => {
   const req = e.request;
   if (req.method !== 'GET') return;
   const url = new URL(req.url);
-  const own = url.origin === self.location.origin;
-  const font = url.hostname.endsWith('gstatic.com') || url.hostname.endsWith('googleapis.com');
-  if (!own && !font) return;
+  if (url.origin !== self.location.origin) return;
   e.respondWith(
     fetch(req)
       .then((res) => {

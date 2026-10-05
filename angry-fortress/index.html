@@ -17,9 +17,8 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" type="image/png" href="assets/icon-192.png">
 <link rel="apple-touch-icon" href="assets/icon-192.png">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=Jua&display=swap">
+<link rel="preload" href="assets/fonts/Jua.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="assets/fonts/BlackHanSans.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
@@ -246,6 +245,7 @@
       <button class="tgl" data-toggle="vibe"><svg><use href="#i-vibe"/></svg><span>진동</span></button>
     </div>
     <button class="btn btn-yellow" id="settings-close">확인</button>
+    <small class="app-version" id="app-version"></small>
   </div>
 </section>
 

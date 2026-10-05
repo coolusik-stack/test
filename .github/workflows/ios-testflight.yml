@@ -1,16 +1,21 @@
 # Build the iOS app on a GitHub-hosted Mac and upload it to TestFlight, no local Mac needed.
-# Runs when you push a tag like `ios-v0.1.0` (or from the Actions tab once this file is on the
-# default branch). Needs four repository secrets, see angry-fortress/IOS.md:
+# Runs for every release tag (`v1.2.3`, made by `npm run release`) and for `ios-v*` tags, but only
+# after the game's tests pass. The version comes from angry-fortress/package.json, the build
+# number from the run number. Needs four repository secrets, see angry-fortress/IOS.md:
 #   ASC_KEY_ID, ASC_ISSUER_ID, ASC_KEY_P8 (App Store Connect API key, Admin role), APPLE_TEAM_ID
 name: iOS TestFlight
 
 on:
   workflow_dispatch:
   push:
-    tags: ['ios-v*']
+    tags: ['v*', 'ios-v*']
 
 jobs:
+  tests:
+    uses: ./.github/workflows/game-tests.yml
+
   testflight:
+    needs: tests
     runs-on: macos-latest
     timeout-minutes: 45
     defaults:
@@ -61,12 +66,14 @@ jobs:
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           BUILD_NUMBER: ${{ github.run_number }}
         run: |
+          VERSION=$(node -p "require('./package.json').version")
+          echo "Building $VERSION ($BUILD_NUMBER)"
           xcodebuild -project ios/App/App.xcodeproj -scheme App -configuration Release \
             -destination 'generic/platform=iOS' -archivePath "$RUNNER_TEMP/App.xcarchive" \
             -allowProvisioningUpdates \
             -authenticationKeyPath "$RUNNER_TEMP/keys/AuthKey_$ASC_KEY_ID.p8" \
             -authenticationKeyID "$ASC_KEY_ID" -authenticationKeyIssuerID "$ASC_ISSUER_ID" \
-            DEVELOPMENT_TEAM="$APPLE_TEAM_ID" CODE_SIGN_STYLE=Automatic CURRENT_PROJECT_VERSION="$BUILD_NUMBER" \
+            DEVELOPMENT_TEAM="$APPLE_TEAM_ID" CODE_SIGN_STYLE=Automatic CURRENT_PROJECT_VERSION="$BUILD_NUMBER" MARKETING_VERSION="$VERSION" \
             archive
 
       - name: Export and upload to App Store Connect

@@ -1,0 +1,32 @@
+# 도토리깡: weekly balance report. CPU vs CPU on every map; the run page shows where they stood,
+# what each spot dealt and took, falls and win rates, so balance drift shows up without anyone
+# running sims by hand. Scheduled runs only fire from the repository's default branch; until the
+# game lives there, push a `balance-*` tag to run it.
+name: Balance report
+
+on:
+  schedule:
+    - cron: '17 0 * * 1' # Mondays 09:17 KST
+  push:
+    tags: ['balance-*']
+  workflow_dispatch:
+
+jobs:
+  balance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    defaults:
+      run:
+        working-directory: angry-fortress
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: angry-fortress/package-lock.json
+      - run: |
+          npm ci
+          npx playwright install --with-deps chromium
+      - run: npm run balance -- 12
+      - run: cat tests/output/balance.md >> "$GITHUB_STEP_SUMMARY"

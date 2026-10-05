@@ -1,0 +1,73 @@
+# 도토리깡: store screenshots and listing.
+# - Every release tag (`v1.2.3`) renders fresh screenshots from the game (App Store iPhone 6.9",
+#   Google Play phone + feature graphic) and attaches them to the run as an artifact.
+# - A `store-v*` tag also uploads the Korean listing text (angry-fortress/store/metadata) and the
+#   App Store screenshots to App Store Connect with fastlane (no binary, no review submission).
+#   That part needs the same four secrets as TestFlight (see angry-fortress/IOS.md) and has not
+#   been run for real yet, so check App Store Connect after the first run.
+name: Store assets
+
+on:
+  push:
+    tags: ['v*', 'store-v*']
+  workflow_dispatch:
+
+jobs:
+  screenshots:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: angry-fortress
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: angry-fortress/package-lock.json
+      - run: |
+          npm ci
+          npx playwright install --with-deps chromium
+          npm run store:shots
+      - uses: actions/upload-artifact@v4
+        with:
+          name: store-screenshots
+          path: |
+            angry-fortress/store/screenshots
+            angry-fortress/store/play
+          retention-days: 90
+
+  listing:
+    if: startsWith(github.ref, 'refs/tags/store-v')
+    needs: screenshots
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: angry-fortress
+    env:
+      ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+      ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+      ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: store-screenshots
+          path: angry-fortress/store
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.3'
+      - name: Upload listing to App Store Connect
+        run: |
+          for v in ASC_KEY_ID ASC_ISSUER_ID ASC_KEY_P8; do
+            if [ -z "${!v}" ]; then echo "::error::Missing repository secret $v (see angry-fortress/IOS.md)"; exit 1; fi
+          done
+          gem install fastlane --no-document
+          node -e 'const e=process.env; require("fs").writeFileSync(process.env.RUNNER_TEMP+"/asc.json", JSON.stringify({key_id:e.ASC_KEY_ID, issuer_id:e.ASC_ISSUER_ID, key:e.ASC_KEY_P8, in_house:false}))'
+          fastlane deliver --api_key_path "$RUNNER_TEMP/asc.json" \
+            --app_identifier com.coolusikstack.dotorifortress --platform ios \
+            --metadata_path store/metadata --screenshots_path store/screenshots \
+            --skip_binary_upload true --overwrite_screenshots true --force true \
+            --submit_for_review false --run_precheck_before_submit false

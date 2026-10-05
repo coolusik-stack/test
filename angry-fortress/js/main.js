@@ -10,6 +10,7 @@ import { Online } from './online.js';
 import { makeCode, cleanCode } from './net.js';
 import { Haptics, isNativeApp } from './haptics.js';
 import { infoOf } from './spots.js';
+import { VERSION } from './version.js';
 
 const $ = (sel) => document.querySelector(sel);
 const $$ = (sel) => [...document.querySelectorAll(sel)];
@@ -1074,6 +1075,7 @@ function bind() {
   click('#help-x', () => { Sound.play('back'); show('title'); });
   click('#btn-settings', () => { Sound.play('tap'); syncToggles(); show('settings'); });
   click('#settings-close', () => { Sound.play('back'); show('title'); });
+  $('#app-version').textContent = `v${VERSION}`;
   click('#setup-back', () => { Sound.play('back'); if (mode === 'online') goLobby('room'); else goTitle(); });
   click('#btn-go', () => {
     if (mode === 'online') {

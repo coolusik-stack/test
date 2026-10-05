@@ -52,10 +52,11 @@ Xcode에서 할 일:
    - `ASC_ISSUER_ID`: 발급자 ID(키 목록 위에 표시)
    - `ASC_KEY_P8`: `.p8` 파일 내용 전체
    - `APPLE_TEAM_ID`: 개발자 계정의 팀 ID(developer.apple.com → Membership)
-3. `ios-v`로 시작하는 태그를 푸시하면 빌드가 시작됩니다. 비공개 저장소는 Mac 실행 시간이 무료 한도에서 10배로 차감됩니다.
+3. 새 버전은 한 줄로 냅니다. 버전이 게임·Xcode·오프라인 캐시에 한꺼번에 들어가고, 태그가 푸시됩니다. GitHub가 **자동 테스트를 먼저 돌리고, 통과해야만** TestFlight에 올립니다(빌드 번호는 실행 번호로 자동 증가). 공개 저장소라 Mac 실행 시간은 무료입니다.
    ```bash
-   git tag ios-v0.1.0 && git push origin ios-v0.1.0
+   npm run release -- patch --push      # 0.1.0 → 0.1.1
    ```
+   빌드만 다시 올리고 싶으면 `ios-v`로 시작하는 태그를 푸시해도 됩니다. 일정과 나머지 자동화는 [LAUNCH.md](LAUNCH.md)에 있습니다.
 
 ## 3. TestFlight로 테스트하기
 

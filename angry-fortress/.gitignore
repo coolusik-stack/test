@@ -8,3 +8,6 @@ ios/App/DerivedData/
 *.xcuserstate
 xcuserdata/
 .DS_Store
+tests/output/
+store/screenshots/
+store/play/

@@ -1,0 +1,53 @@
+# 도토리깡: puts the web version online on Cloudflare Pages (free), after the tests pass.
+# Runs for every release tag (`v1.2.3`, made by `npm run release`) and for `web-v*` tags.
+# Not GitHub Pages on purpose: this repository's Pages already serves a different site.
+# Needs two repository secrets (see angry-fortress/LAUNCH.md): CLOUDFLARE_API_TOKEN (permission
+# "Cloudflare Pages: Edit") and CLOUDFLARE_ACCOUNT_ID. Without them the job just says so and stops.
+name: Web deploy
+
+on:
+  push:
+    tags: ['v*', 'web-v*']
+  workflow_dispatch:
+
+jobs:
+  tests:
+    uses: ./.github/workflows/game-tests.yml
+
+  deploy:
+    needs: tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: angry-fortress
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      PROJECT: ${{ vars.CF_PAGES_PROJECT || 'dotori-kkang' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Secrets present?
+        id: ready
+        run: |
+          if [ -z "$CLOUDFLARE_API_TOKEN" ] || [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then
+            echo "::notice::No Cloudflare secrets yet, so nothing was deployed (see angry-fortress/LAUNCH.md)."
+            echo "ok=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ok=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Build
+        if: steps.ready.outputs.ok == 'true'
+        run: node scripts/build-www.mjs
+
+      - name: Deploy
+        if: steps.ready.outputs.ok == 'true'
+        run: |
+          npx --yes wrangler@3 pages project create "$PROJECT" --production-branch=main 2>/dev/null || true
+          npx --yes wrangler@3 pages deploy www --project-name="$PROJECT" --branch=main --commit-dirty=true
+          echo "### 웹 버전 배포 완료: https://$PROJECT.pages.dev" >> "$GITHUB_STEP_SUMMARY"

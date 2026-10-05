@@ -1,0 +1,2 @@
+친구 대결(각자 폰으로 1:1)은 기기 두 대가 필요합니다. 한 기기로는 타이틀의 '번갈아 대결'(폰 하나로 둘이 번갈아) 또는 'CPU 연습'으로 모든 게임 기능을 확인할 수 있습니다. 로그인이나 계정은 없습니다.
+Online play needs two devices. On one device, "번갈아 대결" (pass-and-play) and "CPU 연습" (vs computer) cover every gameplay feature. No login or account.
