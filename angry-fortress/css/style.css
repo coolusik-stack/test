@@ -867,6 +867,7 @@ svg { width: 1em; height: 1em; fill: currentColor; flex: none; }
 .closet-panel { max-width: 760px; display: flex; flex-direction: column; gap: 8px; }
 .closet-body { display: grid; grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr); gap: 14px; align-items: start; }
 .closet-preview { width: 100%; aspect-ratio: 360 / 330; border-radius: 18px; border: 3px solid var(--ink); background: radial-gradient(circle at 50% 70%, #fff6dc, #9fdcff 75%); }
+.closet-left { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
 .closet-side { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
 .closet-tabs { flex: none; }
 .closet-items { display: grid; grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); gap: 8px; }
@@ -891,8 +892,13 @@ svg { width: 1em; height: 1em; fill: currentColor; flex: none; }
 .look.locked small { color: var(--red-2); }
 .closet-note { margin: 0; font-size: 13px; color: var(--ink-soft); text-align: center; }
 @media (max-height: 430px) {
-  .closet-items { grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); }
-  .look canvas { width: 44px; height: 44px; }
+  .closet-items { grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); gap: 6px; }
+  .look { padding: 2px 4px 4px; font-size: 12px; }
+  .look canvas { width: 42px; height: 42px; }
+  .closet-preview { max-height: 38vh; object-fit: contain; }
+  .closet-panel { gap: 4px; }
+  .shop-card { padding: 6px 8px 6px 12px; }
+  .shop-text span { font-size: 11px; }
 }
 
 .shop-card {

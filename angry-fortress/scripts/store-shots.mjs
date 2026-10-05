@@ -85,6 +85,23 @@ const SCENES = [
     },
   },
   {
+    name: 'closet', caption: '깡단 원정에서 별 모아, 나만의 깡단으로',
+    async setup(page) {
+      await start(page, { mode: 'cpu', theme: 'pine', looks: [{ hat: 'crown', cart: 'gold', trail: 'star' }, { hat: 'mushroom', cart: 'sky', trail: 'leaf' }] });
+      await page.evaluate(() => {
+        const g = window.__af.game, p = g.players[0];
+        const pos = p.body.getPosition();
+        // last shot's stardust arc, rising from the sling toward the other island
+        p.lastTrail = Array.from({ length: 26 }, (_, i) => {
+          const u = i / 25, x = pos.x + 1 + u * 13;
+          return { x, y: pos.y + 1.2 + Math.sin(u * Math.PI * 0.9) * 6.5, s: i % 3 === 0 ? 0.13 : 0.07 };
+        });
+        g.cam.focus(pos.x + 5.2, pos.y + 2.6, g.cam.baseZoom * 1.25, 30);
+      });
+      await page.waitForTimeout(900);
+    },
+  },
+  {
     name: 'crew', caption: '언제나 씩씩한 깡단과 함께',
     async setup(page) {
       await start(page, { mode: 'cpu', theme: 'pine' });
@@ -99,8 +116,8 @@ const SCENES = [
   },
 ];
 
-async function start(page, { mode, theme }) {
-  await page.evaluate(({ mode, theme }) => window.__af.startBattle({ mode, difficulty: 'normal', theme, wind: 'off', timer: 0, guide: true, seed: 777 }), { mode, theme });
+async function start(page, { mode, theme, looks }) {
+  await page.evaluate(({ mode, theme, looks }) => window.__af.startBattle({ mode, difficulty: 'normal', theme, wind: 'off', timer: 0, guide: true, seed: 777, ...(looks ? { looks } : {}) }), { mode, theme, looks });
   await page.waitForFunction(() => { const g = window.__af.game; return g && g.state === 'aim' && g.turn === 0; }, null, { timeout: 15000 });
 }
 

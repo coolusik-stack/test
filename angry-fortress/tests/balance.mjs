@@ -4,6 +4,7 @@
 // from the first shooter's edge (the launch bar: under 70%).
 //   npm run balance            6 matches per map
 //   npm run balance -- 12      more matches, steadier numbers
+//   npm run balance -- 48 --only=oak   one map (seeds differ from the full run's: --from=K starts at match K)
 // Writes tests/output/balance.md (the weekly workflow posts it on the run page).
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -14,6 +15,8 @@ import { MAPS } from './suites/maps.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const N = +(process.argv[2] || 6);
+const only = (process.argv.find((a) => a.startsWith('--only=')) || '').slice(7).split(',').filter(Boolean);
+const from = +((process.argv.find((a) => a.startsWith('--from=')) || '').slice(7) || 0);
 const server = await serve(join(here, '..'));
 const browser = await chromium.launch();
 const page = await browser.newPage();
@@ -21,13 +24,13 @@ await page.goto(server.url + 'index.html');
 await page.waitForFunction(() => window.__af && window.planck);
 
 const md = [`### 도토리깡 balance — CPU vs CPU, ${N} matches per map`, ''];
-for (const theme of MAPS) {
-  const r = await page.evaluate(async ({ theme, N }) => {
+for (const theme of MAPS.filter((m) => !only.length || only.includes(m))) {
+  const r = await page.evaluate(async ({ theme, N, from }) => {
     const { Game } = await import('./js/game.js');
     const { spotsAt } = await import('./js/spots.js');
     const at = {}, deal = {}, take = {};
     let p0wins = 0, firstWins = 0, falls = 0, turns = 0, pads = 0, rewards = 0;
-    for (let k = 0; k < N; k++) {
+    for (let k = from; k < from + N; k++) {
       let s = 7919 * (k + 1);
       Math.random = () => ((s = Math.imul(s ^ (s >>> 15), 0x2c1b3c6d) ^ Math.imul(s ^ (s >>> 13), 0x297a2d39) ^ (s + 0x6d2b79f5)) >>> 0) / 4294967296;
       const cv = document.createElement('canvas'); cv.width = 844; cv.height = 390;
@@ -58,7 +61,7 @@ for (const theme of MAPS) {
     }
     const per = (o) => Object.fromEntries(Object.entries(o).map(([k, [a, n]]) => [k, (a / n).toFixed(1)]));
     return { at, deal: per(deal), take: per(take), p0wins, firstWins, falls, turns: turns / N, pads, rewards };
-  }, { theme, N });
+  }, { theme, N, from });
   const kinds = Object.keys(r.at).sort((a, b) => r.at[b] - r.at[a]);
   md.push(`**${theme}** — first shooter wins ${r.firstWins}/${N} · 1P (left) wins ${r.p0wins}/${N} · falls ${r.falls} · avg ${r.turns.toFixed(1)} turns · pad trips ${r.pads} · spot rewards ${r.rewards}`, '');
   md.push('| shot from | shots | dealt / shot | taken / shot |', '|---|---|---|---|');
