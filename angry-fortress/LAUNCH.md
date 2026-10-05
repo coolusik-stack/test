@@ -24,6 +24,7 @@
 |---|---|---|
 | 게임 코드를 push할 때마다 | 12가지 자동 테스트(켜짐·글꼴, 메뉴~결과, 처음 온 사람의 연습 한 판, 깡단 원정·옷장·결과 카드, 후원 팩 구매·복원, 네 맵 명당 돌기, 출발점 사격, 두 폰 동기화, 친구 대결 로비, 중계 서버로 대결하다 연결 끊기·다른 앱 갔다 오기·새로고침, CPU 한 판, 속도와 화질 자동 조절) + 출시 전 점검 | GitHub → Actions → **Game tests** (표와 스크린샷) |
 | `npm run release -- minor --push` 한 번 | 버전 올리기(게임·Xcode·오프라인 캐시) → 커밋·태그 → 테스트 통과하면 **TestFlight 업로드**, **웹 배포**, **스토어 스크린샷 13장** | Actions → iOS TestFlight / Web deploy / Store assets |
+| iOS 쪽(플러그인 포함)이 바뀔 때마다 | Mac에서 서명 없이 iOS 앱 컴파일 확인 | Actions → **iOS build check** |
 | 게임 코드를 push할 때마다 | 안드로이드 테스트용 APK 빌드 | Actions → **Android** → Artifacts → dotori-kkang-debug (폰에 바로 설치) |
 | 출시 태그(`v…`) | 위에 더해 Play 스토어용 번들(.aab) 서명·빌드, 서비스 계정이 있으면 Play Console 내부 테스트에 자동 업로드 | Actions → **Android**, Play Console |
 | `store-v…` 태그 | 스토어 문구(`store/metadata`)와 스크린샷을 App Store Connect에 올리기(심사 제출은 안 함) | App Store Connect |

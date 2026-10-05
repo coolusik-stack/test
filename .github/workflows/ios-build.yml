@@ -1,0 +1,48 @@
+# 도토리깡: compiles the iOS app for the simulator (no signing, no Apple account needed) whenever
+# the app's native side or its plugins change, so a broken Xcode build shows up here instead of
+# on release day in the TestFlight workflow.
+name: iOS build check
+
+on:
+  push:
+    branches: ['**']
+    paths:
+      - 'angry-fortress/ios/**'
+      - 'angry-fortress/package.json'
+      - 'angry-fortress/package-lock.json'
+      - 'angry-fortress/capacitor.config.json'
+      - '.github/workflows/ios-build.yml'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-latest
+    timeout-minutes: 40
+    defaults:
+      run:
+        working-directory: angry-fortress
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Use the newest Xcode on the runner
+        run: |
+          XC=$(ls -d /Applications/Xcode_*.app | sort -V | tail -1)
+          sudo xcode-select -s "$XC"
+          xcodebuild -version
+
+      - name: Web build + Capacitor sync
+        run: |
+          npm ci --ignore-scripts
+          npm run build
+          npx cap sync ios
+
+      - name: Build for the simulator
+        run: |
+          xcodebuild -project ios/App/App.xcodeproj -scheme App -configuration Debug \
+            -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' \
+            CODE_SIGNING_ALLOWED=NO build | tail -40
+          exit ${PIPESTATUS[0]}
