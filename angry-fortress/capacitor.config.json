@@ -8,5 +8,10 @@
     "scrollEnabled": false,
     "backgroundColor": "#58b7f5",
     "limitsNavigationsToAppBoundDomains": false
+  },
+  "plugins": {
+    "SystemBars": {
+      "hidden": true
+    }
   }
 }

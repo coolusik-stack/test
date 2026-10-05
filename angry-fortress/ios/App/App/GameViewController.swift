@@ -17,9 +17,9 @@ class GameViewController: CAPBridgeViewController {
 
     override var prefersStatusBarHidden: Bool { true }
 
-    // no home bar in the way, and a swipe near the edges while aiming stays in the game
-    override var prefersHomeIndicatorAutoHidden: Bool { true }
-
+    // A swipe near the edges while aiming stays in the game. (The home bar is hidden by
+    // Capacitor's SystemBars plugin, "hidden": true in capacitor.config.json: Capacitor 8 owns
+    // prefersHomeIndicatorAutoHidden, so it can't be overridden here.)
     override var preferredScreenEdgesDeferringSystemGestures: UIRectEdge { [.bottom, .top] }
 }
 
