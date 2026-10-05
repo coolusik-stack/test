@@ -142,7 +142,7 @@ for (const target of TARGETS) {
     if (only && scene.name !== only) continue;
     const ctx = await browser.newContext({ viewport: { width: target.width, height: target.height }, deviceScaleFactor: target.dpr, isMobile: true, hasTouch: true });
     const page = await ctx.newPage();
-    await page.goto(server.url + 'index.html');
+    await page.goto(server.url + 'index.html?hq=1');
     await page.waitForFunction(() => window.__af && window.planck);
     await page.evaluate(() => document.fonts.ready);
     await scene.setup(page);
@@ -159,7 +159,7 @@ for (const target of TARGETS) {
 if (!only || only === 'feature') {
   const ctx = await browser.newContext({ viewport: { width: 1024, height: 500 }, deviceScaleFactor: 1 });
   const page = await ctx.newPage();
-  await page.goto(server.url + 'index.html');
+  await page.goto(server.url + 'index.html?hq=1');
   await page.waitForFunction(() => window.__af && window.planck);
   await page.evaluate(() => document.fonts.ready);
   await page.waitForTimeout(2500);

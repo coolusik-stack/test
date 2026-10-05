@@ -105,7 +105,9 @@ export class Online {
     this.waitingSync = needSync;
     game.hold = needSync;
     const m = this.match.id;
-    this.set({ in: { m, match: this.match, ok: needSync ? 0 : 1 }, st: null, fl: null, live: null, sync: null, need: needSync ? m : null });
+    // nk tells one request from the next: a phone that reloads asks again under the same id
+    const nk = needSync ? Math.random().toString(36).slice(2, 8) : null;
+    this.set({ in: { m, match: this.match, ok: needSync ? 0 : 1 }, st: null, fl: null, live: null, sync: null, need: needSync ? m : null, nk });
     if (this.peer) this._onPeer(this.peer);
   }
 
@@ -192,7 +194,7 @@ export class Online {
     const m = this.match.id;
     // they (re)joined this match without its state: send ours
     if (ps.need === m && this.mine.in && this.mine.in.m === m && this.mine.in.ok) {
-      const key = `${ps.sid}:${m}`;
+      const key = `${ps.sid}:${m}:${ps.nk}`;
       if (this.syncSentFor !== key) {
         this.syncSentFor = key;
         this.set({ sync: { m, ...g.syncPayload() } });
@@ -204,7 +206,7 @@ export class Online {
       if (!ps.sync || ps.sync.m !== m) return;
       this.waitingSync = false;
       try { g.applySync(ps.sync); } catch (e) { console.warn('sync', e); }
-      this.set({ need: null, in: { m, match: this.match, ok: 1 } });
+      this.set({ need: null, nk: null, in: { m, match: this.match, ok: 1 } });
     }
     // what the friend's page sends is untrusted: a malformed field must not take the link down
     try {

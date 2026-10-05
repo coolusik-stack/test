@@ -9,6 +9,8 @@ name: Relay
 
 on:
   push:
+    # branches must be listed too: a push filter with only tags ignores branch pushes
+    branches: ['**']
     paths: ['angry-fortress/relay/**', '.github/workflows/relay-deploy.yml']
     tags: ['relay-v*']
   workflow_dispatch:

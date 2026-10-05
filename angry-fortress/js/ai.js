@@ -12,6 +12,8 @@ const PROFILE = {
   easy: { sa: 5.5, sp: 0.065, wind: [0, 0.45], special: 0.35, learn: 0.8 },
   normal: { sa: 3.0, sp: 0.035, wind: [0.75, 1.1], special: 0.65, learn: 0.55 },
   hard: { sa: 1.0, sp: 0.013, wind: [0.95, 1.05], special: 1, learn: 0.4 },
+  // the tutorial's sparring partner: plain acorns, wobbly aim, and its first two shots fall short
+  tutor: { sa: 6.0, sp: 0.07, wind: [0, 0.3], special: 0, learn: 1, short: 2 },
 };
 
 function gauss() {
@@ -38,10 +40,11 @@ export function planShot(game, me, difficulty) {
   if (hasSpot(game.land, me.body.getPosition().x, 'high', 'crown')) learn *= 0.6;
   const angErr = ((gauss() * prof.sa * Math.PI) / 180) * learn;
   const pwErr = gauss() * prof.sp * learn;
+  const short = me.stats.shots < (prof.short || 0) ? 0.7 : 1;
   return {
     type: plan.type,
     angle: plan.angle + angErr * (dir > 0 ? 1 : -1),
-    power: Math.min(1, Math.max(0.2, plan.power + pwErr)),
+    power: Math.min(1, Math.max(0.2, (plan.power + pwErr) * short)),
     abilityAt: plan.abilityAt,
   };
 }
@@ -298,6 +301,7 @@ const MOVE = {
   easy: { chance: 0.4, notice: 0.35, goal: 0.25, noise: 9, spots: 0.5, look: 3 },
   normal: { chance: 0.75, notice: 0.7, goal: 0.5, noise: 4, spots: 0.85, look: 5 },
   hard: { chance: 1, notice: 1, goal: 0.7, noise: 1.2, spots: 1, look: 6 },
+  tutor: { chance: 0, notice: 0, goal: 0, noise: 9, spots: 0, look: 1 },
 };
 
 export function* planMove(game, me, difficulty) {

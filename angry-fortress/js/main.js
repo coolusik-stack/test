@@ -7,11 +7,12 @@ import Sound from './audio.js';
 import { storage, prefs, clamp } from './util.js';
 import { AMMO, HP_MAX, STAMINA, TEAM, WEB_URL } from './config.js';
 import { Online } from './online.js';
-import { makeCode, cleanCode } from './net.js';
+import { makeCode, cleanCode, keep } from './net.js';
 import { Haptics, isNativeApp } from './haptics.js';
 import { infoOf } from './spots.js';
 import { VERSION } from './version.js';
 import { site, loadSite } from './site.js';
+import { Coach } from './coach.js';
 
 const $ = (sel) => document.querySelector(sel);
 const $$ = (sel) => [...document.querySelectorAll(sel)];
@@ -24,7 +25,7 @@ const settings = Object.assign(
 // maps from older versions were renamed when the game moved into the forest
 if (settings.theme !== 'random' && !THEMES[settings.theme]) settings.theme = 'oak';
 const record = Object.assign({ wins: 0, losses: 0, pvp: 0, fw: 0, fl: 0 }, storage.get('af.record', {}));
-const seen = storage.get('af.seen', { tutorial: false });
+const seen = Object.assign({ tutorial: false, trained: false }, storage.get('af.seen', {}));
 
 let game = null; // the active match (or the title-screen demo)
 let mode = 'cpu';
@@ -41,11 +42,39 @@ let series = null; // best-of-3 on this phone (vs CPU / one phone): { bo, wins: 
 let nextRound = null; // the series state for the next round, once this one is decided
 let hostTries = 0;
 let emoteT = 0;
+let coach = null; // the first-match coach, during the tutorial match only
 const EMOTES = ['😆', '😤', '😱', '👍', '🔥', '😭'];
 
 // ---------------------------------------------------------------- sizing
+// Render resolution adapts to the phone: when frames come too slowly in a match, the canvas drops
+// to the next lower pixel density (fewer pixels to paint is what helps an older phone most). The
+// level is remembered; each launch starts one step sharper and settles again if it has to.
+const DPR_STEPS = [2, 1.6, 1.3, 1];
+const perf = { level: 0, frames: 0, sum: 0, slow: 0, worst: 0, fixed: new URLSearchParams(location.search).has('hq') };
+if (!perf.fixed) try {
+  const saved = Number(localStorage.getItem('af.q')) || 0;
+  perf.level = Math.max(0, Math.min(DPR_STEPS.length - 1, saved - 1));
+} catch (e) { /* no storage */ }
+
+function watchFrames(dt) {
+  if (perf.fixed || perf.level >= DPR_STEPS.length - 1 || document.hidden || !game || game.paused || (screen !== 'battle' && !game.opts.demo)) { perf.frames = perf.sum = 0; return; }
+  if (dt > 0.25) return; // a stall (tab switch, GC pause) says nothing about steady speed
+  perf.frames++;
+  perf.sum += dt;
+  if (perf.sum < 2) return;
+  const fps = perf.frames / perf.sum;
+  perf.frames = perf.sum = 0;
+  perf.slow = fps < 42 ? perf.slow + 1 : 0;
+  if (perf.slow < 2) return;
+  perf.slow = 0;
+  perf.level++;
+  perf.worst = Math.max(perf.worst, perf.level);
+  try { localStorage.setItem('af.q', String(perf.level)); } catch (e) { /* no storage */ }
+  resize();
+}
+
 function resize() {
-  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const dpr = Math.min(window.devicePixelRatio || 1, DPR_STEPS[perf.level]);
   const w = window.innerWidth, h = window.innerHeight;
   size = { w, h, dpr };
   canvas.width = Math.round(w * dpr);
@@ -153,7 +182,7 @@ function crewCanvas(cv, team, variant, pose) {
 function tickCrewCanvases(now) {
   for (const [cv, c] of crewCanvases) {
     if (!cv.isConnected) { crewCanvases.delete(cv); continue; }
-    if (cv.offsetParent === null) continue; // hidden: skip the work
+    if (cv.closest('[hidden]')) continue; // hidden: skip the work (and no layout pass to find out)
     const g = cv.getContext('2d');
     g.setTransform(1, 0, 0, 1, 0, 0);
     g.clearRect(0, 0, cv.width, cv.height);
@@ -169,6 +198,8 @@ function tickCrewCanvases(now) {
 function goTitle() {
   screen = 'title';
   rotatePaused = false;
+  if (coach) { coach.stop(); coach = null; }
+  $('#btn-train').hidden = !!seen.trained;
   show('title');
   $('#hud').hidden = true;
   $('#netlost').hidden = true;
@@ -214,6 +245,7 @@ function startDemo() {
 function startBattle(opts) {
   if (game) game.destroy();
   clearTimeout(demoRestartT);
+  if (coach && !opts.tutorial) { coach.stop(); coach = null; }
   lastOpts = opts;
   screen = 'battle';
   show(null);
@@ -226,6 +258,11 @@ function startBattle(opts) {
     if (g === game) onGameEvent(evt, data); // ignore late events from a replaced match
   }, size);
   game = g;
+  if (opts.tutorial) {
+    coach ||= new Coach($('#coach'), { onTrained: markTrained });
+    coach.start(g);
+    try { Art.drawCaptainIcon($('#coach .coach-face'), 0); } catch (e) { /* art not ready */ }
+  }
   renderPips();
   roundBanner();
   $('#btn-emote').hidden = !g.online;
@@ -252,6 +289,21 @@ function buildOpts() {
   };
 }
 
+// The first-match tutorial: an easy CPU on 도토리 숲 with no wind, no forest events and a coach.
+function startTutorial() {
+  tryFullscreen();
+  mode = 'cpu';
+  series = null;
+  nextRound = null;
+  startBattle({ mode: 'cpu', difficulty: 'tutor', theme: 'oak', wind: 'off', timer: 0, guide: true, firstTurn: 0, seed: 20261205, calm: true, tutorial: true });
+}
+
+function markTrained() {
+  if (seen.trained && seen.tutorial) return;
+  seen.trained = seen.tutorial = true;
+  storage.set('af.seen', seen);
+}
+
 function tryFullscreen() {
   if (isNativeApp() || !matchMedia('(pointer: coarse)').matches) return;
   const el = document.documentElement;
@@ -269,6 +321,7 @@ function tryFullscreen() {
 
 function onGameEvent(evt, data) {
   if (!game || screen !== 'battle') return;
+  if (coach) coach.event(evt, data);
   switch (evt) {
     case 'turn': {
       const p = game.players[data.player];
@@ -280,7 +333,7 @@ function onGameEvent(evt, data) {
       renderSlots();
       if (p.remote) hint('친구가 조준하고 있어요…', 0);
       else if (!p.isAI) {
-        if (!seen.tutorial) hint('새총 근처를 누른 채 뒤로 당겼다 놓으세요!', 0);
+        if (!seen.tutorial && !coach) hint('새총 근처를 누른 채 뒤로 당겼다 놓으세요!', 0);
         else hint('', 0);
       } else hint('CPU가 조준하고 있어요…', 0);
       if (!p.remote && !p.isAI && game.online) {
@@ -293,7 +346,7 @@ function onGameEvent(evt, data) {
       const p = game.players[data.player];
       renderSlots();
       $('#tip').hidden = true;
-      if (!p.isAI && !p.remote && AMMO[data.type].ability) hint('날아가는 중 화면을 터치하면 능력 발동!', 2.5);
+      if (!p.isAI && !p.remote && AMMO[data.type].ability && !coach) hint('날아가는 중 화면을 터치하면 능력 발동!', 2.5);
       else hint('', 0);
       if (!p.isAI && !p.remote && !seen.tutorial) {
         seen.tutorial = true;
@@ -533,6 +586,9 @@ function showResult(r) {
     sub = won ? (fell ? '친구를 구름 아래로 떨어뜨렸어요! 도토리는 몽땅 우리 거!' : `친구 도토리까지 몽땅 우리 거! 남은 체력 ${r.players[me].hp}`)
       : done ? (fell ? '구름 아래로 떨어졌어요… 복수전 한 판?' : '친구가 이겼어요. 복수전 한 판?') : fell ? '구름 아래로 떨어졌지만, 아직 끝나지 않았어요!' : '아직 끝나지 않았어요!';
     if (done) { if (sw === me) record.fw++; else record.fl++; }
+  } else if (lastOpts.tutorial) {
+    title = r.isAIWin ? '연습 끝!' : '연습 끝, 승리!';
+    sub = r.isAIWin ? '괜찮아요, 금방 늘어요! 이제 친구와 붙어 볼까요?' : fell ? '구름 아래로 떨어뜨리기까지! 이제 친구와 붙어 볼까요?' : '깡 하나는 합격! 이제 친구와 붙어 볼까요?';
   } else if (cpu) {
     title = pre + (r.isAIWin ? '패배…' : '승리!');
     sub = r.isAIWin ? (fell ? '구름 아래로 떨어졌어요… 그래도 깡으로 다시 도전!' : `CPU ${TEAM[1].name}이 도토리를 몽땅 가져갔어요. 다시 도전!`)
@@ -562,6 +618,7 @@ function showResult(r) {
     } else if (cpu && loser === 1) $('#again-label').textContent = '다음 판';
     else $('#again-label').textContent = loser < 0 ? '다음 판' : cpu ? '다음 판 · 전장 고르기' : `다음 판 · ${loser + 1}P가 전장 고르기`;
   } else if (wins) $('#again-label').textContent = '새 대결';
+  if (lastOpts.tutorial) $('#again-label').textContent = 'CPU와 한 판';
   const iWon = r.winner >= 0 && (friend ? r.winner === me : cpu ? !r.isAIWin : true);
   if (iWon) Haptics.win(); else Haptics.lose();
   $('#result-title').textContent = title;
@@ -780,13 +837,15 @@ function describe(ls) {
   return [map, wind, timer, bo].filter(Boolean).join(' · ');
 }
 
+// The friend match this phone is in, so a reload (or, in the app, the app being closed by the
+// system) comes straight back to it.
 function saveSession() {
-  try { sessionStorage.setItem('af.online', JSON.stringify({ code: online.code, role: online.role, t: Date.now() })); } catch (e) { /* private mode */ }
+  try { keep().setItem('af.online', JSON.stringify({ code: online.code, role: online.role, t: Date.now() })); } catch (e) { /* private mode */ }
 }
 
 function savedSession() {
   try {
-    const v = JSON.parse(sessionStorage.getItem('af.online') || 'null');
+    const v = JSON.parse(keep().getItem('af.online') || 'null');
     return v && Date.now() - v.t < 20 * 60 * 1000 ? v : null;
   } catch (e) { return null; }
 }
@@ -824,7 +883,7 @@ function leaveOnline(bye = true) {
   if (!online) return;
   online.close(bye);
   online = null;
-  try { sessionStorage.removeItem('af.online'); } catch (e) { /* ignore */ }
+  try { keep().removeItem('af.online'); } catch (e) { /* ignore */ }
 }
 
 function lobbyStatus(text, bad) {
@@ -934,11 +993,22 @@ function onOnline(evt, data) {
 
 // connection trouble during a match
 function syncNetLost() {
+  const away = !!(online && online.paired && online.peer && online.peer.away && game && game.online && screen !== 'title' && screen !== 'lobby');
+  $('#away').hidden = !away;
   if (!online || !game || !game.online || screen === 'title' || screen === 'lobby') { $('#netlost').hidden = true; return; }
   if (online.peer && online.peer.bye) return;
   const lost = online.status === 'lost' || online.status === 'error';
-  if (lost) showNetLost('연결이 끊겼어요', '친구가 돌아오기를 기다리는 중…', true);
-  else $('#netlost').hidden = true;
+  clearTimeout(syncNetLost.t);
+  if (lost) {
+    const mine = online.status === 'error' || (online.link && online.link.kind === 'relay' && !navigator.onLine);
+    showNetLost('연결이 끊겼어요', mine ? '인터넷 연결을 확인해 주세요. 다시 연결되면 바로 이어져요' : '친구가 돌아오기를 기다리는 중…', true);
+    // a long wait: say so, and that leaving is fine
+    syncNetLost.t = setTimeout(() => {
+      if (online && (online.status === 'lost' || online.status === 'error') && !$('#netlost').hidden) {
+        $('#netlost-sub').textContent = '친구가 아직 돌아오지 않았어요. 더 기다리거나 메뉴로 나갈 수 있어요';
+      }
+    }, 45000);
+  } else $('#netlost').hidden = true;
 }
 
 function showNetLost(title, sub, spin) {
@@ -1027,6 +1097,8 @@ function bind() {
     fn(e);
   });
   click('#btn-solo', () => { Sound.play('tap'); goSetup('cpu'); });
+  click('#btn-train', () => { Sound.play('tap'); startTutorial(); });
+  click('#help-train', () => { Sound.play('tap'); startTutorial(); });
   click('#btn-duo', () => { Sound.play('tap'); goSetup('pvp'); });
   click('#btn-friend', () => { Sound.play('tap'); goLobby(); });
   click('#btn-rejoin', () => {
@@ -1119,6 +1191,7 @@ function bind() {
   click('#btn-home', () => { Sound.play('back'); leaveOnline(); goTitle(); });
   click('#btn-again', () => {
     Sound.play('tap');
+    if (lastOpts.tutorial) { goSetup('cpu'); return; }
     if (lastOpts.mode !== 'online') {
       if (nextRound) {
         const loser = nextRound.lastWinner < 0 ? -1 : 1 - nextRound.lastWinner;
@@ -1233,8 +1306,10 @@ function bind() {
   });
 
   document.addEventListener('visibilitychange', () => {
+    // a friend sees "stepped away" instead of a frozen phone (a call, another app)
+    if (online) online.set({ away: document.hidden ? 1 : null });
     if (document.hidden) {
-      if (screen === 'battle') pause(true);
+      if (screen === 'battle' && !(game && game.online)) pause(true);
       Sound.pause();
     } else {
       Sound.resume();
@@ -1277,12 +1352,14 @@ function applySettings() {
 // ---------------------------------------------------------------- loop
 let last = performance.now();
 function frame(now) {
+  watchFrames((now - last) / 1000);
   const dt = Math.min(0.05, (now - last) / 1000);
   last = now;
   if (game) {
     try {
       game.update(dt);
       game.draw();
+      if (coach && screen === 'battle') coach.tick(dt);
     } catch (err) {
       console.error(err);
     }
@@ -1306,9 +1383,15 @@ async function boot() {
   goTitle();
   if (!window.claude) loadSite();
   const join = cleanCode(new URLSearchParams(location.search).get('join') || '');
+  const back = savedSession();
   if (join.length === 4) {
     goLobby('enter');
     $('#code-input').value = join;
+  } else if (back) {
+    // reloaded (or reopened) in the middle of a friend match: straight back to it
+    goLobby('room');
+    hostTries = 0;
+    openLink(back.role, back.code, true);
   }
   requestAnimationFrame((t) => { last = t; frame(t); });
   setTimeout(() => $('#boot').classList.add('gone'), 150);
@@ -1318,6 +1401,6 @@ async function boot() {
 }
 
 // expose for debugging / automated checks
-window.__af = { get game() { return game; }, get online() { return online; }, startBattle, buildOpts, goTitle };
+window.__af = { get game() { return game; }, get online() { return online; }, get perf() { return { ...perf, dpr: size.dpr }; }, startBattle, buildOpts, goTitle };
 
 boot();

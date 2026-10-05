@@ -40,7 +40,7 @@ export class ForestEvents {
 
   // The event that is on during turn `n` (null when none).
   kindFor(n) {
-    if (n < EVENT_FIRST) return null;
+    if (n < EVENT_FIRST || this.g.opts.calm) return null; // the tutorial keeps the forest quiet
     const k = Math.floor((n - EVENT_FIRST) / EVENT_EVERY);
     const off = (n - EVENT_FIRST) % EVENT_EVERY;
     return off < EVENT_LEN ? this.order[k % this.order.length] : null;
@@ -216,7 +216,7 @@ export class ForestEvents {
         g._sfx('land', { vol: 0.6 });
       }
       this._dropBody();
-    } else if (!d && n >= DROP_FIRST && (n - DROP_FIRST) % DROP_EVERY === 0) {
+    } else if (!d && !g.opts.calm && n >= DROP_FIRST && (n - DROP_FIRST) % DROP_EVERY === 0) {
       const r = rng(((g.seed ^ 0xd809) + n * 131) >>> 0);
       this.drop = { x: g.land.mid + r.range(-6, 6), y: 28, kind: r() < 0.5 ? 'nuts' : 'heal', landed: false, showY: 33 };
       this._dropBody();

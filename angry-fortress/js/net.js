@@ -29,13 +29,18 @@ export function cleanCode(s) {
 
 const roomName = (code) => 'dotori-' + code.toLowerCase();
 
-// This page's id. It survives a reload of the tab, so a phone that comes back to a match is
-// recognised as the same phone (the relay then swaps its old connection for the new one).
+// This page's id. It survives a reload of the tab (and, in the app, the app being closed), so a
+// phone that comes back to a match is recognised as the same phone (the relay then swaps its old
+// connection for the new one).
+export const keep = () => {
+  const c = window.Capacitor;
+  return c && typeof c.isNativePlatform === 'function' && c.isNativePlatform() ? localStorage : sessionStorage;
+};
 export const sid = (() => {
   const fresh = () => Array.from(crypto.getRandomValues(new Uint8Array(8)), (b) => (b % 36).toString(36)).join('');
   try {
-    let s = sessionStorage.getItem('af.sid');
-    if (!/^[a-z0-9]{8}$/.test(s || '')) { s = fresh(); sessionStorage.setItem('af.sid', s); }
+    let s = keep().getItem('af.sid');
+    if (!/^[a-z0-9]{8}$/.test(s || '')) { s = fresh(); keep().setItem('af.sid', s); }
     return s;
   } catch (e) {
     return fresh();
