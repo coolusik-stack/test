@@ -1,7 +1,9 @@
 // 깡단: two little squirrels tag along with each captain. One perches on the captain's acorn hat,
-// the other runs along behind the cart. They react to everything that happens: a "깡!" on every
-// shot, a cheer when it lands, a tumble and a proud "끄떡없어!" salute when they get hit. They
-// stay plucky even when they lose.
+// the other runs along behind the cart. They react to everything that happens with poses (a cheer
+// when a shot lands, a tumble and a salute when they get hit) and stay plucky even when they lose.
+// They talk sparingly so a line still means something: never while someone is aiming, at most one
+// speech bubble on screen and one per turn, 20 s or more apart and only every other chance, except
+// for the big moments (a fall, the win, the loss), which always get their line.
 //
 // Presentation only: nothing here touches the physics, so friend matches stay in lockstep.
 import * as Art from './art.js';
@@ -15,7 +17,6 @@ import Sound from './audio.js';
 const HAT = { x: -0.06, y: -1.47 };
 const GROUND_BACK = 1.25; // how far behind the cart the runner stays
 const LINES = {
-  fire: ['깡!', '깡!!', '깡깡!', '발사아!'],
   hit: ['나이스!', '깡깡!', '맞았다!', '우와아!', '봤지?'],
   hurt: ['끄떡없어!', '하나도 안 아파!', '괜찮아 괜찮아!', '간지러워!', '안 아파!'],
   miss: ['아까비!', '다음엔 맞아!', '바람 탓이야!'],
@@ -23,8 +24,6 @@ const LINES = {
   fall: ['으아아!', '엄마아!', '꽉 잡아!'],
   win: ['깡단 최고!', '도토리 몽땅!', '이겼다아!', '깡깡깡!'],
   lose: ['다음엔 이긴다!', '울긴 누가 울어!', '한 판 더!', '깡은 안 졌어!'],
-  idle: ['도토?', '냠냠', '흐흥~', '영차!', '깡?', '배고파…', '줍줍'],
-  turn: ['가자!', '깡 한 번!', '조준 잘해!', '할 수 있어!'],
   drop: ['보급이다!', '내 거!', '와아!'],
   boar: ['멧돼지다!', '도망쳐!', '히이익!'],
   whiff: ['어디 쏜 거야?!', '구름 맛있겠다…', '바람 탓이야!', '안 보였어!'],
@@ -37,12 +36,14 @@ export class Crew {
   constructor(game) {
     this.g = game;
     this.squad = game.players.map((p) => [this._member(p, 0, 'hat'), this._member(p, 1, 'ground')]);
+    this.lastSay = -99; // game time of the last ordinary line
+    this.saidTurn = -1;
   }
 
   _member(p, variant, slot) {
     return {
       p, variant, slot, pose: slot === 'hat' ? 'sit' : 'idle', t: 0, hold: 0, then: null,
-      x: NaN, y: NaN, ox: 0, oy: 0, rot: 0, bubble: null, idleT: 2 + Math.random() * 5, blinkT: Math.random() * 3, blink: 0,
+      x: NaN, y: NaN, ox: 0, oy: 0, rot: 0, bubble: null, idleT: 6 + Math.random() * 8, blinkT: Math.random() * 3, blink: 0,
     };
   }
 
@@ -50,12 +51,11 @@ export class Crew {
   // Something happened to player `p`'s side. `kind` picks the poses and a line from LINES.
   react(p, kind, opt = {}) {
     const [hat, run] = this.squad[p.id];
-    const say = (m, k = kind, chance = 1) => { if (Math.random() < chance) this._say(m, pick(LINES[k])); };
+    const say = (m, k = kind, chance = 1, big = false) => { if (Math.random() < chance) this._say(m, pick(LINES[k]), big); };
     switch (kind) {
       case 'fire':
         this._pose(hat, 'shout', 0.9);
         this._pose(run, 'cheer', 0.9);
-        say(hat);
         this._sfx('kkang', { pitch: p.team ? 0.9 : 1.1 });
         break;
       case 'hit':
@@ -85,22 +85,21 @@ export class Crew {
       case 'fall':
         this._pose(hat, 'scared', 9);
         this._pose(run, 'cling', 9);
-        say(hat);
+        say(hat, 'fall', 1, true);
         break;
       case 'win':
         this._pose(hat, 'dance', 99);
         this._pose(run, 'cheer', 99);
-        say(hat);
-        setTimeout(() => this._say(run, pick(LINES.win)), 900);
+        say(hat, 'win', 1, true);
+        setTimeout(() => this._say(run, pick(LINES.win), true), 900);
         break;
       case 'lose':
         // a little cry, then chins up
-        this._pose(hat, 'cry', 1.8, { pose: 'flex', hold: 99, line: 'lose' });
+        this._pose(hat, 'cry', 1.8, { pose: 'flex', hold: 99, line: 'lose', big: true });
         this._pose(run, 'cry', 2.2, { pose: 'salute', hold: 99 });
         break;
       case 'turn':
         this._pose(run, 'cheer', 0.8);
-        say(run, 'turn', 0.35);
         break;
       case 'drop':
         this._pose(hat, 'cheer', 1.2);
@@ -143,8 +142,17 @@ export class Crew {
     if (pose === 'tumble') { m.vx = -(m.p.facing || 1) * (m.slot === 'hat' ? 2.2 : 1.4); m.vy = m.slot === 'hat' ? -5.5 : -4; }
   }
 
-  _say(m, text) {
-    if (!text || (m.bubble && m.bubble.t < 0.9)) return;
+  // `big`: a moment that always gets its line (a fall, the win, the loss)
+  _say(m, text, big = false) {
+    if (!text) return;
+    const g = this.g;
+    if (!big) {
+      if (g.state === 'aim' || g.state === 'ai-aim' || g.state === 'ai-think') return;
+      if (this.squad.some((pair) => pair.some((x) => x.bubble))) return;
+      if (g.time - this.lastSay < 20 || this.saidTurn === g.turnNo || Math.random() < 0.5) return;
+      this.lastSay = g.time;
+      this.saidTurn = g.turnNo;
+    } else if (m.bubble && m.bubble.t < 0.9) return;
     m.bubble = { text, t: 0, life: 1.5 + text.length * 0.05 };
     if (!this.g.silent && Math.random() < 0.7) this._sfx('chitter', { vol: 0.45, pitch: (m.variant ? 0.95 : 1.25) * (m.p.team ? 0.92 : 1.05) });
   }
@@ -178,7 +186,7 @@ export class Crew {
           const nx = m.then;
           if (nx) {
             this._pose(m, nx.pose, nx.hold ?? 1.2, null);
-            if (nx.line) this._say(m, pick(LINES[nx.line]));
+            if (nx.line) this._say(m, pick(LINES[nx.line]), !!nx.big);
           } else this._pose(m, m.slot === 'hat' ? 'sit' : 'idle', 0);
         }
         this._place(m);
@@ -186,7 +194,7 @@ export class Crew {
         if (m.slot === 'hat' && g.state === 'aim' && p === g.players[g.turn] && !p.isAI && !p.remote && g.stateT > 12 && m.nudged !== g.turnNo) {
           m.nudged = g.turnNo;
           this._pose(m, 'cheer', 0.8);
-          this._say(m, pick(LINES.hurry));
+          this._say(m, pick(LINES.hurry), true); // once a turn, and only after 12 s of waiting
         }
         // fidgets when nothing is going on
         if (m.hold <= 0 && !g.over && !p.dead) {
@@ -197,7 +205,7 @@ export class Crew {
             else if (!m.cling && m.pose === 'cling' && !p.falling) this._pose(m, 'idle', 0);
           }
           if ((m.idleT -= dt) <= 0) {
-            m.idleT = 4 + Math.random() * 7;
+            m.idleT = 7 + Math.random() * 9;
             this._fidget(m);
           }
         }
@@ -205,16 +213,16 @@ export class Crew {
     }
   }
 
+  // A small idle move now and then; nothing while a shot is being lined up or is in the air.
   _fidget(m) {
     const p = m.p, g = this.g;
-    const busy = g.state === 'flight' || (g.state === 'aim' && p === g.players[g.turn]);
+    if (g.state === 'flight' || g.state === 'aim' || g.state === 'ai-aim') return;
     if (m.slot === 'ground' && p.edge && !m.cling) { this._pose(m, 'peek', 1.8); if (Math.random() < 0.4) this._say(m, pick(LINES.danger)); return; }
     if (m.slot === 'ground' && !m.cling && !p.moving) {
       const r = Math.random();
       if (r < (m.variant ? 0.55 : 0.3)) this._pose(m, 'nibble', 2.2);
       else if (r < 0.7) this._pose(m, 'cheer', 0.7);
     } else if (m.slot === 'hat' && Math.random() < 0.35) this._pose(m, 'cheer', 0.6);
-    if (!busy && Math.random() < 0.3) this._say(m, pick(LINES.idle));
   }
 
   // Keep each member where it belongs: on the hat, or on the ground behind the cart (hanging on

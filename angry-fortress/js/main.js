@@ -538,7 +538,7 @@ function startTutorial() {
   mode = 'cpu';
   series = null;
   nextRound = null;
-  startBattle({ mode: 'cpu', difficulty: 'tutor', theme: 'oak', wind: 'off', timer: 0, guide: true, firstTurn: 0, seed: 20261205, calm: true, tutorial: true });
+  startBattle({ mode: 'cpu', difficulty: 'tutor', theme: 'oak', wind: 'off', timer: 0, guide: true, firstTurn: 0, seed: 20261205, flip: false, calm: true, tutorial: true });
 }
 
 function markTrained() {
@@ -574,11 +574,10 @@ function onGameEvent(evt, data) {
       renderForecast(ev);
       syncTurn();
       renderSlots();
+      // the turn banner already says whose turn it is; a hint only where it helps
       if (p.remote) hint('친구가 조준하고 있어요…', 0);
-      else if (!p.isAI) {
-        if (!seen.tutorial && !coach) hint('새총 근처를 누른 채 뒤로 당겼다 놓으세요!', 0);
-        else hint('', 0);
-      } else hint('CPU가 조준하고 있어요…', 0);
+      else if (!p.isAI && !seen.tutorial && !coach) hint('새총 근처를 누른 채 뒤로 당겼다 놓으세요!', 0);
+      else hint('', 0);
       if (!p.remote && !p.isAI && game.online) {
         Sound.play('select', { vol: 0.8 });
         Haptics.myTurn();
@@ -589,8 +588,12 @@ function onGameEvent(evt, data) {
       const p = game.players[data.player];
       renderSlots();
       $('#tip').hidden = true;
-      if (!p.isAI && !p.remote && AMMO[data.type].ability && !coach) hint('날아가는 중 화면을 터치하면 능력 발동!', 2.5);
-      else hint('', 0);
+      // the ability tip, for the first few special shots only
+      if (!p.isAI && !p.remote && AMMO[data.type].ability && !coach && (seen.ability || 0) < 3) {
+        seen.ability = (seen.ability || 0) + 1;
+        storage.set('af.seen', seen);
+        hint('날아가는 중 화면을 터치하면 능력 발동!', 2.5);
+      } else hint('', 0);
       if (!p.isAI && !p.remote && !seen.tutorial) {
         seen.tutorial = true;
         storage.set('af.seen', seen);
@@ -664,7 +667,7 @@ function banner(text, sub, color) {
   b.style.setProperty('--team', color || '#fff');
   b.hidden = false;
   clearTimeout(bannerTimer);
-  bannerTimer = setTimeout(() => (b.hidden = true), 1500);
+  bannerTimer = setTimeout(() => (b.hidden = true), 1200);
 }
 
 let hintTimer = null;

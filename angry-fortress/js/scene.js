@@ -1,11 +1,20 @@
-// Sky-forest backdrop: sky, sun or moon with light shafts, layers of distant floating islands
-// drifting in the mist, undergrowth behind the playfield, waterfalls spilling off the islands,
-// the bottomless sea of clouds underneath, and ambient pollen / falling leaves / mist / fireflies.
+// Sky-forest backdrop: sky, sun or moon with faint light shafts, two layers of distant floating
+// islands in the mist, undergrowth behind the playfield, waterfalls spilling off the islands, the
+// bottomless sea of clouds underneath, and a little drifting pollen / petals / leaves / snow /
+// fireflies. All of it stays quiet and pale (lower value range, washed toward the sky, slow, few
+// moving things) so the islands, the carts and the shot are what the eye finds.
 import { rng, noise1D, clamp } from './util.js';
 import { WORLD } from './terrain.js';
 
 const YREF = 12; // world height where parallax layers line up with the playfield
 const TAU = Math.PI * 2;
+
+// '#rrggbb' a toward b by t, as '#rrggbb'
+function mix(a, b, t) {
+  const p = (c) => [1, 3, 5].map((i) => parseInt(c.slice(i, i + 2), 16));
+  const [x, y] = [p(a), p(b)];
+  return '#' + x.map((v, i) => Math.round(v + (y[i] - v) * t).toString(16).padStart(2, '0')).join('');
+}
 
 export class Scene {
   constructor(theme, seed) {
@@ -16,9 +25,11 @@ export class Scene {
     const shape = theme.bgTree === 'pine' ? 'pine' : 'round';
     this.far = this._islandLayer(0.18, seed + 1, 13, 0.7, shape, r);
     this.mid = this._islandLayer(0.42, seed + 2, 9.5, 1.0, shape, r);
-    this.near = this._islandLayer(0.7, seed + 3, 6, 1.5, shape, r);
+    // the backdrop's colours, washed toward the sky so they sit back
+    this.farColor = mix(theme.far, theme.sky[1], 0.45);
+    this.midColor = [mix(theme.mid[0], theme.sky[1], 0.35), mix(theme.mid[1], theme.sky[1], 0.35)];
     this.clouds = [];
-    for (let i = 0; i < (theme.clouds ?? 5); i++) {
+    for (let i = 0; i < Math.min(3, theme.clouds ?? 3); i++) {
       this.clouds.push({
         x: r.range(-30, WORLD.W + 30),
         y: r.range(WORLD.H * 0.5, WORLD.H * 0.8),
@@ -29,9 +40,9 @@ export class Scene {
     }
     this.stars = Array.from({ length: 70 }, () => ({ x: r(), y: r() * 0.6, s: r.range(0.8, 1.8), ph: r() * TAU }));
     this.motes = [];
-    const n = theme.ambient === 'firefly' ? 34 : theme.ambient === 'mist' ? 10 : theme.ambient === 'snow' ? 90 : 42;
+    // a handful at a time: steady drift, nothing that blinks or pops
+    const n = { firefly: 10, mist: 5, snow: 24, petal: 14, leaf: 12 }[theme.ambient] ?? 12;
     for (let i = 0; i < n; i++) this.motes.push(this._mote(true));
-    this.frame = this._canopyFrame(r);
     this.shore = null;
     this.brush = null;
   }
@@ -130,19 +141,6 @@ export class Scene {
     return { par, isles };
   }
 
-  // Leaf clusters hanging into the top of the backdrop (screen space, gentle parallax).
-  _canopyFrame(r) {
-    const blobs = [];
-    // only in the two top corners, like branches reaching in from outside the frame
-    for (let i = 0; i < 16; i++) {
-      const left = i % 2 === 0;
-      const u = left ? r.range(-0.04, 0.16) : r.range(0.84, 1.04);
-      const v = r.range(-0.03, 0.07) + (left ? u : 1 - u) * -0.15;
-      blobs.push({ u, v, rad: r.range(0.035, 0.065), ph: r() * TAU });
-    }
-    return blobs;
-  }
-
   _mote(init) {
     const r = this.r;
     return { x: r(), y: init ? r() : -0.05, s: r.range(0.5, 1.2), ph: r() * TAU, v: r.range(0.6, 1.2), blink: r() * TAU };
@@ -194,7 +192,7 @@ export class Scene {
     if (t.night) {
       ctx.fillStyle = '#fff';
       for (const s of this.stars) {
-        ctx.globalAlpha = 0.35 + 0.45 * Math.abs(Math.sin(time * 0.8 + s.ph));
+        ctx.globalAlpha = 0.45 + 0.15 * Math.sin(time * 0.5 + s.ph);
         ctx.fillRect(s.x * vw, s.y * vh, s.s, s.s);
       }
       ctx.globalAlpha = 1;
@@ -228,43 +226,33 @@ export class Scene {
     // the cloud sea stretching to the horizon far below
     this._horizon(ctx, vw, vh, dpr, cam, time, layerT);
     // distant floating islands + mist, nearer ones darker and bigger
-    this._isles(ctx, this.far, cam, vw, time, layerT, t.far, null, 0, null);
+    this._isles(ctx, this.far, layerT, this.farColor, null, 0);
     this._mist(ctx, vw, vh, dpr, cam, this.far.par, WORLD.SEA + 12, 0.9);
-    // light shafts fall across the middle distance
-    if (t.rays) this._rays(ctx, vw, vh, dpr, sx, sy, time);
-    this._isles(ctx, this.mid, cam, vw, time, layerT, t.mid[0], t.mid[1], 0.16, null);
-    this._mist(ctx, vw, vh, dpr, cam, this.mid.par, WORLD.SEA + 8, 0.7);
-    this._isles(ctx, this.near, cam, vw, time, layerT, t.near[0], t.mid[1], 0.3, t.near[1]);
-    this._mist(ctx, vw, vh, dpr, cam, this.near.par, WORLD.SEA + 4.5, 0.8);
-    // leaves hanging into the top of the view
-    this._frameLeaves(ctx, vw, vh, dpr, cam, time);
+    // faint light shafts across the middle distance
+    if (t.rays) this._rays(ctx, vw, vh, dpr, sx, sy);
+    this._isles(ctx, this.mid, layerT, this.midColor[0], this.midColor[1], 0.08);
+    this._mist(ctx, vw, vh, dpr, cam, this.mid.par, WORLD.SEA + 8, 0.8);
   }
 
-  _isles(ctx, layer, cam, vw, time, layerT, color, hiColor, shade, vineColor) {
-    const z = cam.zoom;
+  // Still, flat, unoutlined: scenery, not something to shoot at.
+  _isles(ctx, layer, layerT, color, hiColor, shade) {
+    layerT(layer.par);
     for (const is of layer.isles) {
-      layerT(layer.par, Math.sin(time * 0.45 + is.ph) * is.amp);
       ctx.fillStyle = color;
       ctx.fill(is.rock);
       if (shade) {
         ctx.fillStyle = `rgba(20,12,30,${shade})`;
         ctx.fill(is.rock);
       }
-      if (vineColor) {
-        ctx.strokeStyle = vineColor;
-        ctx.lineWidth = 0.08;
-        ctx.stroke(is.vines);
-      }
       ctx.fillStyle = color;
       ctx.fill(is.canopy);
       if (hiColor) {
         ctx.fillStyle = hiColor;
-        ctx.globalAlpha = 0.5;
+        ctx.globalAlpha = 0.4;
         ctx.fill(is.hi);
         ctx.globalAlpha = 1;
       }
     }
-    void z; void vw;
   }
 
   // Far below and far away: the top of the cloud sea, rolling to the horizon.
@@ -305,16 +293,16 @@ export class Scene {
     ctx.globalAlpha = 1;
   }
 
-  _rays(ctx, vw, vh, dpr, sx, sy, time) {
+  _rays(ctx, vw, vh, dpr, sx, sy) {
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.save();
     ctx.globalCompositeOperation = 'lighter';
     ctx.fillStyle = this.t.rays;
     const len = Math.hypot(vw, vh) * 1.2;
-    for (let i = 0; i < 6; i++) {
-      const a = Math.PI * 0.5 + (sx > vw / 2 ? 0.35 : -0.35) + (i - 2.5) * 0.12;
-      const w = 0.025 + (i % 3) * 0.012;
-      ctx.globalAlpha = 0.6 + 0.4 * Math.sin(time * 0.4 + i * 1.7);
+    for (let i = 0; i < 4; i++) {
+      const a = Math.PI * 0.5 + (sx > vw / 2 ? 0.35 : -0.35) + (i - 1.5) * 0.15;
+      const w = 0.025 + (i % 2) * 0.014;
+      ctx.globalAlpha = 0.55;
       ctx.beginPath();
       ctx.moveTo(sx, sy);
       ctx.lineTo(sx + Math.cos(a - w) * len, sy + Math.sin(a - w) * len);
@@ -323,27 +311,6 @@ export class Scene {
       ctx.fill();
     }
     ctx.restore();
-  }
-
-  _frameLeaves(ctx, vw, vh, dpr, cam, time) {
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    const base = Math.min(vw, vh);
-    const leaf = this.t.mid[0], hi = this.t.mid[1];
-    for (const pass of [0, 1]) {
-      ctx.fillStyle = pass ? hi : leaf;
-      ctx.globalAlpha = pass ? 0.5 : 0.95;
-      ctx.beginPath();
-      for (const b of this.frame) {
-        const x = b.u * vw + Math.sin(time * 0.5 + b.ph) * 2;
-        const y = b.v * vh + Math.cos(time * 0.6 + b.ph) * 1.5;
-        const rr = b.rad * base * (pass ? 0.5 : 1);
-        const ox = pass ? -rr * 0.5 : 0, oy = pass ? -rr * 0.5 : 0;
-        ctx.moveTo(x + ox + rr, y + oy);
-        ctx.ellipse(x + ox, y + oy, rr, rr * 0.8, b.ph, 0, TAU);
-      }
-      ctx.fill();
-    }
-    ctx.globalAlpha = 1;
   }
 
   _drawCloud(ctx, c, cam, vw, vh, dpr) {
@@ -440,15 +407,15 @@ export class Scene {
       for (let y = bottom; y <= f.y + 0.01; y += 0.4) ctx.lineTo(xAt(y, 1), -y);
       ctx.closePath();
       ctx.fillStyle = a.water;
-      ctx.globalAlpha = 0.75;
+      ctx.globalAlpha = 0.55;
       ctx.fill();
-      // streaks rushing down
-      ctx.globalAlpha = 0.9;
+      // streaks running down (slow and faint: an edge marker, not a show)
+      ctx.globalAlpha = 0.4;
       ctx.strokeStyle = '#ffffff';
       ctx.lineWidth = 0.05;
       ctx.setLineDash([0.5, 0.8]);
       for (const side of [-0.5, 0, 0.5]) {
-        ctx.lineDashOffset = -(time * 7 + f.ph + side * 3);
+        ctx.lineDashOffset = -(time * 3.2 + f.ph + side * 3);
         ctx.beginPath();
         for (let y = f.y; y >= bottom; y -= 0.4) ctx.lineTo(xAt(y, side), -y);
         ctx.stroke();
@@ -458,7 +425,7 @@ export class Scene {
       ctx.fillStyle = a.cloud;
       for (let k = 0; k < 4; k++) {
         const ph = (time * 0.8 + k * 0.25 + f.ph) % 1;
-        ctx.globalAlpha = 0.6 * (1 - ph);
+        ctx.globalAlpha = 0.3 * (1 - ph);
         ctx.beginPath();
         ctx.arc(xAt(bottom, 0) + (k - 1.5) * 0.35, -(bottom + ph * 0.8), 0.25 + ph * 0.5, 0, TAU);
         ctx.fill();
@@ -525,7 +492,7 @@ export class Scene {
       ctx.save();
       ctx.globalCompositeOperation = 'lighter';
       for (const m of this.motes) {
-        const a = 0.25 + 0.75 * Math.max(0, Math.sin(m.blink));
+        const a = 0.35 + 0.15 * Math.sin(m.blink * 0.4);
         const x = m.x * vw, y = (0.25 + m.y * 0.7) * vh;
         const g = ctx.createRadialGradient(x, y, 0, x, y, 9 * m.s);
         g.addColorStop(0, `rgba(230,255,140,${0.9 * a})`);
@@ -545,6 +512,7 @@ export class Scene {
         ctx.rotate(Math.sin(m.ph) * 1.2);
         const leaves = this.t.leaf || ['rgba(120,200,80,0.7)'];
         ctx.fillStyle = leaves[Math.floor(m.s * 97) % leaves.length];
+        ctx.globalAlpha = 0.6;
         ctx.beginPath();
         ctx.ellipse(0, 0, 4.5 * m.s, 2 * m.s, 0, 0, TAU);
         ctx.fill();
@@ -555,7 +523,7 @@ export class Scene {
         ctx.translate(x, y);
         ctx.rotate(m.ph * 1.3);
         ctx.scale(1, 0.55 + 0.45 * Math.abs(Math.sin(m.ph * 1.7)));
-        ctx.fillStyle = m.s > 1.1 ? 'rgba(255,214,228,0.95)' : 'rgba(250,170,200,0.85)';
+        ctx.fillStyle = m.s > 1.1 ? 'rgba(255,214,228,0.55)' : 'rgba(250,170,200,0.45)';
         ctx.beginPath();
         ctx.moveTo(0, -3.4 * m.s);
         ctx.quadraticCurveTo(3.2 * m.s, -2.4 * m.s, 0, 3 * m.s);
@@ -563,12 +531,12 @@ export class Scene {
         ctx.fill();
         ctx.restore();
       } else if (kind === 'snow') {
-        ctx.fillStyle = `rgba(255,255,255,${0.55 + 0.35 * Math.min(1, m.s - 0.4)})`;
+        ctx.fillStyle = `rgba(255,255,255,${0.3 + 0.2 * Math.min(1, m.s - 0.4)})`;
         ctx.beginPath();
         ctx.arc(x, y, 1.1 + 1.9 * m.s, 0, TAU);
         ctx.fill();
       } else if (kind === 'pollen') {
-        ctx.fillStyle = `rgba(255,250,200,${0.35 + 0.35 * Math.sin(m.blink)})`;
+        ctx.fillStyle = 'rgba(255,250,200,0.35)';
         ctx.beginPath();
         ctx.arc(x, y, 1.4 * m.s + 0.4, 0, TAU);
         ctx.fill();

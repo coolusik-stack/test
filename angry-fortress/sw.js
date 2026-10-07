@@ -1,6 +1,6 @@
 // Offline cache for the game shell. Bump VERSION when files change (the web build stamps its own
 // copy with the version and commit, see scripts/build-www.mjs).
-const VERSION = 'af-v15';
+const VERSION = 'af-v16';
 const SHELL = [
   './',
   './index.html',
@@ -10,6 +10,7 @@ const SHELL = [
   './js/main.js',
   './js/game.js',
   './js/terrain.js',
+  './js/maps.js',
   './js/scene.js',
   './js/fx.js',
   './js/camera.js',

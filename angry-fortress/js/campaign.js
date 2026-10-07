@@ -20,14 +20,14 @@ export const STAGES = [
   { id: 'spring-1', season: 'spring', theme: 'oak', foe: '솔숲단 막내 솔솔', difficulty: 'easy', wind: 'off', goal: 'shots8', look: { hat: 'acorn' } },
   { id: 'spring-2', season: 'spring', theme: 'blossom', foe: '꽃잎 줍는 솔방', difficulty: 'easy', wind: 'normal', goal: 'acorn', look: { hat: 'leaf' } },
   { id: 'spring-3', season: 'spring', theme: 'mole', foe: '두더지 굴 수문장 솔이', difficulty: 'normal', wind: 'normal', goal: 'fall', look: { hat: 'leaf', cart: 'red' } },
-  { id: 'summer-1', season: 'summer', theme: 'sunflower', foe: '해바라기 밭 뜀박이', difficulty: 'normal', wind: 'off', goal: 'shots8', look: { hat: 'straw' } },
-  { id: 'summer-2', season: 'summer', theme: 'night', foe: '반딧불 길잡이', difficulty: 'normal', wind: 'normal', goal: 'hp80', look: { hat: 'mushroom', cart: 'sky' } },
-  { id: 'summer-3', season: 'summer', theme: 'arch', foe: '바위다리 대장 무지개솔', difficulty: 'normal', wind: 'strong', goal: 'fall', look: { hat: 'straw', cart: 'red', trail: 'leaf' } },
+  { id: 'summer-1', season: 'summer', theme: 'sunflower', foe: '해바라기 비탈 뜀박이', difficulty: 'normal', wind: 'off', goal: 'shots8', look: { hat: 'straw' } },
+  { id: 'summer-2', season: 'summer', theme: 'night', foe: '반딧불 징검다리 길잡이', difficulty: 'normal', wind: 'normal', goal: 'hp80', look: { hat: 'mushroom', cart: 'sky' } },
+  { id: 'summer-3', season: 'summer', theme: 'arch', foe: '하늘다리 대장 무지개솔', difficulty: 'normal', wind: 'strong', goal: 'fall', look: { hat: 'straw', cart: 'red', trail: 'leaf' } },
   { id: 'autumn-1', season: 'autumn', theme: 'maple', foe: '흙다리 지킴이', difficulty: 'normal', wind: 'normal', goal: 'acorn', look: { hat: 'acorn', cart: 'red' } },
-  { id: 'autumn-2', season: 'autumn', theme: 'ginkgo', foe: '은행 봉우리 명사수', difficulty: 'hard', wind: 'off', goal: 'hits4', look: { hat: 'mushroom', cart: 'leaf' } },
-  { id: 'autumn-3', season: 'autumn', theme: 'pine', foe: '소나무 언덕 대장 솔바람', difficulty: 'hard', wind: 'normal', goal: 'fall', look: { hat: 'pinecone', cart: 'leaf', trail: 'leaf' } },
-  { id: 'winter-1', season: 'winter', theme: 'snowcliff', foe: '눈벼랑 썰매꾼', difficulty: 'hard', wind: 'normal', goal: 'shots8', look: { hat: 'pinecone', cart: 'sky' } },
-  { id: 'winter-2', season: 'winter', theme: 'igloo', foe: '이글루 마을 파수꾼', difficulty: 'hard', wind: 'normal', goal: 'hp80', look: { hat: 'mushroom', cart: 'sky', trail: 'star' } },
+  { id: 'autumn-2', season: 'autumn', theme: 'ginkgo', foe: '은행 참호 명사수', difficulty: 'hard', wind: 'off', goal: 'hits4', look: { hat: 'mushroom', cart: 'leaf' } },
+  { id: 'autumn-3', season: 'autumn', theme: 'pine', foe: '소나무 절벽 대장 솔바람', difficulty: 'hard', wind: 'normal', goal: 'fall', look: { hat: 'pinecone', cart: 'leaf', trail: 'leaf' } },
+  { id: 'winter-1', season: 'winter', theme: 'snowcliff', foe: '살얼음 썰매꾼', difficulty: 'hard', wind: 'normal', goal: 'shots8', look: { hat: 'pinecone', cart: 'sky' } },
+  { id: 'winter-2', season: 'winter', theme: 'igloo', foe: '이글루 파수꾼', difficulty: 'hard', wind: 'normal', goal: 'hp80', look: { hat: 'mushroom', cart: 'sky', trail: 'star' } },
   { id: 'winter-3', season: 'winter', theme: 'aurora', foe: '솔숲단 큰대장 솔왕', difficulty: 'hard', wind: 'strong', goal: 'fall', look: { hat: 'crown', cart: 'gold', trail: 'star' }, boss: true },
 ];
 export const MAX_STARS = STAGES.length * 3;
@@ -86,7 +86,7 @@ export function isOpen(prog, i) {
 
 // The battle options for a stage (main.js adds the player's own look).
 export function battleOpts(s) {
-  return { mode: 'cpu', difficulty: s.difficulty, theme: s.theme, wind: s.wind, timer: 0, guide: true, firstTurn: 0, campaign: s.id, foe: s.foe };
+  return { mode: 'cpu', difficulty: s.difficulty, theme: s.theme, wind: s.wind, timer: 0, guide: true, firstTurn: 0, flip: !!s.flip, campaign: s.id, foe: s.foe };
 }
 
 // Which of the stage's goals this result met (only a win earns any), and the stars it adds.

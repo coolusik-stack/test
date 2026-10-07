@@ -2955,7 +2955,7 @@ export function drawHomeTree(ctx, h) {
     return g;
   });
   ctx.save(); ctx.translate(wx, wy);
-  ctx.globalAlpha = 0.85 + 0.15 * Math.sin(time * 2.3 + seed);
+  ctx.globalAlpha = 0.9;
   ctx.beginPath(); ctx.arc(0, 0, 1.2, 0, TAU); ctx.fill();
   ctx.globalAlpha = 1;
   ctx.beginPath(); ctx.arc(0, 0, wr + 0.1, 0, TAU); ctx.fillStyle = '#7a5a40'; ctx.fill();
@@ -2973,7 +2973,7 @@ export function drawHomeTree(ctx, h) {
   // window ledge + rope ladder
   ctx.beginPath(); roundRectPath(ctx, wx - 0.55, wy + wr + 0.08, 1.1, 0.1, 0.04);
   ctx.fillStyle = '#9a7454'; ctx.fill(); ctx.lineWidth = lw * 0.8; ctx.strokeStyle = P.line; ctx.stroke();
-  const lt = wy + wr + 0.16, lxl = wx - 0.26, lxr = wx + 0.26, swing = Math.sin(time * 1.3 + seed) * 0.04;
+  const lt = wy + wr + 0.16, lxl = wx - 0.26, lxr = wx + 0.26, swing = 0;
   ctx.beginPath();
   ctx.moveTo(lxl, lt); ctx.quadraticCurveTo(lxl - 0.05 + swing, lt * 0.5, lxl - 0.02 + swing * 2, -0.02);
   ctx.moveTo(lxr, lt); ctx.quadraticCurveTo(lxr - 0.05 + swing, lt * 0.5, lxr - 0.02 + swing * 2, -0.02);
@@ -3063,7 +3063,9 @@ export function drawHomeTree(ctx, h) {
   ctx.strokeStyle = P.line; ctx.lineWidth = 0.09 + lw; ctx.stroke();
   ctx.strokeStyle = '#a07a54'; ctx.lineWidth = 0.09; ctx.stroke();
   ctx.beginPath(); ctx.arc(px1, py1, 0.08, 0, TAU); ctx.fillStyle = '#e8c860'; ctx.fill();
-  const w1 = Math.sin(time * 4.2 + seed) * 0.1, w2 = Math.sin(time * 4.2 - 1.2 + seed) * 0.14;
+  // the pennant is the one thing here that moves, and only as hard as the wind blows
+  const gust = Math.min(1, Math.abs(+h.wind || 0) / 5);
+  const w1 = Math.sin(time * (1.5 + 3 * gust) + seed) * 0.1 * gust, w2 = Math.sin(time * (1.5 + 3 * gust) - 1.2 + seed) * 0.14 * gust;
   const fx = px1 - 0.02, fy0 = py1 + 0.08, fy1 = py1 + 0.62;
   ctx.beginPath();
   ctx.moveTo(fx, fy0);

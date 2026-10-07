@@ -62,27 +62,32 @@ export function padLaunch(pad, x, y) {
 }
 
 // ------------------------------------------------------------------ drawing
-// Glowing strips on the ground marking each spot, a little sign with its icon, and the pads.
+// A little sign with its icon by each spot, and the pads. The strip on the ground only shows to
+// the player whose turn it is, for spots within a drive of their cart (bright once they're on it):
+// the rest of the time the field stays quiet. Nothing here moves.
+const REACH = 9; // metres: about a turn's drive
 export function drawSpots(ctx, game, view) {
   const land = game.land;
   if (!land.spots) return;
-  const t = game.time, z = game.cam.zoom, ter = game.terrain;
+  const z = game.cam.zoom, ter = game.terrain;
   const cur = game.players[game.turn];
   const cx = cur && !cur.dead ? cur.body.getPosition().x : -99;
+  const choosing = game.state === 'aim' && cur && !cur.isAI && !cur.remote;
   for (const s of land.spots) {
     const [a, b] = s.range;
     if (b < view.x0 - 2 || a > view.x1 + 2) continue;
     const info = infoOf(s);
     if (s.kind === 'pad') { drawPad(ctx, game, s); continue; }
-    // the strip follows the ground (and vanishes where the ground has been blown away)
     const inside = cx >= a && cx <= b;
+    for (const sx of s.signs || (s.sign != null ? [s.sign] : [])) drawSign(ctx, sx, info, ter, z, inside, s.top);
+    if (!choosing || (!inside && (cx < a - REACH || cx > b + REACH))) continue;
+    // the strip follows the ground (and vanishes where the ground has been blown away)
     ctx.save();
     ctx.lineCap = 'round';
     ctx.strokeStyle = info.color;
-    ctx.globalAlpha = inside ? 0.75 + 0.2 * Math.sin(t * 5) : 0.32;
+    ctx.globalAlpha = inside ? 0.8 : 0.4;
     ctx.lineWidth = inside ? 0.16 : 0.11;
     ctx.setLineDash([0.32, 0.22]);
-    ctx.lineDashOffset = -t * 0.6;
     ctx.beginPath();
     let pen = false;
     for (let x = a; x <= b + 0.001; x += 0.2) {
@@ -93,7 +98,6 @@ export function drawSpots(ctx, game, view) {
     }
     ctx.stroke();
     ctx.restore();
-    for (const sx of s.signs || (s.sign != null ? [s.sign] : [])) drawSign(ctx, sx, info, ter, z, inside, t, s.top);
   }
 }
 
@@ -104,11 +108,11 @@ function floorAt(ter, x, floor) {
   return -1;
 }
 
-function drawSign(ctx, sx, info, ter, z, active, t, top) {
+function drawSign(ctx, sx, info, ter, z, active, top) {
   const gy = ter.surfaceY(sx, top ?? undefined);
   if (gy < 0) return;
-  const bob = active ? Math.sin(t * 6) * 0.04 : 0;
   ctx.save();
+  ctx.globalAlpha = active ? 1 : 0.7;
   ctx.translate(sx, -gy);
   // post
   ctx.strokeStyle = '#5a3a1c';
@@ -116,9 +120,9 @@ function drawSign(ctx, sx, info, ter, z, active, t, top) {
   ctx.lineCap = 'round';
   ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(0, -0.78); ctx.stroke();
   // board (pixel-sized so it reads at any zoom)
-  ctx.translate(0, -0.95 + bob);
+  ctx.translate(0, -0.95);
   ctx.scale(1 / z, 1 / z);
-  const S = clamp(z * 0.62, 18, 30);
+  const S = clamp(z * 0.56, 16, 26);
   ctx.fillStyle = active ? '#fff3c4' : '#f4e2bf';
   ctx.strokeStyle = '#3e240e';
   ctx.lineWidth = 2.2;

@@ -3,6 +3,7 @@
 // physics and into Path2D shapes for rendering. The land is a set of floating islands over a
 // bottomless sea of clouds: dig through one and whoever stands on it falls.
 import { clamp, lerp, rng, noise1D } from './util.js';
+import { MAPS } from './maps.js';
 
 // SEA is the top of the cloud sea: anything that sinks below it has fallen out of the world.
 export const WORLD = { W: 72, H: 40, CELL: 0.25, SEA: 1.0, SEA0: 1.0 };
@@ -27,6 +28,7 @@ export class Terrain {
     this.version = 0;
     this.heights = opts.heights; // function x -> surface height (for generation)
     this.backs = opts.backs || []; // tunnels open at both ends: drawn dark inside while their roof stands
+    this.paints = opts.paints || []; // ground of another stuff: an igloo's snow bricks, a rainbow of rock
     this.opLog = []; // every carve since generation, [x, y, r] in centimetres (quantised so peers agree)
     this._generate(opts);
     this.f0 = this.f.slice();
@@ -448,12 +450,12 @@ export class Terrain {
           // roots and vines dangling from the underside of the island
           const lo = Math.min(x0, x1), hi = Math.max(x0, x1);
           for (let slot = Math.ceil(lo / SLOT); slot * SLOT < hi; slot++) {
-            if (hash(slot, 31) > 0.34) continue;
+            if (hash(slot, 31) > 0.2) continue;
             const tx = slot * SLOT;
             const t = (tx - x0) / dx;
             if (t < 0 || t > 1) continue;
             const ty = -(y0 + dy * t) - 0.04;
-            const L = 0.35 + Math.pow(hash(slot, 32), 1.6) * 1.9;
+            const L = 0.3 + Math.pow(hash(slot, 32), 1.6) * 1.3;
             const bend = (hash(slot, 33) - 0.5) * 0.7 * L;
             if (hash(slot, 34) < 0.55) {
               roots.moveTo(tx, ty);
@@ -488,19 +490,24 @@ export class Terrain {
           tufts.lineTo(tx + lean + 0.06, -ty - hgt * 0.75);
           tufts.lineTo(tx + 0.07, -ty + 0.02);
           tufts.closePath();
-          if (decor.length && hash(slot, 11) < 0.16) addDecor(slot, tx, ty);
+          // sparse: a plant here and there (a sunflower field stays a sunflower field)
+          if (decor.length && hash(slot, 11) < (decor[Math.floor(hash(slot, 3) * decor.length)] === 'sunflower' ? 0.14 : 0.065)) addDecor(slot, tx, ty);
         }
       }
     }
-    // a tunnel is open to the sky at both ends, so it is not a hole: fill it column by column up
-    // to the underside of its roof, wherever the roof still stands (a colored back gets its own path)
+    // a tunnel is open to the sky at both ends, so it is not a hole: fill it column by column from
+    // its floor (which may climb) up to the underside of its roof, wherever the roof still stands
+    // (a colored back gets its own path)
     const backPaths = [];
     for (const b of this.backs) {
       const into = b.color ? new Path2D() : holes;
       for (let x = b.x0; x <= b.x1 + 0.001; x += 0.25) {
-        let top = null;
-        for (let y = b.y0 + 0.2; y <= b.y1 + 0.6; y += 0.1) if (this.solid(x + 0.125, y)) { top = y; break; }
-        if (top != null) into.rect(x - 0.01, -(top + 0.15), 0.27, top + 0.15 - b.y0);
+        const cx = x + 0.125;
+        let y = b.y0 + 0.1, floor = null, top = null;
+        for (; y <= b.y1 + 0.6; y += 0.1) if (!this.solid(cx, y)) { floor = y; break; }
+        if (floor == null) continue;
+        for (; y <= b.y1 + 0.6; y += 0.1) if (this.solid(cx, y)) { top = y; break; }
+        if (top != null) into.rect(x - 0.01, -(top + 0.15), 0.27, top - floor + 0.45);
       }
       if (b.color) backPaths.push({ path: into, color: b.color });
     }
@@ -513,6 +520,49 @@ export class Terrain {
     this.sunflowers = sunflowers;
     this.decor = { fern, fernHi, bush, bushHi, clover, needles, shrooms, leaves };
     this.hanging = { roots, vines, vineLeaves };
+  }
+
+  // Part of the ground painted as something else (already clipped to what's left of the ground):
+  // 'snow' packed snow bricks inside an ellipse (only above `above`, if given), 'rainbow' bands
+  // following an elliptical arch.
+  _paint(ctx, p) {
+    ctx.save();
+    if (p.kind === 'snow') {
+      if (p.above != null) { ctx.beginPath(); ctx.rect(p.x - p.rx - 1, -(p.y + p.ry + 1), p.rx * 2 + 2, p.y + p.ry + 1 - p.above); ctx.clip(); }
+      ctx.beginPath();
+      ctx.ellipse(p.x, -p.y, p.rx, p.ry, 0, 0, Math.PI * 2);
+      ctx.clip();
+      const g = ctx.createLinearGradient(0, -(p.y + p.ry), 0, -(p.y - p.ry));
+      g.addColorStop(0, '#fbfdff');
+      g.addColorStop(1, '#cfdeee');
+      ctx.fillStyle = g;
+      ctx.fillRect(p.x - p.rx, -(p.y + p.ry), p.rx * 2, p.ry * 2);
+      // the blocks: rows of bricks, each row offset by half a brick
+      ctx.beginPath();
+      for (let row = 0, y = p.y - p.ry; y < p.y + p.ry; row++, y += 0.62) {
+        ctx.moveTo(p.x - p.rx, -y);
+        ctx.lineTo(p.x + p.rx, -y);
+        for (let x = p.x - p.rx + (row % 2 ? 0.5 : 0); x < p.x + p.rx; x += 1.0) {
+          ctx.moveTo(x, -y);
+          ctx.lineTo(x, -(y + 0.62));
+        }
+      }
+      ctx.strokeStyle = 'rgba(140,170,205,0.6)';
+      ctx.lineWidth = 0.05;
+      ctx.stroke();
+    } else if (p.kind === 'rainbow') {
+      const cols = ['#ff8a8a', '#ffbf6a', '#ffe680', '#9de08c', '#86c4ff', '#b79cf2'];
+      const w = p.w / cols.length;
+      ctx.lineWidth = w * 1.02;
+      cols.forEach((c, i) => {
+        const off = p.w / 2 - w * (i + 0.5);
+        ctx.strokeStyle = c;
+        ctx.beginPath();
+        ctx.ellipse(p.x, -p.y, p.rx + off, p.ry + off, 0, Math.PI, Math.PI * 2);
+        ctx.stroke();
+      });
+    }
+    ctx.restore();
   }
 
   draw(ctx, style, pattern, view) {
@@ -535,6 +585,7 @@ export class Terrain {
     }
     ctx.fillStyle = this._depthGrad;
     ctx.fillRect(-2, -WORLD.H, WORLD.W + 4, WORLD.H + 2);
+    for (const p of this.paints) this._paint(ctx, p);
     ctx.lineWidth = 0.55;
     ctx.strokeStyle = s.bevel || 'rgba(0,0,0,0.2)';
     ctx.stroke(this.path);
@@ -729,577 +780,60 @@ function simplifyLoop(l, eps) {
 // Every map floats over the cloud sea: two home islands (or one long ridge), and whatever the
 // theme puts in the middle. Each island is an upside-down mountain: a flat top to stand on, a
 // rocky underside that is thickest in the middle and thins out toward the cliffs at its ends.
-export function buildLandscape(layout, seed) {
-  if (layout.fixed) return buildFixed(layout.fixed, seed);
+// The battlefield of a map (see maps.js), whole, left to right. `flip` swaps the two homes: every
+// x becomes W − x and the left home's team becomes the right one's, so a match can put either
+// player on either side of a map that is not a mirror image.
+export function buildLandscape(layout, seed, flip = false) {
   const { W } = WORLD;
-  const r = rng(seed);
-  const n1 = noise1D(seed + 11);
-  const n2 = noise1D(seed + 23);
-  const nU = noise1D(seed + 37);
-  const bases = [W * 0.17 + r.range(-1.2, 1.2), W * 0.83 + r.range(-1.2, 1.2)];
-  const baseH = [r.range(layout.baseMin, layout.baseMax), r.range(layout.baseMin, layout.baseMax)];
-  const mid = W / 2 + r.range(-1.5, 1.5);
-  const midH = r.range(layout.midMin, layout.midMax);
-  const ends = [bases[0] - 6.5, bases[1] + 6.5]; // outer cliffs of the two home islands
-  const HOME = layout.home ?? 3.6; // ground under each captain at the start
-  // control points for the big shape
-  const cps = [
-    [ends[0] - 2, baseH[0] - 2.4],
-    [ends[0] + 2.4, baseH[0] - 0.2],
-    [bases[0] - 3, baseH[0]],
-    [bases[0] + 7, baseH[0]],
-  ];
-  const features = {};
-  const plateaus = [
-    [bases[0] - 3, bases[0] + 7, baseH[0]],
-    [bases[1] - 7, bases[1] + 3, baseH[1]],
-  ];
-  // islands: [left x, right x, max thickness, profile exponent (small = blunt, thick to the edges)]
-  let spans;
-  const homeSpans = (inner, D = HOME, p = 0.55) => [[ends[0], Math.min(bases[0] + 8.5, mid - inner), D, p], [Math.max(bases[1] - 8.5, mid + inner), ends[1], D, p]];
-  if (layout.mid === 'gorge') {
-    // a bottomless canyon between two big landmasses, flat rims on both sides for a log bridge
-    const rim = midH, gap = 2.6, lip = 1.9;
-    cps.push(
-      [mid - 10, lerp(baseH[0], rim, 0.5)], [mid - gap - lip, rim], [mid - gap, rim], [mid - gap + 1.0, rim - 3],
-      [mid + gap - 1.0, rim - 3], [mid + gap, rim], [mid + gap + lip, rim], [mid + 10, lerp(baseH[1], rim, 0.5)],
-    );
-    plateaus.push([mid - gap - lip, mid - gap, rim], [mid + gap, mid + gap + lip, rim]);
-    features.bridge = { x: mid, y: rim, span: (gap + lip * 0.55) * 2 };
-    // thick enough under each captain, deeper toward the canyon
-    const D = (a, b, x) => HOME / Math.sqrt(Math.sin(Math.PI * (x - a) / (b - a)));
-    spans = [[ends[0], mid - gap, D(ends[0], mid - gap, bases[0]), 0.5], [mid + gap, ends[1], D(mid + gap, ends[1], bases[1]), 0.5]];
-  } else if (layout.mid === 'mesa') {
-    // a big floating mountain in the middle: room on top for a landmark, thick enough to tunnel through
-    const top = midH;
-    cps.push([mid - 8.6, lerp(baseH[0], top, 0.22)], [mid - 6, top], [mid + 6, top], [mid + 8.6, lerp(baseH[1], top, 0.22)]);
-    plateaus.push([mid - 6, mid + 6, top]);
-    spans = homeSpans(13.6);
-    spans.splice(1, 0, [mid - 9.8, mid + 9.8, 9.5, 0.6]);
-  } else if (layout.mid === 'valley') {
-    cps.push([mid - 7, lerp(baseH[0], midH, 0.5)], [mid, midH], [mid + 7, lerp(baseH[1], midH, 0.5)]);
-    spans = homeSpans(15.5);
-    spans.splice(1, 0, [mid - 7.6, mid + 7.6, 6.2, 0.6]);
-  } else {
-    // one long ridge floating end to end
-    const a0 = lerp(baseH[0], midH, 0.55), a1 = lerp(baseH[1], midH, 0.55);
-    cps.push([mid - 7, a0], [mid, midH], [mid + 7, a1]);
-    if (layout.ledges) {
-      // little flat steps on both slopes near the top, each holding a boulder
-      const d = layout.ledges;
-      const at = (a, t) => lerp(a, midH, (1 - Math.cos(t * Math.PI)) / 2);
-      const hl = at(a0, (7 - d) / 7), hr = at(a1, (7 - d) / 7);
-      cps.push([mid - d - 0.9, hl], [mid - d + 0.9, hl], [mid + d - 0.9, hr], [mid + d + 0.9, hr]);
-      plateaus.push([mid - d - 0.9, mid - d + 0.9, hl], [mid + d - 0.9, mid + d + 0.9, hr]);
-      features.lips = [{ x: mid - d - 0.75, y: hl }, { x: mid + d + 0.75, y: hr }];
-      // each boulder sits at the uphill end of its step: a clean hit still sends it rolling
-      features.boulders = [{ x: mid - d + 0.4, y: hl, dir: 1 }, { x: mid + d - 0.4, y: hr, dir: -1 }];
-    }
-    const t0 = (bases[0] - ends[0]) / (ends[1] - ends[0]);
-    spans = [[ends[0], ends[1], HOME / Math.pow(Math.sin(Math.PI * t0), 0.4), 0.4]];
-  }
-  cps.push([bases[1] - 7, baseH[1]], [bases[1] + 3, baseH[1]], [ends[1] - 2.4, baseH[1] - 0.2], [ends[1] + 2, baseH[1] - 2.4]);
-  cps.sort((a, b) => a[0] - b[0]);
+  const raw = MAPS[layout.fixed](W);
+  const def = flip ? flipped(raw, W) : raw;
+  const n1 = noise1D(seed + 11), nU = noise1D(seed + 37);
+  // keep spots and roads dead flat; let the rest of the grass undulate a little
   const heights = (x) => {
-    let k = 0;
-    while (k < cps.length - 2 && cps[k + 1][0] < x) k++;
-    const [x0, y0] = cps[k];
-    const [x1, y1] = cps[k + 1];
-    const t = clamp((x - x0) / (x1 - x0), 0, 1);
-    let h = lerp(y0, y1, (1 - Math.cos(t * Math.PI)) / 2);
-    let flat = 0;
-    for (const [a, b] of plateaus) {
-      const d = x < a ? a - x : x > b ? x - b : 0;
-      flat = Math.max(flat, clamp(1 - d / 2.5, 0, 1));
-    }
-    const detail = n1(x * 0.16) * layout.rough + n2(x * 0.7) * layout.rough * 0.22;
-    return h + detail * (1 - flat * 0.92);
+    let h = cosInterp(def.top, x);
+    if (!def.flat.some(([a, b]) => x > a - 0.2 && x < b + 0.2)) h += n1(x * 0.5) * 0.12;
+    return h;
   };
-  spans = spans.map(([a, b, D, p]) => ({ a, b, D, p }));
-  // the rocky underside: thickest in the middle of each island, jagged, never thinner than a lip
+  const islandAt = (x) => def.islands.find((i) => x > i.a && x < i.b);
   const under = (x) => {
-    for (const s of spans) {
-      if (x <= s.a || x >= s.b) continue;
-      const k = Math.sin(Math.PI * (x - s.a) / (s.b - s.a));
-      const d = s.D * Math.pow(k, s.p) + (nU(x * 0.55) * 0.55 + nU(x * 1.7 + 9) * 0.18) * k;
-      return heights(x) - Math.max(0.08, d);
-    }
-    return Infinity;
+    const isl = islandAt(x);
+    if (!isl) return Infinity;
+    const calm = isl.calm && x > isl.calm[0] && x < isl.calm[1] ? 0.15 : 1;
+    return cosInterp(isl.under, x) + nU(x * 0.6) * 0.35 * calm;
   };
   const onIsland = (x) => under(x) < Infinity;
-  const ops = [];
-  // hanging crags under the islands (never right under a captain: that ground is fair game)
-  for (const s of spans) {
-    const w = s.b - s.a;
-    const n = w > 18 ? 2 : 1;
-    for (let c = 0; c < n; c++) {
-      let x = lerp(s.a, s.b, n === 1 ? r.range(0.3, 0.7) : c === 0 ? r.range(0.18, 0.38) : r.range(0.62, 0.82));
-      for (const bx of bases) if (Math.abs(x - bx) < 3.2) x = bx + Math.sign(x - bx || 1) * 3.2;
-      if (!onIsland(x)) continue;
-      const uy = under(x);
-      // long enough to look like a crag, never long enough to dip into the clouds
-      const ry = Math.min(r.range(1.3, 2.3) * Math.min(1.4, s.D / 5), (uy - WORLD.SEA - 2.6) / 1.5), rx = r.range(0.7, 1.2);
-      if (ry < 0.6) continue;
-      ops.push({ type: 'add', x, y: uy - ry * 0.35, rx, ry });
-      ops.push({ type: 'add', x: x + r.range(-0.6, 0.6), y: uy - ry * 0.9, rx: rx * 0.5, ry: ry * 0.6 });
-    }
-  }
-  if (layout.arch) {
-    ops.push({ type: 'sub', x: mid, y: midH * 0.55, rx: 2.6, ry: 1.9 });
-  }
-  if (layout.spire) {
-    ops.push({ type: 'add', x: mid, y: midH + 2.5, rx: 1.1, ry: 3.2 });
-  }
-  if (layout.tunnel) {
-    // a squirrel tunnel straight through the floating mountain, open at both slopes: a flat,
-    // well-aimed shot goes right through
-    // low in the mountain's flank: a thick roof over it and solid rock under the floor, so it
-    // reads as a tunnel and not as two islands stacked up
-    const wall = lerp(Math.max(baseH[0], baseH[1]), midH, 0.22);
-    const ty = layout.mid === 'mesa' ? wall + 1.1 : midH - 2.8;
-    let xa = mid, xb = mid;
-    while (xa > mid - 16 && heights(xa) > ty + 0.4) xa -= 0.25;
-    while (xb < mid + 16 && heights(xb) > ty + 0.4) xb += 0.25;
-    for (let x = xa - 1.2; x <= xb + 1.2; x += 0.5) ops.push({ type: 'sub', x, y: ty, rx: 1.05, ry: 1.05 });
-    features.tunnel = { x: mid, y: ty, xa, xb };
-    features.giant = { x: mid };
-  }
-  if (layout.spire) features.spire = { x: mid };
-  // a little rock lip on the downhill edge of each boulder step (round stones roll on any tilt)
-  for (const l of features.lips || []) ops.push({ type: 'add', x: l.x, y: l.y + 0.12, rx: 0.42, ry: 0.4 });
-  if (layout.islands) {
-    // two small sky islets, mirrored, each carrying a nut basket
-    features.islands = [];
-    for (const side of [-1, 1]) {
-      const ix = mid + side * layout.islands, iy = midH + 6.8;
-      ops.push({ type: 'add', x: ix, y: iy, rx: 2.9, ry: 0.75 });
-      ops.push({ type: 'add', x: ix, y: iy - 0.7, rx: 1.9, ry: 0.8 });
-      ops.push({ type: 'add', x: ix + side * 0.3, y: iy - 1.4, rx: 0.9, ry: 0.6 });
-      features.islands.push({ x: ix, y: iy + 0.75 });
-    }
-    features.bounce = [{ x: mid - 3.4 }, { x: mid + 3.4 }];
-  }
-  return { heights, under, onIsland, spans, ops, bases, baseH, mid, midH, features };
+  const spans = def.islands.map((i) => ({ a: i.a, b: i.b })).sort((p, q) => p.a - q.a);
+  return {
+    heights, under, onIsland, spans, ops: def.ops, bases: def.bases, mid: W / 2,
+    features: { ...(def.features || {}), fixed: true }, spots: def.spots, forts: def.forts,
+    fixed: layout.fixed, backs: def.backs || [], paints: def.paints || [], flip,
+  };
 }
 
-// ---------- hand-made maps ----------
-// Fixed, mirrored layouts where every spot means something (see spots.js). Each map is described
-// for its left half (x ≤ 36) and mirrored: the top surface and each island's underside as [x, y]
-// points joined by cosine curves, then carves, crags, spots and landmarks per side. Only small
-// things vary between matches (wind, fort design, decor); the shapes stay put so players can
-// learn them. Slopes a cart has to drive up stay at 1:2 or gentler (steeper ones read as walls).
-const FIXED = {
-  // 도토리 숲 — hide, look, or cross? Home island, from the outer cliff inward: fort hill with a
-  // dead-end burrow dug into its face (mouth toward the enemy: lobs land on the roof, flat shots
-  // go in and out) · start · lookout hump · acorn tree at the front · mushroom pad to the middle
-  // island. Middle island: one flat crown under the great oak and a pad home at each end.
-  oak: {
-    top: [
-      [2.0, 13.6], [3.2, 16.4], [8.6, 16.4], [9.9, 12.0], [13.6, 12.0], [17.6, 14.0], [19.6, 14.0], [23.6, 12.0], [26.6, 12.0], [27.3, 11.4],
-      [30.6, 14.4], [31.2, 15.4], [36, 15.4],
-    ],
-    flat: [[3.4, 8.4], [9.9, 13.6], [17.6, 19.6], [23.6, 26.6], [31.2, 36]],
-    islands: [
-      { a: 2.1, b: 27.2, under: [[2.1, 13.0], [3.4, 10.6], [6.0, 9.0], [9.6, 8.6], [11.6, 8.4], [15.0, 8.4], [18.6, 8.8], [21.5, 8.8], [24.4, 9.4], [25.9, 10.1], [27.2, 11.3]] },
-      { a: 30.7, b: 36, under: [[30.7, 14.2], [31.8, 12.6], [34.0, 10.4], [36.0, 8.4]] },
-    ],
-    base: 11.8, baseH: 12, midH: 15.4,
-    side({ X, span, side, team, ops, spots, forts }) {
-      // the burrow: dug into the face of the fort hill, a dead end big enough for a cart
-      for (let x = 6.4; x <= 10.6 + 0.01; x += 0.4) ops.push({ type: 'sub', x: X(x), y: 13.2, rx: 1.2, ry: 1.2 });
-      // crags hanging under the home island (never under the start or the burrow)
-      ops.push({ type: 'add', x: X(4.2), y: 9.0, rx: 0.8, ry: 1.6 });
-      ops.push({ type: 'add', x: X(4.5), y: 7.9, rx: 0.4, ry: 0.9 });
-      ops.push({ type: 'add', x: X(20.2), y: 8.3, rx: 0.7, ry: 1.1 });
-      spots.push({ kind: 'burrow', team, range: span(6.2, 9.4), sign: X(11.0), floor: 12.0 });
-      spots.push({ kind: 'high', team, range: span(17.8, 19.4), sign: X(20.4) });
-      spots.push({ kind: 'tree', team, range: span(23.6, 25.2), sign: X(23.1) });
-      spots.push({ kind: 'pad', team, range: span(25.4, 26.5), dir: side, to: { x: X(34.4), y: 15.4 }, apex: 19.6 });
-      spots.push({ kind: 'pad', team: -1, range: span(31.3, 32.4), dir: -side, to: { x: X(12.0), y: 12.0 }, apex: 21.2 });
-      forts.push({ back: X(4.6), facing: side });
-    },
-    center({ M, W, ops, spots }) {
-      // the great crag under the middle island
-      ops.push({ type: 'add', x: M, y: 7.0, rx: 1.5, ry: 2.4 });
-      ops.push({ type: 'add', x: M + 0.4, y: 5.2, rx: 0.65, ry: 1.3 });
-      spots.push({ kind: 'crown', team: -1, range: [32.6, W - 32.6], sign: null, signs: [33.0, W - 33.0] });
-    },
-    features: (W, M) => ({
-      trees: [
-        { x: M, kind: 'oak', giant: true, h: 7.6, canopyR: 3.5, hpMul: 2, nuts: 6, hive: true, web: false, room: 3.2 },
-        { x: 24.4, kind: 'oak', h: 4.7, canopyR: 1.85, nuts: 5, hive: false, web: false, room: 1.5 },
-        { x: W - 24.4, kind: 'oak', h: 4.7, canopyR: 1.85, nuts: 5, hive: false, web: false, room: 1.5 },
-      ],
-    }),
-  },
-
-  // 단풍 협곡 — cross, or cut? One landmass split by a bottomless canyon, joined only by a thin
-  // earth bridge. From the outer cliff: fort · a rock floating just over the ground behind the
-  // start (a roof overhead, open on both sides: somewhere to fall back to) · start · the maple
-  // tree · a bluff at the canyon rim (lookout) · the bridge. The bridge is under 2 m thick: stand
-  // on it and the ground cracks; a hit nearby drops it, and once it is gone the two sides can't
-  // reach each other again.
-  maple: {
-    top: [[2.0, 11.2], [3.0, 13.0], [23.5, 13.0], [27.5, 15.0], [30.4, 15.0], [32.0, 14.2], [36, 14.2]],
-    flat: [[3.0, 23.5], [27.5, 30.4], [32.0, 36]],
-    islands: [
-      {
-        a: 2.1, b: 36, calm: [30.4, 36], // the bridge's underside stays even, so its thickness is what it says
-        under: [[2.1, 11.6], [3.4, 10.0], [7, 9.6], [11, 9.4], [15, 9.4], [19, 9.0], [23, 8.6], [27, 8.2], [29.0, 8.6], [30.8, 10.2], [32.0, 12.2], [36, 12.4]],
-      },
-    ],
-    base: 15.0, baseH: 13, midH: 14.2,
-    side({ X, span, side, team, ops, spots, forts }) {
-      // the floating rock: a little sky island hovering a hand's width over a cart's head, reaching
-      // well out toward the enemy so lobs coming down at an angle still land on it
-      ops.push({ type: 'add', x: X(10.0), y: 17.1, rx: 2.8, ry: 1.3 });
-      ops.push({ type: 'add', x: X(10.2), y: 16.2, rx: 1.9, ry: 0.65 });
-      ops.push({ type: 'add', x: X(10.4), y: 15.8, rx: 0.6, ry: 0.35 });
-      ops.push({ type: 'add', x: X(6.0), y: 8.6, rx: 0.9, ry: 1.6 });
-      ops.push({ type: 'add', x: X(6.3), y: 7.2, rx: 0.45, ry: 0.9 });
-      ops.push({ type: 'add', x: X(19.0), y: 7.8, rx: 0.9, ry: 1.5 });
-      ops.push({ type: 'add', x: X(26.0), y: 7.2, rx: 1.0, ry: 1.6 });
-      ops.push({ type: 'add', x: X(26.4), y: 5.8, rx: 0.45, ry: 0.9 });
-      spots.push({
-        kind: 'burrow', team, range: span(7.6, 10.2), sign: X(13.3), floor: 13.0,
-        label: { name: '뜬바위 그늘', desc: '머리 위에 뜬 바위가 위에서 오는 공격을 막아 줘요. 양옆은 뚫려 있어 낮게 쏜 건 그대로 들어와요' },
-      });
-      spots.push({ kind: 'tree', team, range: span(20.5, 22.5), sign: X(19.8), label: { name: '단풍 명당' } });
-      spots.push({ kind: 'high', team, range: span(27.7, 29.5), sign: X(30.0), label: { name: '벼랑 전망대', desc: '조준선이 두 배로 길어져요. 바로 앞은 협곡이에요' } });
-      forts.push({ back: X(3.4), facing: side });
-    },
-    center({ W, spots }) {
-      spots.push({ kind: 'bridge', team: -1, range: [32.4, W - 32.4], sign: null, signs: [31.8, W - 31.8] });
-    },
-    features: (W, M) => ({
-      trees: [21.5, W - 21.5].map((x) => ({ x, kind: 'maple', h: 4.6, canopyR: 1.9, nuts: 5, hive: false, web: false, room: 1.5 })),
-      crates: [{ x: M }], // a nut basket in the middle of the bridge
-    }),
-  },
-
-  // 소나무 언덕 — king of the hill. One ridge from end to end. From the outer cliff: fort · start
-  // · a hollow with a pine tree in it (a nut every turn, but the hill in front gets in the way of
-  // your shots) · the climb · a ledge halfway up (lookout) · the summit under the great pine
-  // (lookout + a nut every turn), three turns of climbing away and in plain view of both sides.
-  pine: {
-    top: [[2.2, 10.8], [3.4, 12.6], [11.0, 12.6], [14.6, 10.8], [16.2, 10.8], [20.2, 12.8], [25.0, 15.2], [28.0, 15.2], [32.6, 17.5], [36, 17.5]],
-    flat: [[3.4, 11.0], [14.6, 16.2], [25.0, 28.0], [32.6, 36]],
-    islands: [{ a: 2.3, b: 36, under: [[2.3, 11.0], [3.6, 9.8], [8, 9.0], [11, 8.9], [14, 8.0], [16, 7.6], [20, 7.6], [26, 7.0], [32, 6.2], [36, 5.8]] }],
-    base: 9.4, baseH: 12.6, midH: 17.5,
-    side({ X, span, side, team, ops, spots, forts }) {
-      ops.push({ type: 'add', x: X(6.0), y: 7.6, rx: 1.0, ry: 1.7 });
-      ops.push({ type: 'add', x: X(6.3), y: 6.0, rx: 0.5, ry: 1.0 });
-      ops.push({ type: 'add', x: X(17.0), y: 5.6, rx: 1.0, ry: 1.7 });
-      ops.push({ type: 'add', x: X(24.0), y: 4.8, rx: 1.1, ry: 1.8 });
-      ops.push({ type: 'add', x: X(24.4), y: 3.4, rx: 0.5, ry: 0.9 });
-      spots.push({ kind: 'tree', team, range: span(14.4, 16.4), sign: X(13.4), label: { name: '솔방울 명당', desc: '내 차례가 시작될 때마다 특수 견과 +1. 움푹 꺼진 데라 앞 오르막이 내 샷을 자주 막아요' } });
-      spots.push({ kind: 'high', team, range: span(25.3, 27.7), sign: X(24.4), label: { name: '전망 턱' } });
-      forts.push({ back: X(4.0), facing: side });
-    },
-    center({ M, W, ops, spots }) {
-      ops.push({ type: 'add', x: M, y: 3.6, rx: 1.4, ry: 2.2 });
-      spots.push({
-        kind: 'crown', team: -1, range: [32.8, W - 32.8], sign: null, signs: [32.3, W - 32.3],
-        label: { name: '솔방울 고지', desc: '조준선 두 배 + 내 차례마다 특수 견과 +1. 양쪽 어디서나 다 보여요' },
-      });
-    },
-    features: (W, M) => ({
-      trees: [
-        { x: M, kind: 'pine', giant: true, h: 7.4, canopyR: 2.6, hpMul: 2, nuts: 6, hive: true, web: false, room: 2.4 },
-        ...[15.4, W - 15.4].map((x) => ({ x, kind: 'pine', h: 4.6, canopyR: 1.8, nuts: 5, hive: false, web: false, room: 1.5 })),
-      ],
-    }),
-  },
-
-  // 반딧불 밤숲 — hop the islands. Home island: fort · start · a glowing mushroom pad that throws
-  // you up to a small floating islet (lookout; thin, so it breaks under you) with a pad at each
-  // end: back home, or down to the middle island. The middle island is split by a rock spire
-  // (a nut basket on top); at its foot is the firefly tree (a nut every turn, flat shots from the
-  // far side hit the spire), with a pad home at the outer edge.
-  night: {
-    top: [[2.4, 12.0], [3.4, 13.6], [15.4, 13.6], [16.6, 12.6], [28.2, 12.0], [29.2, 13.0], [34.8, 13.0], [35.4, 18.4], [36, 19.0]],
-    flat: [[3.4, 15.4], [29.2, 34.8]],
-    islands: [
-      { a: 2.6, b: 16.4, under: [[2.6, 13.0], [3.8, 11.2], [7, 10.0], [11, 9.8], [14, 10.2], [16.4, 12.4]] },
-      { a: 28.6, b: 36, under: [[28.6, 12.2], [30, 10.4], [33, 9.2], [36, 7.2]] },
-    ],
-    base: 9.6, baseH: 13.6, midH: 13.0,
-    side({ X, span, side, team, ops, spots, forts }) {
-      // the floating islet: flat on top, thick in the middle, thin at the ends
-      ops.push({ type: 'add', x: X(22.0), y: 19.0, rx: 3.2, ry: 0.6 });
-      ops.push({ type: 'add', x: X(22.0), y: 18.3, rx: 2.2, ry: 0.8 });
-      ops.push({ type: 'add', x: X(22.3), y: 17.5, rx: 1.1, ry: 0.6 });
-      ops.push({ type: 'add', x: X(22.2), y: 16.8, rx: 0.4, ry: 0.5 });
-      ops.push({ type: 'add', x: X(6.5), y: 8.4, rx: 0.9, ry: 1.4 });
-      ops.push({ type: 'add', x: X(6.8), y: 7.2, rx: 0.45, ry: 0.8 });
-      ops.push({ type: 'add', x: X(32.0), y: 7.6, rx: 0.9, ry: 1.5 });
-      const islet = 21; // look for its top from here down (it floats over the gap)
-      spots.push({ kind: 'pad', team, range: span(13.6, 14.7), dir: side, to: { x: X(21.0), y: 19.55 }, apex: 23.2 });
-      spots.push({ kind: 'pad', team, range: span(19.4, 20.2), dir: -side, to: { x: X(9.6), y: 13.6 }, apex: 23.0, top: islet });
-      spots.push({
-        kind: 'high', team, range: span(20.5, 23.5), sign: X(23.7), top: islet,
-        label: { name: '반딧불 섬', desc: '조준선이 두 배로 길어져요. 작고 얇아서 잘 무너져요' },
-      });
-      spots.push({ kind: 'pad', team, range: span(23.8, 24.6), dir: side, to: { x: X(31.8), y: 13.0 }, apex: 22.6, top: islet });
-      spots.push({ kind: 'pad', team, range: span(29.0, 30.0), dir: -side, to: { x: X(9.6), y: 13.6 }, apex: 25.0 });
-      spots.push({ kind: 'tree', team, range: span(30.8, 33.4), sign: X(33.9), label: { name: '반딧불 명당', desc: '내 차례가 시작될 때마다 특수 견과 +1. 건너편에서 낮게 쏜 건 바위 기둥이 막아 줘요' } });
-      forts.push({ back: X(3.8), facing: side });
-    },
-    center({ M, ops }) {
-      // the spire's overhanging cap
-      ops.push({ type: 'add', x: M, y: 19.0, rx: 1.5, ry: 0.55 });
-      ops.push({ type: 'add', x: M, y: 6.0, rx: 1.2, ry: 2.0 });
-    },
-    features: (W, M) => ({
-      trees: [32.0, W - 32.0].map((x) => ({ x, kind: 'chestnut', h: 4.4, canopyR: 1.8, nuts: 5, hive: false, web: false, room: 1.5 })),
-      crates: [{ x: M }], // on top of the spire
-    }),
-  },
-
-  // 벚꽃 분지 (spring) — hold the rim, or go down? Home stands high on the rim of a wide valley:
-  // fort · start · the rim's edge (lookout: the whole valley below) · a long slope down · the
-  // blossom tree at the valley floor (a nut every turn) · the giant cherry in the middle, buzzing
-  // with bees, between the two valley spots.
-  blossom: {
-    top: [[2.0, 13.4], [3.2, 16.2], [16.2, 16.2], [17.4, 15.8], [26.0, 11.6], [36, 11.6]],
-    flat: [[3.2, 16.2], [26.0, 36]],
-    islands: [{ a: 2.1, b: 36, under: [[2.1, 13.8], [3.4, 12.2], [8, 12.0], [13, 12.0], [17, 11.4], [22, 9.4], [27, 8.2], [32, 7.8], [36, 7.6]] }],
-    base: 10.2, baseH: 16.2, midH: 11.6,
-    side({ X, span, side, team, ops, spots, forts }) {
-      ops.push({ type: 'add', x: X(5.6), y: 11.2, rx: 0.9, ry: 1.6 });
-      ops.push({ type: 'add', x: X(5.9), y: 9.8, rx: 0.45, ry: 0.9 });
-      ops.push({ type: 'add', x: X(20.0), y: 8.8, rx: 0.9, ry: 1.5 });
-      ops.push({ type: 'add', x: X(29.0), y: 7.2, rx: 1.0, ry: 1.6 });
-      ops.push({ type: 'add', x: X(29.3), y: 5.8, rx: 0.5, ry: 0.9 });
-      spots.push({ kind: 'high', team, range: span(13.6, 16.0), sign: X(12.8), label: { name: '벚꽃 전망대', desc: '분지 가장자리. 조준선이 두 배로 길어지고 분지가 다 내려다보여요' } });
-      spots.push({ kind: 'tree', team, range: span(28.2, 30.8), sign: X(31.6), label: { name: '벚꽃 명당', desc: '내 차례가 시작될 때마다 특수 견과 +1. 분지 바닥이라 가장자리에서 다 보여요' } });
-      forts.push({ back: X(4.0), facing: side });
-    },
-    center({ M, ops }) {
-      ops.push({ type: 'add', x: M, y: 5.6, rx: 1.4, ry: 2.2 });
-      ops.push({ type: 'add', x: M + 0.3, y: 3.8, rx: 0.6, ry: 1.1 });
-    },
-    features: (W, M) => ({
-      trees: [
-        { x: M, kind: 'blossom', giant: true, h: 7.2, canopyR: 3.3, hpMul: 2, nuts: 6, hive: true, web: false, room: 3.0 },
-        ...[29.5, W - 29.5].map((x) => ({ x, kind: 'blossom', h: 4.4, canopyR: 1.8, nuts: 5, hive: false, web: false, room: 1.5 })),
-      ],
-    }),
-  },
-
-  // 두더지 굴 산 (spring) — through, or over? A flat-topped mountain fills the middle, too steep to
-  // drive. A mole tunnel runs right through it at ground level: just inside, the mountain is a
-  // roof (only shots along the tunnel get in), and the two tunnel mouths look at each other. A
-  // mushroom pad just behind the start throws you onto the top (lookout + a nut every turn, seen
-  // by everyone), and a pad up there throws you back; the road to the tunnel stays clear.
-  mole: {
-    top: [[2.2, 10.6], [3.4, 12.2], [24.6, 12.2], [25.6, 13.4], [26.2, 18.6], [27.0, 19.2], [36, 19.2]],
-    flat: [[3.4, 24.6], [27.0, 36]],
-    islands: [{ a: 2.3, b: 36, under: [[2.3, 10.8], [3.6, 9.4], [8, 8.8], [14, 8.8], [20, 8.6], [25, 7.8], [30, 6.8], [36, 6.4]] }],
-    base: 10.6, baseH: 12.2, midH: 19.2,
-    side({ X, span, side, team, ops, spots, forts }) {
-      ops.push({ type: 'add', x: X(6.0), y: 8.6, rx: 0.9, ry: 1.5 });
-      ops.push({ type: 'add', x: X(6.3), y: 7.3, rx: 0.45, ry: 0.85 });
-      ops.push({ type: 'add', x: X(18.0), y: 8.0, rx: 0.9, ry: 1.4 });
-      spots.push({
-        kind: 'burrow', team, range: span(26.6, 30.0), sign: X(24.2), floor: 12.2, band: [11.4, 15.5],
-        label: { name: '두더지 굴', desc: '산이 지붕이 되어 위에서 오는 공격을 막아 줘요. 굴을 따라 낮게 쏜 건 그대로 들어와요' },
-      });
-      spots.push({ kind: 'pad', team, range: span(7.0, 8.0), dir: -side, to: { x: X(32.4), y: 19.2 }, apex: 25.0 });
-      spots.push({ kind: 'pad', team, range: span(27.4, 28.4), dir: -side, to: { x: X(12.6), y: 12.2 }, apex: 24.0, top: 20, band: [18.4, 23] });
-      forts.push({ back: X(3.8), facing: side });
-    },
-    center({ M, W, ops, spots }) {
-      // the tunnel: ground level all the way through, 2.6 m high
-      for (let x = 24.4; x <= W - 24.4 + 0.01; x += 0.45) ops.push({ type: 'sub', x, y: 13.5, rx: 1.3, ry: 1.3 });
-      ops.push({ type: 'add', x: M, y: 4.6, rx: 1.5, ry: 2.4 });
-      ops.push({ type: 'add', x: M - 0.4, y: 2.8, rx: 0.6, ry: 1.2 });
-      spots.push({
-        kind: 'crown', team: -1, range: [31.4, W - 31.4], sign: null, signs: [31.0, W - 31.0], top: 20, band: [18.4, 23],
-        label: { name: '두더지 산 꼭대기', desc: '조준선 두 배 + 내 차례마다 특수 견과 +1. 양쪽에서 다 보여요' },
-      });
-    },
-    features: (W, M) => ({
-      trees: [{ x: M, kind: 'blossom', h: 4.8, canopyR: 2.2, nuts: 5, hive: false, web: false, room: 2.0, top: 20 }],
-    }),
-    backs: (W) => [{ x0: 25.2, x1: W - 25.2, y0: 12.2, y1: 14.7 }],
-  },
-
-  // 해바라기 들판 (summer) — nowhere to hide. Rolling open field: fort · start · a knoll with a
-  // zelkova's shade (a nut every turn) · a dip with a nut basket · the lookout hut hill in the
-  // middle, out in the open. Wind decides more here than anywhere.
-  sunflower: {
-    top: [[2.0, 11.2], [3.2, 13.2], [10.0, 13.2], [13.6, 14.2], [17.2, 14.2], [21.0, 13.0], [28.0, 13.0], [32.0, 14.6], [36, 14.6]],
-    flat: [[3.2, 10.0], [13.6, 17.2], [21.0, 28.0], [32.0, 36]],
-    islands: [{ a: 2.1, b: 36, under: [[2.1, 11.6], [3.4, 9.8], [10, 9.4], [15, 10.0], [21, 9.2], [28, 8.6], [33, 9.6], [36, 9.8]] }],
-    base: 8.2, baseH: 13.2, midH: 14.6,
-    side({ X, span, side, team, ops, spots, forts }) {
-      ops.push({ type: 'add', x: X(5.4), y: 9.4, rx: 0.9, ry: 1.5 });
-      ops.push({ type: 'add', x: X(5.7), y: 8.0, rx: 0.45, ry: 0.8 });
-      ops.push({ type: 'add', x: X(24.0), y: 8.4, rx: 1.0, ry: 1.5 });
-      ops.push({ type: 'add', x: X(24.3), y: 7.0, rx: 0.5, ry: 0.85 });
-      spots.push({ kind: 'tree', team, range: span(14.0, 16.8), sign: X(13.0), label: { name: '느티나무 그늘', desc: '내 차례가 시작될 때마다 특수 견과 +1. 나무가 내 높은 샷을 막기도 해요' } });
-      forts.push({ back: X(3.4), facing: side });
-    },
-    center({ M, W, ops, spots }) {
-      ops.push({ type: 'add', x: M, y: 8.2, rx: 1.6, ry: 2.0 });
-      spots.push({ kind: 'high', team: -1, range: [32.4, W - 32.4], sign: null, signs: [32.0, W - 32.0], label: { name: '원두막 언덕', desc: '조준선이 두 배로 길어져요. 들판 한가운데라 숨을 곳이 없어요' } });
-    },
-    features: (W, M) => ({
-      trees: [15.4, W - 15.4].map((x) => ({ x, kind: 'oak', h: 4.8, canopyR: 2.0, nuts: 5, hive: false, web: false, room: 1.5 })),
-      crates: [{ x: 24.5 }, { x: W - 24.5 }],
-    }),
-  },
-
-  // 은행나무 쌍봉 (autumn) — shoot from behind your hill. Each start sits behind its own peak, so
-  // only lobs go out (and come in). The peak top is a lookout in plain view; past it the slope
-  // runs down into a narrow golden valley with a ginkgo on each side (a nut every turn) and a nut
-  // basket in the middle, under both peaks.
-  ginkgo: {
-    top: [[2.2, 10.6], [3.4, 12.0], [11.0, 12.0], [19.0, 16.0], [22.0, 16.0], [30.6, 11.6], [36, 11.6]],
-    flat: [[3.4, 11.0], [19.0, 22.0], [30.6, 36]],
-    islands: [{ a: 2.3, b: 36, under: [[2.3, 10.8], [3.6, 9.0], [8, 8.4], [12, 8.4], [16, 9.0], [20, 10.0], [24, 9.2], [30, 7.6], [36, 7.2]] }],
-    base: 8.6, baseH: 12.0, midH: 11.6,
-    side({ X, span, side, team, ops, spots, forts }) {
-      ops.push({ type: 'add', x: X(6.0), y: 8.0, rx: 0.9, ry: 1.5 });
-      ops.push({ type: 'add', x: X(6.3), y: 6.6, rx: 0.45, ry: 0.85 });
-      ops.push({ type: 'add', x: X(20.5), y: 9.0, rx: 1.0, ry: 1.6 });
-      ops.push({ type: 'add', x: X(20.8), y: 7.5, rx: 0.5, ry: 0.9 });
-      spots.push({ kind: 'high', team, range: span(19.2, 21.8), sign: X(18.4), label: { name: '은행 봉우리', desc: '조준선이 두 배로 길어져요. 산마루라 양쪽에서 다 보여요' } });
-      spots.push({ kind: 'tree', team, range: span(31.0, 33.2), sign: X(30.2), label: { name: '은행 명당', desc: '내 차례가 시작될 때마다 특수 견과 +1. 골짜기라 양쪽 봉우리에서 내려다봐요' } });
-      forts.push({ back: X(3.8), facing: side });
-    },
-    center({ M, ops }) {
-      ops.push({ type: 'add', x: M, y: 6.0, rx: 1.3, ry: 2.0 });
-    },
-    features: (W, M) => ({
-      trees: [32.2, W - 32.2].map((x) => ({ x, kind: 'ginkgo', h: 4.8, canopyR: 2.0, nuts: 5, hive: false, web: false, room: 1.4 })),
-      crates: [{ x: M }],
-    }),
-  },
-
-  // 살얼음 벼랑 (winter) — no way across. Two islands with a wide chasm between: nobody drives over,
-  // it's all shooting. The ice is thin everywhere (about 3 m), so a good walnut drops anyone. Home:
-  // fort · start · a rise with a snowy pine (a nut every turn) · the ledge at the chasm (lookout,
-  // and the thinnest ice of all).
-  snowcliff: {
-    top: [[2.2, 11.4], [3.4, 13.0], [13.0, 13.0], [17.4, 14.8], [21.0, 14.8], [23.4, 14.0], [27.0, 14.0], [36, 14.0]],
-    flat: [[3.4, 13.0], [17.4, 21.0], [23.4, 27.0]],
-    islands: [{ a: 2.3, b: 27.0, under: [[2.3, 11.6], [3.6, 10.4], [8, 10.0], [13, 10.0], [17, 11.6], [21, 11.8], [24.5, 11.4], [26.4, 12.0], [27.0, 13.2]] }],
-    base: 9.2, baseH: 13.0, midH: 14.0,
-    side({ X, span, side, team, ops, spots, forts }) {
-      ops.push({ type: 'add', x: X(5.4), y: 9.6, rx: 0.8, ry: 1.4 });
-      ops.push({ type: 'add', x: X(5.7), y: 8.4, rx: 0.4, ry: 0.8 });
-      ops.push({ type: 'add', x: X(15.0), y: 10.0, rx: 0.8, ry: 1.2 });
-      spots.push({ kind: 'tree', team, range: span(17.8, 20.6), sign: X(16.8), label: { name: '눈꽃 명당', desc: '내 차례가 시작될 때마다 특수 견과 +1. 땅이 얇으니 발밑을 조심해요' } });
-      spots.push({ kind: 'high', team, range: span(23.8, 26.4), sign: X(23.0), label: { name: '살얼음 전망대', desc: '조준선이 두 배로 길어져요. 얼음이 가장 얇은 벼랑 끝이에요' } });
-      forts.push({ back: X(3.8), facing: side });
-    },
-    center() {},
-    features: (W, M) => ({
-      trees: [19.2, W - 19.2].map((x) => ({ x, kind: 'snowpine', h: 4.6, canopyR: 1.8, nuts: 5, hive: false, web: false, room: 1.4 })),
-    }),
-  },
-
-  // 오로라 빙벽 (winter night) — over the wall. A tall ice wall stands in the middle: nothing flat
-  // gets past it, every shot is a high lob. Home: fort · start · a snowy oak (a nut every turn) ·
-  // the foot of the wall with a mushroom pad that throws you onto the top (lookout + a nut every
-  // turn, in everyone's sights), and a pad up there that throws you home.
-  aurora: {
-    top: [[2.2, 10.8], [3.4, 12.4], [21.6, 12.4], [24.0, 13.0], [31.0, 13.0], [32.6, 20.4], [33.4, 21.0], [36, 21.0]],
-    flat: [[3.4, 21.6], [24.0, 31.0], [33.4, 36]],
-    islands: [{ a: 2.3, b: 36, under: [[2.3, 11.0], [3.6, 9.6], [8, 9.0], [14, 9.0], [20, 8.8], [26, 8.2], [31, 7.4], [36, 7.0]] }],
-    base: 9.8, baseH: 12.4, midH: 21.0,
-    side({ X, span, side, team, ops, spots, forts }) {
-      ops.push({ type: 'add', x: X(5.8), y: 8.8, rx: 0.9, ry: 1.5 });
-      ops.push({ type: 'add', x: X(6.1), y: 7.4, rx: 0.45, ry: 0.85 });
-      ops.push({ type: 'add', x: X(23.0), y: 7.6, rx: 0.9, ry: 1.5 });
-      spots.push({ kind: 'tree', team, range: span(15.4, 17.8), sign: X(14.6), label: { name: '눈꽃 명당', desc: '내 차례가 시작될 때마다 특수 견과 +1' } });
-      spots.push({ kind: 'pad', team, range: span(28.0, 29.1), dir: side, to: { x: X(35.0), y: 21.0 }, apex: 25.6 });
-      spots.push({ kind: 'pad', team, range: span(33.6, 34.4), dir: -side, to: { x: X(13.0), y: 12.4 }, apex: 25.0 });
-      forts.push({ back: X(3.8), facing: side });
-    },
-    center({ M, W, ops, spots }) {
-      ops.push({ type: 'add', x: M, y: 5.4, rx: 1.4, ry: 2.2 });
-      ops.push({ type: 'add', x: M + 0.3, y: 3.6, rx: 0.6, ry: 1.0 });
-      spots.push({
-        kind: 'crown', team: -1, range: [34.6, W - 34.6], sign: null, signs: [34.8, W - 34.8],
-        label: { name: '빙벽 꼭대기', desc: '조준선 두 배 + 내 차례마다 특수 견과 +1. 좁고 높아서 다 보여요' },
-      });
-    },
-    features: (W, M) => ({
-      trees: [16.6, W - 16.6].map((x) => ({ x, kind: 'snowoak', h: 4.6, canopyR: 1.9, nuts: 5, hive: false, web: false, room: 1.4 })),
-    }),
-  },
-
-  // 무지개 바위다리 (summer) — the high road. A thick stone arch bridges the chasm between the two
-  // homes; its top is the only way across and the highest ground on the map. Home: fort · start ·
-  // a shade tree (a nut every turn) · the ramp up · the arch, with the lookout crown at its apex
-  // (a nut every turn, seen by everyone). Blow the arch out from under someone and they're gone.
-  arch: {
-    top: [[2.2, 10.8], [3.4, 12.4], [16.6, 12.4], [23.2, 15.0], [24.4, 15.1], [30.6, 17.9], [36, 18.2]],
-    flat: [[3.4, 16.6]],
-    islands: [{ a: 2.3, b: 36, under: [[2.3, 11.0], [3.6, 9.2], [8, 8.6], [14, 8.8], [20, 9.8], [24, 11.6], [28, 13.6], [32, 14.8], [36, 15.2]] }],
-    base: 9.6, baseH: 12.4, midH: 18.2,
-    side({ X, span, side, team, ops, spots, forts }) {
-      ops.push({ type: 'add', x: X(6.0), y: 8.4, rx: 0.9, ry: 1.5 });
-      ops.push({ type: 'add', x: X(6.3), y: 7.0, rx: 0.45, ry: 0.85 });
-      ops.push({ type: 'add', x: X(17.0), y: 8.6, rx: 1.0, ry: 1.5 });
-      ops.push({ type: 'add', x: X(17.3), y: 7.2, rx: 0.5, ry: 0.85 });
-      spots.push({ kind: 'tree', team, range: span(14.4, 16.6), sign: X(13.6), label: { name: '여름 그늘', desc: '내 차례가 시작될 때마다 특수 견과 +1. 나무가 내 높은 샷을 막기도 해요' } });
-      forts.push({ back: X(3.8), facing: side });
-    },
-    center({ M, W, spots }) {
-      spots.push({
-        kind: 'crown', team: -1, range: [33.4, W - 33.4], sign: null, signs: [33.0, W - 33.0],
-        label: { name: '바위다리 꼭대기', desc: '조준선 두 배 + 내 차례마다 특수 견과 +1. 다리를 깨면 그대로 떨어져요' },
-      });
-    },
-    features: (W, M) => ({
-      trees: [15.5, W - 15.5].map((x) => ({ x, kind: 'oak', h: 4.6, canopyR: 1.9, nuts: 5, hive: false, web: false, room: 1.3 })),
-      crates: [{ x: 28.0 }, { x: W - 28.0 }],
-    }),
-  },
-
-  // 이글루 마을 (winter) — duck into an igloo. A flat snowfield dotted with snow domes. The igloo in
-  // front of each start is a room with a low door on each side, the road runs through it (only flat
-  // shots get in, a drilled roof is a hole); a plain snow dome further on is cover from flat shots. A snowy pine
-  // between them gives a nut every turn, and a nut basket waits in the middle of the field.
-  igloo: {
-    top: [[2.2, 10.8], [3.4, 12.6], [36, 12.6]],
-    flat: [[3.4, 36]],
-    islands: [{ a: 2.3, b: 36, under: [[2.3, 11.0], [3.6, 9.4], [8, 8.8], [14, 8.8], [20, 8.6], [27, 8.2], [33, 8.6], [36, 8.8]] }],
-    base: 9.4, baseH: 12.6, midH: 12.6,
-    side({ X, span, side, team, ops, spots, forts }) {
-      // the igloo: a snow dome with a room inside and a low door on each side (drive through it)
-      ops.push({ type: 'add', x: X(16.6), y: 12.6, rx: 3.4, ry: 4.5 });
-      for (let x = 13.0; x <= 20.2 + 0.01; x += 0.4) {
-        const room = Math.abs(x - 16.6) <= 1.2, r = room ? 1.3 : 1.15; // room 2.6 m high, doors 2.3 m
-        ops.push({ type: 'sub', x: X(x), y: 12.6 + r, rx: r, ry: r });
-      }
-      // a plain snow dome further out: cover from flat shots, and a hump to drive over
-      ops.push({ type: 'add', x: X(27.4), y: 12.4, rx: 2.2, ry: 2.3 });
-      ops.push({ type: 'add', x: X(5.8), y: 8.6, rx: 0.9, ry: 1.5 });
-      ops.push({ type: 'add', x: X(6.1), y: 7.2, rx: 0.45, ry: 0.85 });
-      ops.push({ type: 'add', x: X(22.0), y: 8.0, rx: 0.9, ry: 1.4 });
-      spots.push({
-        kind: 'burrow', team, range: span(15.2, 17.6), sign: X(12.6), floor: 12.6, band: [11.8, 14.5],
-        label: { name: '이글루', desc: '눈 지붕이 위에서 오는 공격을 막아 줘요. 문으로 낮게 쏜 것만 드나들어요' },
-      });
-      spots.push({ kind: 'tree', team, range: span(22.0, 24.6), sign: X(21.2), label: { name: '눈꽃 명당', desc: '내 차례가 시작될 때마다 특수 견과 +1' } });
-      forts.push({ back: X(3.8), facing: side });
-    },
-    center({ M, ops }) {
-      ops.push({ type: 'add', x: M, y: 7.4, rx: 1.4, ry: 2.2 });
-    },
-    features: (W, M) => ({
-      trees: [23.3, W - 23.3].map((x) => ({ x, kind: 'snowpine', h: 4.6, canopyR: 1.8, nuts: 5, hive: false, web: false, room: 1.3 })),
-      crates: [{ x: M }],
-    }),
-    // the room inside, in cold shade
-    backs: (W) => [13.2, W - 20.0].map((x0) => ({ x0, x1: x0 + 6.8, y0: 12.6, y1: 15.2, color: 'rgba(74,100,138,0.95)' })),
-  },
-};
+// A map seen in a mirror (see buildLandscape).
+function flipped(d, W) {
+  const fx = (x) => W - x;
+  const fr = ([a, b]) => [W - b, W - a];
+  const team = (t) => (t < 0 ? t : 1 - t);
+  const pts = (l) => l.map(([x, y]) => [fx(x), y]).reverse();
+  const o = { ...d };
+  o.top = pts(d.top);
+  o.flat = d.flat.map(fr);
+  o.islands = d.islands.map((i) => ({ ...i, a: fx(i.b), b: fx(i.a), under: pts(i.under), calm: i.calm && fr(i.calm) }));
+  o.bases = [fx(d.bases[1]), fx(d.bases[0])];
+  o.ops = d.ops.map((op) => ({ ...op, x: fx(op.x) }));
+  o.spots = d.spots.map((s) => ({
+    ...s, team: team(s.team), range: fr(s.range),
+    sign: s.sign == null ? s.sign : fx(s.sign), signs: s.signs && s.signs.map(fx),
+    dir: s.dir && -s.dir, to: s.to && { ...s.to, x: fx(s.to.x) },
+  }));
+  o.forts = [d.forts[1], d.forts[0]].map((f) => ({ ...f, back: fx(f.back), facing: -f.facing }));
+  const f = d.features || {};
+  o.features = { ...f, trees: (f.trees || []).map((t) => ({ ...t, x: fx(t.x) })), crates: (f.crates || []).map((c) => ({ ...c, x: fx(c.x) })) };
+  o.backs = (d.backs || []).map((b) => ({ ...b, x0: fx(b.x1), x1: fx(b.x0) }));
+  o.paints = (d.paints || []).map((p) => ({ ...p, x: fx(p.x) }));
+  return o;
+}
 
 function cosInterp(pts, x) {
   if (x <= pts[0][0]) return pts[0][1];
@@ -1311,49 +845,6 @@ function cosInterp(pts, x) {
     }
   }
   return pts[pts.length - 1][1];
-}
-
-function buildFixed(id, seed) {
-  const def = FIXED[id];
-  const { W } = WORLD;
-  const M = W / 2;
-  const n1 = noise1D(seed + 11), nU = noise1D(seed + 37);
-  const mirror = (x) => (x <= M ? x : W - x);
-  // keep spots and paths dead flat; let the rest of the grass undulate a little
-  const heights = (x) => {
-    const mx = mirror(x);
-    let h = cosInterp(def.top, mx);
-    if (!def.flat.some(([a, b]) => mx > a - 0.2 && mx < b + 0.2)) h += n1(x * 0.5) * 0.12;
-    return h;
-  };
-  // an island that reaches the middle is one island, mirrored onto itself
-  const islandAt = (mx) => def.islands.find((i) => mx > i.a && (i.b >= M || mx < i.b));
-  const under = (x) => {
-    const mx = mirror(x);
-    const isl = islandAt(mx);
-    if (!isl) return Infinity;
-    const calm = isl.calm && mx > isl.calm[0] && mx < isl.calm[1] ? 0.15 : 1;
-    return cosInterp(isl.under, mx) + nU(x * 0.6) * 0.35 * calm;
-  };
-  const onIsland = (x) => under(x) < Infinity;
-  const spans = [];
-  for (const i of def.islands) {
-    if (i.b >= M) spans.push({ a: i.a, b: W - i.a });
-    else spans.push({ a: i.a, b: i.b }, { a: W - i.b, b: W - i.a });
-  }
-  spans.sort((p, q) => p.a - q.a);
-  // where each spot is (what it does lives in spots.js)
-  const ops = [], spots = [], forts = [];
-  for (const side of [1, -1]) {
-    const X = (x) => (side > 0 ? x : W - x);
-    const span = (a, b) => (side > 0 ? [a, b] : [W - b, W - a]);
-    def.side({ X, span, side, team: side > 0 ? 0 : 1, ops, spots, forts });
-  }
-  def.center({ M, W, ops, spots });
-  return {
-    heights, under, onIsland, spans, ops, bases: [def.base, W - def.base], baseH: [def.baseH, def.baseH], mid: M, midH: def.midH,
-    features: { ...def.features(W, M), fixed: true }, spots, forts, fixed: id, backs: def.backs ? def.backs(W) : [],
-  };
 }
 
 // Tileable dirt texture as a CanvasPattern mapped at 64px per meter.

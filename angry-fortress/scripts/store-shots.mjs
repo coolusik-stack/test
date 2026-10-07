@@ -56,11 +56,12 @@ const SCENES = [
       await page.evaluate(async () => {
         const g = window.__af.game, q = g.players[1], pl = window.planck;
         const { AMMO } = await import('./js/config.js');
-        q.body.setPosition(pl.Vec2(37.4, 14.2 + 0.77));
+        // on the thin earth bridge over the canyon, with a burr landing at its feet
+        q.body.setPosition(pl.Vec2(37.2, g.terrain.surfaceY(37.2) + 0.77));
         q.body.setLinearVelocity(pl.Vec2(0, 0));
         q.facing = -1;
         g.state = 'flight';
-        g.blastQueue.push({ x: 36.0, y: 14.3, spec: AMMO.burr.blast, owner: g.players[0], kind: 'burr' });
+        g.blastQueue.push({ x: 36.4, y: g.terrain.surfaceY(36.4) + 0.2, spec: AMMO.burr.blast, owner: g.players[0], kind: 'burr' });
       });
       await page.waitForFunction(() => { const g = window.__af.game; return g.fallcam || g.players[1].dead; }, null, { timeout: 8000 });
       await page.waitForTimeout(700);
@@ -82,10 +83,10 @@ const SCENES = [
   {
     name: 'pad', caption: '버섯 트램펄린 타고 다른 섬으로 슝!',
     async setup(page) {
-      await start(page, { mode: 'pvp', theme: 'oak' });
+      await start(page, { mode: 'pvp', theme: 'night' });
       await page.evaluate(() => {
         const g = window.__af.game, p = g.players[0], pl = window.planck;
-        p.body.setPosition(pl.Vec2(24.6, g.terrain.surfaceY(24.6) + 0.77));
+        p.body.setPosition(pl.Vec2(13.2, g.terrain.surfaceY(13.2) + 0.77));
         p.stamina = 1e9;
         g.setMove(1);
       });
@@ -125,7 +126,7 @@ const SCENES = [
 ];
 
 async function start(page, { mode, theme, looks }) {
-  await page.evaluate(({ mode, theme, looks }) => window.__af.startBattle({ mode, difficulty: 'normal', theme, wind: 'off', timer: 0, guide: true, seed: 777, ...(looks ? { looks } : {}) }), { mode, theme, looks });
+  await page.evaluate(({ mode, theme, looks }) => window.__af.startBattle({ mode, difficulty: 'normal', theme, wind: 'off', timer: 0, guide: true, seed: 777, flip: false, ...(looks ? { looks } : {}) }), { mode, theme, looks });
   await page.waitForFunction(() => { const g = window.__af.game; return g && g.state === 'aim' && g.turn === 0; }, null, { timeout: 15000 });
 }
 

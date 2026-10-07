@@ -29,45 +29,18 @@ export class Forest {
   populate() {
     const g = this.g, r = this.r;
     const land = g.land;
-    const W = WORLD.W;
     for (const p of g.players) {
       const x = p.body.getPosition().x - p.facing * 2.9;
       this.homes.push({ x, y: g.terrain.surfaceY(x), team: p.team, facing: p.facing, seed: r.int(1, 9999) });
     }
-    const x0 = land.bases[0] + 7.2, x1 = land.bases[1] - 7.2;
     this.taken = [];
-    const kinds = g.theme.trees || ['oak'];
-    const f = land.features || {};
-    this._placeFeatures(f);
-    if (f.fixed) {
-      // a hand-made map: everything that matters is already where it was designed to be
-      this.terrainVersion = g.terrain.version;
-      return;
-    }
-    // Mirrored pairs keep the two halves fair; a centre piece is optional.
-    const pairOrSingle = (place, count, minD = 1.5) => {
-      const mid = W / 2;
-      let placed = 0;
-      if (count % 2 === 1) placed += this._tryAround(mid + r.range(-2.5, 2.5), place, 3) ? 1 : 0;
-      for (let k = 0; k < Math.floor(count / 2); k++) {
-        const x = lerp(x0, mid - minD, r.range(0.1, 0.95));
-        const ok = this._tryAround(x, place, 2.5);
-        if (ok !== null && ok !== false) this._tryAround(W - ok, place, 2.5);
-        placed++;
-      }
-      return placed;
-    };
-    // trees first: they are the landmarks
-    pairOrSingle((x) => this._placeTree(x, r.pick(kinds)), f.giant ? r.int(0, 1) * 2 : r.int(1, 3), 3);
-    pairOrSingle((x) => this._placeProp(x), r.int(1, 2) * 2);
-    pairOrSingle((x) => this._placeStructure(CRATE, x, 0.6), r() < 0.5 ? 1 : 2);
-    pairOrSingle((x) => this._placeDandelion(x), r() < 0.35 ? 1 : 2);
+    // a hand-made map: everything that matters is already where it was designed to be
+    this._placeFeatures(land.features || {});
     this.terrainVersion = g.terrain.version;
   }
 
-  // Each map's landmarks: the trees and baskets of a hand-made map, or (on a generated one) the
-  // giant oak over the tunnel, the canyon bridge, the ridge boulders, the floating islands'
-  // baskets and the valley's bounce mushrooms. Always mirrored.
+  // Each map's landmarks (see maps.js): its trees and nut baskets, and any boulders, log bridge or
+  // bounce mushrooms it asks for.
   _placeFeatures(f) {
     const g = this.g, t = g.terrain;
     if (f.spire) this.taken.push([f.spire.x - 1.8, f.spire.x + 1.8]);
@@ -547,7 +520,7 @@ export class Forest {
   // ------------------------------------------------------------------ drawing
   drawBehind(ctx) {
     if (!Art.drawHomeTree) return;
-    for (const h of this.homes) Art.drawHomeTree(ctx, { x: h.x, y: -h.y, team: h.team, facing: h.facing, time: this.g.time, seed: h.seed, season: this.g.theme.season });
+    for (const h of this.homes) Art.drawHomeTree(ctx, { x: h.x, y: -h.y, team: h.team, facing: h.facing, time: this.g.time, seed: h.seed, season: this.g.theme.season, wind: this.g.wind });
   }
 
   drawFront(ctx, view) {

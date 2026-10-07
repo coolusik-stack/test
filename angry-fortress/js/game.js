@@ -107,9 +107,11 @@ export class Game {
     this.seaTarget = WORLD.SEA0;
     const r = rng(this.seed);
     this.world = new planck.World({ gravity: V(0, -GRAV) });
-    const land = buildLandscape(this.theme.layout, this.seed);
+    // which home each player gets: the stage's say, else the draw (the seed, so two phones agree)
+    this.flip = this.opts.flip ?? ((this.seed >>> 3) & 1) === 1;
+    const land = buildLandscape(this.theme.layout, this.seed, this.flip);
     this.land = land;
-    this.terrain = new Terrain({ style: this.theme.ground, seed: this.seed, heights: land.heights, under: land.under, ops: land.ops, backs: land.backs });
+    this.terrain = new Terrain({ style: this.theme.ground, seed: this.seed, heights: land.heights, under: land.under, ops: land.ops, backs: land.backs, paints: land.paints });
     this.terrain.attach(this.world, planck);
     this.scene.setLand(land);
     this.pattern = makeDirtPattern(this.ctx, this.theme.ground, this.seed);
@@ -525,9 +527,10 @@ export class Game {
       this._sfx(r > 1.6 ? 'explode_big' : 'explode_small');
     }
     if (crater > 0.6) this.fx.burst(x, y, 'dirt', Math.round(8 + crater * 6), { speed: 7 + r * 2, color: this.theme.ground.dirtDark });
-    this.fx.shake(0.12 + r * 0.1);
+    // a blast on its own only thuds; the big shake and the slow-motion are kept for hits that hurt
+    // (see _hurt) and for knock-outs, so they still mean something
+    this.fx.shake(0.05 + r * 0.04);
     this._hap('boom', r);
-    if (r > 1.6) this.slowmo(0.18);
     // captains
     for (const p of this.players) {
       if (p.dead) continue;
@@ -1978,6 +1981,8 @@ export class Game {
     const W = this.cssW, H = this.cssH;
     const cam = this.cam;
     this.scene.drawBack(ctx, cam, W, H, dpr, this.time);
+    // drifting pollen, petals, leaves or snow: behind the playfield, never over it
+    this.scene.drawAmbient(ctx, W, H, dpr, this.time);
     const [shx, shy] = this.fx.shakeOffset();
     cam.apply(ctx, dpr, shx, shy);
     const view = cam.view();
@@ -2057,7 +2062,6 @@ export class Game {
     this.crew.drawBubbles(ctx, cam.zoom);
 
     // screen-space overlays
-    this.scene.drawAmbient(ctx, W, H, dpr, this.time);
     this.events.drawScreen(ctx, W, H, dpr, this.time, this._frameDt || 0.016);
     if (this.dangerT > 0.01) {
       // red pulse at the edges while a low-HP captain is in danger
