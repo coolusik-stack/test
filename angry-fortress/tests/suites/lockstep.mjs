@@ -5,7 +5,7 @@ import { MAPS } from './maps.mjs';
 
 export default {
   name: 'lockstep',
-  what: '두 폰 동기화: 4맵 + 땅 무너짐·트램펄린·다리·명당 보상',
+  what: '두 폰 동기화: 모든 맵 + 땅 무너짐·트램펄린·다리·명당 보상',
   async run(t) {
     const page = await t.page();
     // a walnut next to a captain standing on a thin crust

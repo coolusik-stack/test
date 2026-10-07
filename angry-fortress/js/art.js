@@ -2200,20 +2200,28 @@ const TREE_P = {
   maple:    { bark: '#7a685a', barkHi: '#aa988a', barkLo: '#4a3c32', line: '#261c16', leaf: ['#a8301a', '#de5a2a', '#ffad54'], leafLine: '#5a1608', nut: 'acorn', leafCol: '#e8622a' },
   pine:     { bark: '#80482a', barkHi: '#b4744a', barkLo: '#4a2412', line: '#2a1408', leaf: ['#1c5030', '#2e7444', '#62aa66'], leafLine: '#0c3018', nut: 'pinecone', leafCol: '#3a8a4a' },
   chestnut: { bark: '#6e4a30', barkHi: '#9e7656', barkLo: '#40281a', line: '#26160a', leaf: ['#5a8a1c', '#8ab83a', '#d2e67a'], leafLine: '#2e4a0c', nut: 'burr', leafCol: '#8ab83a' },
+  // seasons
+  blossom:  { bark: '#5e3a3c', barkHi: '#94686a', barkLo: '#3a2224', line: '#2a1214', leaf: ['#e27aa2', '#f7a9c6', '#ffe3ee'], leafLine: '#8a2e54', nut: 'acorn', leafCol: '#f8b4cc' },
+  ginkgo:   { bark: '#7a6448', barkHi: '#a8906a', barkLo: '#4a3a28', line: '#2a2014', leaf: ['#d0920e', '#f0c02c', '#ffe680'], leafLine: '#7a5208', nut: 'acorn', leafCol: '#f2c230' },
+  snowpine: { bark: '#6a4632', barkHi: '#9a7458', barkLo: '#3e2618', line: '#22140a', leaf: ['#1d4a3e', '#2c6656', '#5f9a88'], leafLine: '#0c2a22', nut: 'pinecone', leafCol: '#e9f3fb', snow: true, shape: 'pine' },
+  snowoak:  { bark: '#6a5446', barkHi: '#9a8474', barkLo: '#3e3028', line: '#22180e', leaf: ['#5a7a62', '#7a9a80', '#b6ccb8'], leafLine: '#2a3e30', nut: 'acorn', leafCol: '#e9f3fb', nutLeaf: '#7a9a80', snow: true },
 };
+TREE_P.pine.shape = 'pine';
+const SNOW = { fill: '#f6fbff', shade: '#cfe0f0', line: '#7f97b0' };
 
 function treeGeom(t) {
   const kind = TREE_P[t.kind] ? t.kind : 'oak';
+  const shape = TREE_P[kind].shape || 'round';
   const h = clamp(+t.h || 4, 2, 8), R = clamp(+t.canopyR || 2.2, 1, 4);
   const seed = t.seed | 0, dir = (seed & 1) ? -1 : 1;
   const cy = -h;
-  const bottom = cy + R * (kind === 'pine' ? 0.9 : 0.72);
+  const bottom = cy + R * (shape === 'pine' ? 0.9 : 0.72);
   const lean = (hash(seed, 1.7) - 0.5) * 0.35;
   const tx = (yy) => lean * clamp(-yy / h, 0, 1);
   const by = Math.min(bottom + 0.25, -0.9);
   const tip = [tx(by) + dir * (R * 0.92 + 0.25), by - 0.3];
   const webY = Math.min(bottom + 1.2, -1.15);
-  return { kind, h, R, dir, cy, bottom, lean, tx, by, tip, web: [tx(webY) + dir * 1.3, webY] };
+  return { kind, shape, h, R, dir, cy, bottom, lean, tx, by, tip, web: [tx(webY) + dir * 1.3, webY] };
 }
 
 export function treeAnchors(t) {
@@ -2247,7 +2255,7 @@ function drawTrunk(ctx, G, P, lw, seed, hp, time) {
   const top = G.cy + G.R * 0.3;
   // bark texture
   ctx.beginPath();
-  if (G.kind === 'pine') {
+  if (G.shape === 'pine') {
     const R = rng(seed * 3 + 1);
     for (let i = 0; i < 16; i++) {
       const yy = -0.3 + (top + 0.3) * R(), xx = G.tx(yy) + (R() - 0.5) * 0.5, ww = 0.1 + R() * 0.08;
@@ -2385,6 +2393,22 @@ function drawRoundCanopy(ctx, G, P, lw, seed, shake, time) {
   ctx.beginPath();
   for (const t of C.tex) if (t[3] && t[1] < t[5]) leafShapeAt(ctx, t[0], t[1], t[2] * 0.85, t[2] * 0.38, t[4]);
   ctx.fillStyle = rgba(P.leaf[2], 0.75); ctx.fill();
+  if (P.snow) {
+    // snow lying on the top of every clump, with a lumpy lower edge
+    ctx.save();
+    ctx.beginPath(); circlesPath(ctx, C.B, 0, 0, 1, wob); ctx.clip();
+    ctx.beginPath();
+    for (let i = 0; i < C.B.length; i++) {
+      const b = C.B[i], w = wob ? wob[i] : 0, x = b[0] + w, y = b[1] - w * 0.5, r = b[2];
+      ctx.moveTo(x - r * 1.02, y - r * 0.05);
+      ctx.arc(x, y, r * 1.02, PI, TAU);
+      for (let k = 4; k >= 0; k--) ctx.quadraticCurveTo(x - r + (k + 0.5) * r * 0.4, y - r * 0.05 + r * (k % 2 ? 0.2 : -0.04), x - r + k * r * 0.4, y - r * 0.05);
+    }
+    ctx.fillStyle = SNOW.fill; ctx.fill();
+    ctx.restore();
+    ctx.beginPath(); circlesPath(ctx, C.B, 0, 0, 1, wob);
+    ctx.lineWidth = lw * 2; ctx.strokeStyle = P.leafLine; ctx.stroke();
+  }
   ctx.restore();
 }
 function pineTierPath(ctx, cx, apexY, baseY, hw, bumps) {
@@ -2415,13 +2439,31 @@ function drawPineCanopy(ctx, G, P, lw, seed, shake, time) {
     ctx.fillStyle = P.leaf[1]; ctx.fill();
     ctx.beginPath(); ctx.moveTo(cx - 0.05, apex + 0.1); ctx.quadraticCurveTo(cx - hw * 0.4, apex + (baseY - apex) * 0.5, cx - hw * 0.8, baseY - 0.1);
     ctx.strokeStyle = rgba(P.leaf[2], 0.8); ctx.lineWidth = lw * 1.2; ctx.lineCap = 'round'; ctx.stroke();
+    if (P.snow) {
+      // a snow mantle over the upper half of the tier, hanging in scallops
+      const d = (baseY - apex) * 0.58, sw = hw * 0.62;
+      ctx.beginPath();
+      ctx.moveTo(cx, apex - 0.02);
+      ctx.quadraticCurveTo(cx - sw * 0.5, apex + d * 0.45, cx - sw, apex + d);
+      const k = 4;
+      for (let j = 0; j < k; j++) {
+        const x0 = cx - sw + (2 * sw / k) * j, x1 = x0 + 2 * sw / k;
+        ctx.quadraticCurveTo((x0 + x1) / 2, apex + d + (j % 2 ? 0.06 : 0.16) * R, x1, apex + d - (j === k - 1 ? 0 : 0.03 * R));
+      }
+      ctx.quadraticCurveTo(cx + sw * 0.5, apex + d * 0.45, cx, apex - 0.02);
+      ctx.closePath();
+      ctx.fillStyle = SNOW.fill; ctx.fill();
+      ctx.lineWidth = lw * 0.8; ctx.strokeStyle = SNOW.line; ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(cx + sw * 0.15, apex + d * 0.25); ctx.quadraticCurveTo(cx + sw * 0.45, apex + d * 0.6, cx + sw * 0.8, apex + d * 0.95);
+      ctx.strokeStyle = SNOW.shade; ctx.lineWidth = lw * 1.4; ctx.stroke();
+    }
   }
 }
 function treeNutSlots(G, seed) {
   return blockDetail('tn' + G.kind + G.R + 's' + seed, () => {
     const Rn = rng(seed * 7 + 29), out = [];
     for (let i = 0; i < 6; i++) {
-      if (G.kind === 'pine') {
+      if (G.shape === 'pine') {
         const tier = i % 3, baseY = G.bottom - tier * G.R * 0.45, hw = G.R * (1.0 - tier * 0.2);
         const side = (i & 1) ? 1 : -1, f = 0.35 + 0.45 * Rn();
         out.push([side * hw * f, baseY - G.cy + 0.12]);
@@ -2445,7 +2487,7 @@ function drawTreeNuts(ctx, G, P, nuts, seed, lw, shake, time) {
     ctx.beginPath(); ctx.moveTo(0, -0.14); ctx.lineTo(0, s * 0.4);
     ctx.strokeStyle = '#3a2410'; ctx.lineWidth = 0.035; ctx.stroke();
     if (type !== 'pinecone') {
-      ctx.beginPath(); leafShapeAt(ctx, 0.1, -0.1, 0.1, 0.05, -0.5); ctx.fillStyle = P.leafCol; ctx.fill();
+      ctx.beginPath(); leafShapeAt(ctx, 0.1, -0.1, 0.1, 0.05, -0.5); ctx.fillStyle = P.nutLeaf || P.leafCol; ctx.fill();
       ctx.lineWidth = lw * 0.6; ctx.strokeStyle = P.leafLine; ctx.stroke();
     }
     drawMiniNut(ctx, type, 0, s * 1.3, s, 0, lw * 0.9);
@@ -2461,7 +2503,7 @@ function drawFallingLeaves(ctx, G, P, shake, time, seed) {
     const y = G.bottom - G.R * 0.2 + ph * 3.0;
     ctx.globalAlpha = clamp(shake * 1.6, 0, 1) * (1 - ph);
     ctx.beginPath(); leafShapeAt(ctx, x, y, 0.12, 0.06, ph * 9 + i);
-    ctx.fillStyle = G.kind === 'pine' ? P.leaf[1] : P.leafCol; ctx.fill();
+    ctx.fillStyle = G.shape === 'pine' && !P.snow ? P.leaf[1] : P.leafCol; ctx.fill();
     ctx.lineWidth = 0.02; ctx.strokeStyle = P.leafLine; ctx.stroke();
   }
   ctx.restore();
@@ -2483,7 +2525,7 @@ export function drawTree(ctx, t) {
   const px = G.tx(G.bottom), py = G.bottom;
   ctx.save();
   ctx.translate(px, py); ctx.rotate(sway); ctx.translate(-px, -py);
-  if (G.kind === 'pine') drawPineCanopy(ctx, G, P, lw, seed, shake, time);
+  if (G.shape === 'pine') drawPineCanopy(ctx, G, P, lw, seed, shake, time);
   else drawRoundCanopy(ctx, G, P, lw, seed, shake, time);
   drawTreeNuts(ctx, G, P, nuts, seed, lw, shake, time);
   ctx.restore();
@@ -2494,7 +2536,7 @@ export function drawTree(ctx, t) {
 // --- fallen tree (physics box len × 0.7)
 export function drawFallenTree(ctx, f) {
   if (!f) return;
-  const kind = TREE_P[f.kind] ? f.kind : 'oak', P = TREE_P[kind];
+  const kind = TREE_P[f.kind] ? f.kind : 'oak', P = TREE_P[kind], pine = P.shape === 'pine';
   const len = Math.max(1, +f.len || 4), seed = f.seed | 0, lw = 0.04;
   const r0 = 0.35, r1 = 0.24, L2 = len / 2;
   ctx.save();
@@ -2514,7 +2556,7 @@ export function drawFallenTree(ctx, f) {
   ctx.strokeStyle = P.bark; ctx.lineWidth = 0.07; ctx.stroke();
   ctx.beginPath();
   for (const p of tips) {
-    if (kind === 'pine') {
+    if (pine) {
       for (let k = -3; k <= 3; k++) { const a = p[2] + k * 0.3; ctx.moveTo(p[0], p[1]); ctx.lineTo(p[0] + Math.cos(a) * 0.22, p[1] + Math.sin(a) * 0.22); }
     } else {
       leafShapeAt(ctx, p[0] + Math.cos(p[2]) * 0.12, p[1] + Math.sin(p[2]) * 0.12, 0.16, 0.08, p[2]);
@@ -2522,8 +2564,8 @@ export function drawFallenTree(ctx, f) {
       leafShapeAt(ctx, p[0] + Math.cos(p[2] - 1.0) * 0.12, p[1] + Math.sin(p[2] - 1.0) * 0.12, 0.13, 0.065, p[2] - 1.0);
     }
   }
-  if (kind === 'pine') { ctx.strokeStyle = P.leafLine; ctx.lineWidth = 0.06; ctx.stroke(); ctx.strokeStyle = P.leaf[1]; ctx.lineWidth = 0.035; ctx.stroke(); }
-  else { ctx.fillStyle = P.leafCol; ctx.fill(); ctx.lineWidth = lw * 0.7; ctx.strokeStyle = P.leafLine; ctx.stroke(); }
+  if (pine) { ctx.strokeStyle = P.leafLine; ctx.lineWidth = 0.06; ctx.stroke(); ctx.strokeStyle = P.leaf[1]; ctx.lineWidth = 0.035; ctx.stroke(); }
+  else { ctx.fillStyle = P.snow ? P.leaf[1] : P.leafCol; ctx.fill(); ctx.lineWidth = lw * 0.7; ctx.strokeStyle = P.leafLine; ctx.stroke(); }
   // log body with a splintered broken end on the left
   const J = [[-L2 - 0.08, r0 * 0.7], [-L2 + 0.1, r0 * 0.35], [-L2 - 0.13, 0.02], [-L2 + 0.06, -r0 * 0.35], [-L2 - 0.06, -r0 * 0.72]];
   const body = () => {
@@ -2949,8 +2991,17 @@ export function drawHomeTree(ctx, h) {
   const pileX = dx + dw / 2 + 0.55, pn = pine ? 'pinecone' : 'acorn', ps = pine ? 0.15 : 0.13;
   const pile = [[-0.3, -0.13], [0, -0.13], [0.3, -0.13], [-0.15, -0.38], [0.15, -0.38], [0, -0.62]];
   for (let i = 0; i < pile.length; i++) drawMiniNut(ctx, pn, pileX + pile[i][0], pile[i][1] - (pine ? 0.02 : 0), ps, (i - 2.5) * 0.15, lw * 0.8);
-  // canopy (soft, no outline)
-  const shade = (k) => mix(P.leaf[k], '#b8c8c0', 0.08);
+  // canopy (soft, no outline), dressed for the season: the oak blossoms in spring and turns in
+  // autumn, the pine stays green, and in winter both carry snow
+  const season = h.season;
+  const SEASON_LEAF = {
+    spring: [['#e18bb0', '#f4b4cc', '#ffe2ee'], ['#3f6e50', '#5a8e66', '#a4cfa0']],
+    autumn: [['#c2601e', '#e48e30', '#ffd070'], P.leaf],
+    winter: [['#6a8478', '#8aa496', '#c4d6cc'], ['#2e5242', '#44705a', '#86aa94']],
+  };
+  const L = (SEASON_LEAF[season] || [])[team] || P.leaf;
+  const shade = (k) => mix(L[k], '#b8c8c0', 0.08);
+  const snow = season === 'winter';
   if (pine) {
     const tiers = 5, base = -4.7, sp = 1.45, R = 3.7;
     for (let i = 0; i < tiers; i++) {
@@ -2964,7 +3015,17 @@ export function drawHomeTree(ctx, h) {
       ctx.closePath();
       ctx.fillStyle = shade(1); ctx.fill();
       ctx.beginPath(); ctx.moveTo(lx * 0.1, apex + 0.3); ctx.quadraticCurveTo(lx * hw * 0.66, apex + (baseY - apex) * 0.5, lx * hw * 1.3, baseY - 0.2);
-      ctx.strokeStyle = rgba(P.leaf[2], 0.6); ctx.lineWidth = 0.08; ctx.stroke();
+      ctx.strokeStyle = rgba(L[2], 0.6); ctx.lineWidth = 0.08; ctx.stroke();
+      if (snow) {
+        const d = (baseY - apex) * 0.55, sw = hw * 0.6;
+        ctx.beginPath();
+        ctx.moveTo(0, apex - 0.05);
+        ctx.quadraticCurveTo(-sw * 0.5, apex + d * 0.45, -sw, apex + d);
+        for (let j = 0; j < 5; j++) { const x0 = -sw + (2 * sw / 5) * j, x1 = x0 + 2 * sw / 5; ctx.quadraticCurveTo((x0 + x1) / 2, apex + d + (j % 2 ? 0.15 : 0.32), x1, apex + d); }
+        ctx.quadraticCurveTo(sw * 0.5, apex + d * 0.45, 0, apex - 0.05);
+        ctx.closePath();
+        ctx.fillStyle = 'rgba(246,251,255,0.95)'; ctx.fill();
+      }
     }
   } else {
     const C = canopyBalls(3.5, seed + 77);
@@ -2974,13 +3035,26 @@ export function drawHomeTree(ctx, h) {
     const B = C.B.map(b => [b[0] * 1.15, b[1], b[2] * 1.05]);
     ctx.beginPath(); circlesPath(ctx, B, 0, 0, 1, null); ctx.fillStyle = shade(0); ctx.fill();
     ctx.beginPath(); circlesPath(ctx, B, lx * 0.18, -0.14, 0.8, null); ctx.fillStyle = shade(1); ctx.fill();
-    ctx.beginPath(); circlesPath(ctx, B, lx * 0.45, -0.34, 0.42, null); ctx.fillStyle = rgba(P.leaf[2], 0.75); ctx.fill();
+    ctx.beginPath(); circlesPath(ctx, B, lx * 0.45, -0.34, 0.42, null); ctx.fillStyle = rgba(L[2], 0.75); ctx.fill();
     ctx.beginPath();
     for (const t of C.tex) if (!t[3]) leafShapeAt(ctx, t[0] * 1.15, t[1], t[2] * 0.95, t[2] * 0.42, t[4]);
-    ctx.fillStyle = rgba(P.leaf[0], 0.45); ctx.fill();
+    ctx.fillStyle = rgba(L[0], 0.45); ctx.fill();
     ctx.beginPath();
     for (const t of C.tex) if (t[3]) leafShapeAt(ctx, t[0] * 1.15, t[1], t[2] * 0.85, t[2] * 0.38, t[4]);
-    ctx.fillStyle = rgba(P.leaf[2], 0.5); ctx.fill();
+    ctx.fillStyle = rgba(L[2], 0.5); ctx.fill();
+    if (snow) {
+      ctx.save();
+      ctx.beginPath(); circlesPath(ctx, B, 0, 0, 1, null); ctx.clip();
+      ctx.beginPath();
+      for (const b of B) {
+        const r = b[2];
+        ctx.moveTo(b[0] - r * 1.02, b[1] - r * 0.1);
+        ctx.arc(b[0], b[1], r * 1.02, PI, TAU);
+        for (let k = 4; k >= 0; k--) ctx.quadraticCurveTo(b[0] - r + (k + 0.5) * r * 0.4, b[1] - r * 0.1 + r * (k % 2 ? 0.22 : -0.02), b[0] - r + k * r * 0.4, b[1] - r * 0.1);
+      }
+      ctx.fillStyle = 'rgba(246,251,255,0.95)'; ctx.fill();
+      ctx.restore();
+    }
     ctx.restore();
   }
   // team pennant on a pole sticking out of the trunk

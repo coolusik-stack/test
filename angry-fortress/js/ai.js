@@ -37,7 +37,7 @@ export function planShot(game, me, difficulty) {
 
   // human-like error that shrinks as the CPU "learns" the range; a lookout steadies the hand
   let learn = Math.max(prof.learn, 1.35 - 0.15 * me.stats.shots);
-  if (hasSpot(game.land, me.body.getPosition().x, 'high', 'crown')) learn *= 0.6;
+  if (hasSpot(game.land, { x: me.body.getPosition().x, foot: me.body.getPosition().y - CART_R }, 'high', 'crown')) learn *= 0.6;
   const angErr = ((gauss() * prof.sa * Math.PI) / 180) * learn;
   const pwErr = gauss() * prof.sp * learn;
   const short = me.stats.shots < (prof.short || 0) ? 0.7 : 1;
@@ -315,7 +315,7 @@ export function* planMove(game, me, difficulty) {
   for (const dir of [-1, 1]) {
     let x = x0, foot = foot0, stam = me.stamina, dist = 0, pad = false, since = 0;
     for (let guard = 0; guard < 500 && stam > STAMINA_PER_M * 0.5; guard++) {
-      const p = padAt(land, x, dir);
+      const p = padAt(land, { x, foot }, dir);
       if (p) {
         // one bounce at most, and only when there is stamina left to pay for it
         if (pad || stam < PAD_COST) break;
@@ -361,14 +361,14 @@ export function* planMove(game, me, difficulty) {
   // a spot several turns away worth heading for (kept between turns, given up after a while)
   const goals = (game.aiGoals ||= {});
   let goal = goals[me.id];
-  const inGoal = (x) => goal && x >= goal.s.range[0] && x <= goal.s.range[1];
+  const inGoal = (x, foot) => goal && spotsAt(land, { x, foot }).includes(goal.s);
   const alive = (s) => ter.surfaceY((s.range[0] + s.range[1]) / 2, s.top ?? undefined) > WORLD.SEA + 0.5;
-  if (goal && (inGoal(x0) || ++goal.turns > 5 || !alive(goal.s))) goal = goals[me.id] = null;
-  const settled = spotsAt(land, x0).some((s) => s.kind !== 'pad' && worth(s.kind) > 0);
+  if (goal && (inGoal(x0, foot0) || ++goal.turns > 5 || !alive(goal.s))) goal = goals[me.id] = null;
+  const settled = spotsAt(land, { x: x0, foot: foot0 }).some((s) => s.kind !== 'pad' && worth(s.kind) > 0);
   if (!goal && land.spots && Math.random() < prof.goal * (settled ? 0.5 : 1)) {
     let best = null;
     for (const s of land.spots) {
-      if (s.kind === 'pad' || x0 >= s.range[0] && x0 <= s.range[1] || !alive(s)) continue;
+      if (s.kind === 'pad' || spotsAt(land, { x: x0, foot: foot0 }).includes(s) || !alive(s)) continue;
       const gx = x0 < s.range[0] ? s.range[0] + 0.8 : s.range[1] - 0.8;
       const v = worth(s.kind) + 3 - 0.15 * far(x0, gx) + (Math.random() - 0.5) * 6;
       if (!best || v > best.v) best = { v, s, x: gx };
@@ -382,7 +382,7 @@ export function* planMove(game, me, difficulty) {
     else if (th < THIN_GROUND) v -= (THIN_GROUND - th) * 14;
     const edge = edgeDist(ter, c.x, c.foot);
     if (edge < 1.8) v -= (1.8 - edge) * 7;
-    const here = spotsAt(land, c.x).filter((s) => s.kind !== 'pad');
+    const here = spotsAt(land, { x: c.x, foot: c.foot }).filter((s) => s.kind !== 'pad');
     for (const s of here) {
       if (s.kind === 'burrow' && !(game._covered(c.x, c.foot + 4.2, c.x, c.foot + 1) && game._covered(c.x + Math.sign(ex - c.x) * 3, c.foot + 4.2, c.x, c.foot + 1))) continue; // roof gone (or never reached this far)
       v += worth(s.kind);
@@ -400,7 +400,7 @@ export function* planMove(game, me, difficulty) {
         const mid = (s.range[0] + s.range[1]) / 2;
         if (s.kind === 'pad') {
           if (island(mid) !== isl || Math.abs(mid - c.x) > 7) continue;
-          for (const t of spotsAt(land, s.to.x)) if (t.kind !== 'pad') next = Math.max(next, worth(t.kind) * 0.3);
+          for (const t of spotsAt(land, { x: s.to.x, foot: s.to.y })) if (t.kind !== 'pad') next = Math.max(next, worth(t.kind) * 0.3);
         } else if (island(mid) === isl && Math.abs(mid - c.x) < 7.5) next = Math.max(next, worth(s.kind) * 0.4);
       }
       v += next;

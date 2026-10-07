@@ -26,6 +26,7 @@ export class Terrain {
     this.body = null;
     this.version = 0;
     this.heights = opts.heights; // function x -> surface height (for generation)
+    this.backs = opts.backs || []; // tunnels open at both ends: drawn dark inside while their roof stands
     this.opLog = []; // every carve since generation, [x, y, r] in centimetres (quantised so peers agree)
     this._generate(opts);
     this.f0 = this.f.slice();
@@ -360,7 +361,7 @@ export class Terrain {
     const bush = new Path2D(), bushHi = new Path2D();
     const clover = new Path2D(), needles = new Path2D();
     const roots = new Path2D(), vines = new Path2D(), vineLeaves = new Path2D();
-    const flowers = [], shrooms = [], leaves = [];
+    const flowers = [], shrooms = [], leaves = [], sunflowers = [];
     const { stride, cell, scar } = this;
     const st = this.style;
     const decor = st.decor || [];
@@ -418,6 +419,8 @@ export class Terrain {
           needles.moveTo(nx - Math.cos(a) * 0.1, y - 0.02 - Math.sin(a) * 0.03);
           needles.lineTo(nx + Math.cos(a) * 0.1, y - 0.02 + Math.sin(a) * 0.03);
         }
+      } else if (kind === 'sunflower') {
+        sunflowers.push({ x: tx, y, h: (0.95 + hash(slot, 40) * 0.55) * s, lean: (hash(slot, 41) - 0.5) * 0.25, face: hash(slot, 42) < 0.5 ? -1 : 1 });
       } else if (kind === 'flower' && st.flowers) {
         flowers.push({ x: tx, y: y - 0.2, c: st.flowers[Math.floor(hash(slot, 8) * st.flowers.length)], s: 0.06 + hash(slot, 9) * 0.04 });
       }
@@ -489,11 +492,25 @@ export class Terrain {
         }
       }
     }
+    // a tunnel is open to the sky at both ends, so it is not a hole: fill it column by column up
+    // to the underside of its roof, wherever the roof still stands (a colored back gets its own path)
+    const backPaths = [];
+    for (const b of this.backs) {
+      const into = b.color ? new Path2D() : holes;
+      for (let x = b.x0; x <= b.x1 + 0.001; x += 0.25) {
+        let top = null;
+        for (let y = b.y0 + 0.2; y <= b.y1 + 0.6; y += 0.1) if (this.solid(x + 0.125, y)) { top = y; break; }
+        if (top != null) into.rect(x - 0.01, -(top + 0.15), 0.27, top + 0.15 - b.y0);
+      }
+      if (b.color) backPaths.push({ path: into, color: b.color });
+    }
+    this.backPaths = backPaths;
     this.path = path;
     this.holePath = holes;
     this.grassPath = grass;
     this.tuftPath = tufts;
     this.flowers = flowers;
+    this.sunflowers = sunflowers;
     this.decor = { fern, fernHi, bush, bushHi, clover, needles, shrooms, leaves };
     this.hanging = { roots, vines, vineLeaves };
   }
@@ -504,6 +521,7 @@ export class Terrain {
     // enclosed caves read as dark hollows, not windows to the sky
     ctx.fillStyle = s.cave || 'rgba(30,16,8,0.82)';
     ctx.fill(this.holePath);
+    for (const bp of this.backPaths) { ctx.fillStyle = bp.color; ctx.fill(bp.path); }
     ctx.fillStyle = pattern || s.dirt;
     ctx.fill(this.path, 'evenodd');
     // depth darkening + inner bevel + scorch, all clipped to the solid
@@ -591,7 +609,39 @@ export class Terrain {
       ctx.arc(fl.x, fl.y, fl.s * 0.6, 0, Math.PI * 2);
       ctx.fill();
     }
+    if (this.sunflowers && this.sunflowers.length) this._drawSunflowers(ctx, view);
     if (d) this._drawSmallDecor(ctx, d, s);
+    ctx.restore();
+  }
+
+  // tall sunflowers standing in the grass, heads nodding toward the sun
+  _drawSunflowers(ctx, view) {
+    ctx.save();
+    ctx.lineCap = 'round';
+    for (const f of this.sunflowers) {
+      if (view && (f.x < view.x0 - 2 || f.x > view.x1 + 2)) continue;
+      const hx = f.x + f.lean, hy = f.y - f.h;
+      ctx.beginPath(); ctx.moveTo(f.x, f.y); ctx.quadraticCurveTo(f.x + f.lean * 0.2, f.y - f.h * 0.5, hx, hy);
+      ctx.strokeStyle = '#2f6e1e'; ctx.lineWidth = 0.09; ctx.stroke();
+      ctx.strokeStyle = '#5aa83a'; ctx.lineWidth = 0.05; ctx.stroke();
+      for (const [u, side] of [[0.45, -1], [0.62, 1]]) {
+        const lx = f.x + f.lean * u * u, ly = f.y - f.h * u;
+        ctx.beginPath(); ctx.ellipse(lx + side * 0.17, ly + 0.02, 0.19, 0.08, side * 0.5, 0, Math.PI * 2);
+        ctx.fillStyle = '#4e9a2e'; ctx.fill(); ctx.lineWidth = 0.025; ctx.strokeStyle = '#1f4a10'; ctx.stroke();
+      }
+      ctx.save(); ctx.translate(hx, hy); ctx.rotate(f.face * 0.25);
+      ctx.beginPath();
+      for (let k = 0; k < 12; k++) {
+        const a = (k / 12) * Math.PI * 2;
+        ctx.moveTo(0, 0);
+        ctx.ellipse(Math.cos(a) * 0.2, Math.sin(a) * 0.2, 0.13, 0.055, a, 0, Math.PI * 2);
+      }
+      ctx.fillStyle = '#ffcc1f'; ctx.fill(); ctx.lineWidth = 0.022; ctx.strokeStyle = '#b07a08'; ctx.stroke();
+      ctx.beginPath(); ctx.arc(0, 0, 0.14, 0, Math.PI * 2);
+      ctx.fillStyle = '#6a3a14'; ctx.fill(); ctx.strokeStyle = '#3a1c06'; ctx.stroke();
+      ctx.beginPath(); ctx.arc(-0.04, -0.04, 0.05, 0, Math.PI * 2); ctx.fillStyle = 'rgba(255,220,150,0.35)'; ctx.fill();
+      ctx.restore();
+    }
     ctx.restore();
   }
 
@@ -1005,6 +1055,250 @@ const FIXED = {
       crates: [{ x: M }], // on top of the spire
     }),
   },
+
+  // 벚꽃 분지 (spring) — hold the rim, or go down? Home stands high on the rim of a wide valley:
+  // fort · start · the rim's edge (lookout: the whole valley below) · a long slope down · the
+  // blossom tree at the valley floor (a nut every turn) · the giant cherry in the middle, buzzing
+  // with bees, between the two valley spots.
+  blossom: {
+    top: [[2.0, 13.4], [3.2, 16.2], [16.2, 16.2], [17.4, 15.8], [26.0, 11.6], [36, 11.6]],
+    flat: [[3.2, 16.2], [26.0, 36]],
+    islands: [{ a: 2.1, b: 36, under: [[2.1, 13.8], [3.4, 12.2], [8, 12.0], [13, 12.0], [17, 11.4], [22, 9.4], [27, 8.2], [32, 7.8], [36, 7.6]] }],
+    base: 10.2, baseH: 16.2, midH: 11.6,
+    side({ X, span, side, team, ops, spots, forts }) {
+      ops.push({ type: 'add', x: X(5.6), y: 11.2, rx: 0.9, ry: 1.6 });
+      ops.push({ type: 'add', x: X(5.9), y: 9.8, rx: 0.45, ry: 0.9 });
+      ops.push({ type: 'add', x: X(20.0), y: 8.8, rx: 0.9, ry: 1.5 });
+      ops.push({ type: 'add', x: X(29.0), y: 7.2, rx: 1.0, ry: 1.6 });
+      ops.push({ type: 'add', x: X(29.3), y: 5.8, rx: 0.5, ry: 0.9 });
+      spots.push({ kind: 'high', team, range: span(13.6, 16.0), sign: X(12.8), label: { name: '벚꽃 전망대', desc: '분지 가장자리. 조준선이 두 배로 길어지고 분지가 다 내려다보여요' } });
+      spots.push({ kind: 'tree', team, range: span(28.2, 30.8), sign: X(31.6), label: { name: '벚꽃 명당', desc: '내 차례가 시작될 때마다 특수 견과 +1. 분지 바닥이라 가장자리에서 다 보여요' } });
+      forts.push({ back: X(4.0), facing: side });
+    },
+    center({ M, ops }) {
+      ops.push({ type: 'add', x: M, y: 5.6, rx: 1.4, ry: 2.2 });
+      ops.push({ type: 'add', x: M + 0.3, y: 3.8, rx: 0.6, ry: 1.1 });
+    },
+    features: (W, M) => ({
+      trees: [
+        { x: M, kind: 'blossom', giant: true, h: 7.2, canopyR: 3.3, hpMul: 2, nuts: 6, hive: true, web: false, room: 3.0 },
+        ...[29.5, W - 29.5].map((x) => ({ x, kind: 'blossom', h: 4.4, canopyR: 1.8, nuts: 5, hive: false, web: false, room: 1.5 })),
+      ],
+    }),
+  },
+
+  // 두더지 굴 산 (spring) — through, or over? A flat-topped mountain fills the middle, too steep to
+  // drive. A mole tunnel runs right through it at ground level: just inside, the mountain is a
+  // roof (only shots along the tunnel get in), and the two tunnel mouths look at each other. A
+  // mushroom pad just behind the start throws you onto the top (lookout + a nut every turn, seen
+  // by everyone), and a pad up there throws you back; the road to the tunnel stays clear.
+  mole: {
+    top: [[2.2, 10.6], [3.4, 12.2], [24.6, 12.2], [25.6, 13.4], [26.2, 18.6], [27.0, 19.2], [36, 19.2]],
+    flat: [[3.4, 24.6], [27.0, 36]],
+    islands: [{ a: 2.3, b: 36, under: [[2.3, 10.8], [3.6, 9.4], [8, 8.8], [14, 8.8], [20, 8.6], [25, 7.8], [30, 6.8], [36, 6.4]] }],
+    base: 10.6, baseH: 12.2, midH: 19.2,
+    side({ X, span, side, team, ops, spots, forts }) {
+      ops.push({ type: 'add', x: X(6.0), y: 8.6, rx: 0.9, ry: 1.5 });
+      ops.push({ type: 'add', x: X(6.3), y: 7.3, rx: 0.45, ry: 0.85 });
+      ops.push({ type: 'add', x: X(18.0), y: 8.0, rx: 0.9, ry: 1.4 });
+      spots.push({
+        kind: 'burrow', team, range: span(26.6, 30.0), sign: X(24.2), floor: 12.2, band: [11.4, 15.5],
+        label: { name: '두더지 굴', desc: '산이 지붕이 되어 위에서 오는 공격을 막아 줘요. 굴을 따라 낮게 쏜 건 그대로 들어와요' },
+      });
+      spots.push({ kind: 'pad', team, range: span(7.0, 8.0), dir: -side, to: { x: X(32.4), y: 19.2 }, apex: 25.0 });
+      spots.push({ kind: 'pad', team, range: span(27.4, 28.4), dir: -side, to: { x: X(12.6), y: 12.2 }, apex: 24.0, top: 20, band: [18.4, 23] });
+      forts.push({ back: X(3.8), facing: side });
+    },
+    center({ M, W, ops, spots }) {
+      // the tunnel: ground level all the way through, 2.6 m high
+      for (let x = 24.4; x <= W - 24.4 + 0.01; x += 0.45) ops.push({ type: 'sub', x, y: 13.5, rx: 1.3, ry: 1.3 });
+      ops.push({ type: 'add', x: M, y: 4.6, rx: 1.5, ry: 2.4 });
+      ops.push({ type: 'add', x: M - 0.4, y: 2.8, rx: 0.6, ry: 1.2 });
+      spots.push({
+        kind: 'crown', team: -1, range: [31.4, W - 31.4], sign: null, signs: [31.0, W - 31.0], top: 20, band: [18.4, 23],
+        label: { name: '두더지 산 꼭대기', desc: '조준선 두 배 + 내 차례마다 특수 견과 +1. 양쪽에서 다 보여요' },
+      });
+    },
+    features: (W, M) => ({
+      trees: [{ x: M, kind: 'blossom', h: 4.8, canopyR: 2.2, nuts: 5, hive: false, web: false, room: 2.0, top: 20 }],
+    }),
+    backs: (W) => [{ x0: 25.2, x1: W - 25.2, y0: 12.2, y1: 14.7 }],
+  },
+
+  // 해바라기 들판 (summer) — nowhere to hide. Rolling open field: fort · start · a knoll with a
+  // zelkova's shade (a nut every turn) · a dip with a nut basket · the lookout hut hill in the
+  // middle, out in the open. Wind decides more here than anywhere.
+  sunflower: {
+    top: [[2.0, 11.2], [3.2, 13.2], [10.0, 13.2], [13.6, 14.2], [17.2, 14.2], [21.0, 13.0], [28.0, 13.0], [32.0, 14.6], [36, 14.6]],
+    flat: [[3.2, 10.0], [13.6, 17.2], [21.0, 28.0], [32.0, 36]],
+    islands: [{ a: 2.1, b: 36, under: [[2.1, 11.6], [3.4, 9.8], [10, 9.4], [15, 10.0], [21, 9.2], [28, 8.6], [33, 9.6], [36, 9.8]] }],
+    base: 8.2, baseH: 13.2, midH: 14.6,
+    side({ X, span, side, team, ops, spots, forts }) {
+      ops.push({ type: 'add', x: X(5.4), y: 9.4, rx: 0.9, ry: 1.5 });
+      ops.push({ type: 'add', x: X(5.7), y: 8.0, rx: 0.45, ry: 0.8 });
+      ops.push({ type: 'add', x: X(24.0), y: 8.4, rx: 1.0, ry: 1.5 });
+      ops.push({ type: 'add', x: X(24.3), y: 7.0, rx: 0.5, ry: 0.85 });
+      spots.push({ kind: 'tree', team, range: span(14.0, 16.8), sign: X(13.0), label: { name: '느티나무 그늘', desc: '내 차례가 시작될 때마다 특수 견과 +1. 나무가 내 높은 샷을 막기도 해요' } });
+      forts.push({ back: X(3.4), facing: side });
+    },
+    center({ M, W, ops, spots }) {
+      ops.push({ type: 'add', x: M, y: 8.2, rx: 1.6, ry: 2.0 });
+      spots.push({ kind: 'high', team: -1, range: [32.4, W - 32.4], sign: null, signs: [32.0, W - 32.0], label: { name: '원두막 언덕', desc: '조준선이 두 배로 길어져요. 들판 한가운데라 숨을 곳이 없어요' } });
+    },
+    features: (W, M) => ({
+      trees: [15.4, W - 15.4].map((x) => ({ x, kind: 'oak', h: 4.8, canopyR: 2.0, nuts: 5, hive: false, web: false, room: 1.5 })),
+      crates: [{ x: 24.5 }, { x: W - 24.5 }],
+    }),
+  },
+
+  // 은행나무 쌍봉 (autumn) — shoot from behind your hill. Each start sits behind its own peak, so
+  // only lobs go out (and come in). The peak top is a lookout in plain view; past it the slope
+  // runs down into a narrow golden valley with a ginkgo on each side (a nut every turn) and a nut
+  // basket in the middle, under both peaks.
+  ginkgo: {
+    top: [[2.2, 10.6], [3.4, 12.0], [11.0, 12.0], [19.0, 16.0], [22.0, 16.0], [30.6, 11.6], [36, 11.6]],
+    flat: [[3.4, 11.0], [19.0, 22.0], [30.6, 36]],
+    islands: [{ a: 2.3, b: 36, under: [[2.3, 10.8], [3.6, 9.0], [8, 8.4], [12, 8.4], [16, 9.0], [20, 10.0], [24, 9.2], [30, 7.6], [36, 7.2]] }],
+    base: 8.6, baseH: 12.0, midH: 11.6,
+    side({ X, span, side, team, ops, spots, forts }) {
+      ops.push({ type: 'add', x: X(6.0), y: 8.0, rx: 0.9, ry: 1.5 });
+      ops.push({ type: 'add', x: X(6.3), y: 6.6, rx: 0.45, ry: 0.85 });
+      ops.push({ type: 'add', x: X(20.5), y: 9.0, rx: 1.0, ry: 1.6 });
+      ops.push({ type: 'add', x: X(20.8), y: 7.5, rx: 0.5, ry: 0.9 });
+      spots.push({ kind: 'high', team, range: span(19.2, 21.8), sign: X(18.4), label: { name: '은행 봉우리', desc: '조준선이 두 배로 길어져요. 산마루라 양쪽에서 다 보여요' } });
+      spots.push({ kind: 'tree', team, range: span(31.0, 33.2), sign: X(30.2), label: { name: '은행 명당', desc: '내 차례가 시작될 때마다 특수 견과 +1. 골짜기라 양쪽 봉우리에서 내려다봐요' } });
+      forts.push({ back: X(3.8), facing: side });
+    },
+    center({ M, ops }) {
+      ops.push({ type: 'add', x: M, y: 6.0, rx: 1.3, ry: 2.0 });
+    },
+    features: (W, M) => ({
+      trees: [32.2, W - 32.2].map((x) => ({ x, kind: 'ginkgo', h: 4.8, canopyR: 2.0, nuts: 5, hive: false, web: false, room: 1.4 })),
+      crates: [{ x: M }],
+    }),
+  },
+
+  // 살얼음 벼랑 (winter) — no way across. Two islands with a wide chasm between: nobody drives over,
+  // it's all shooting. The ice is thin everywhere (about 3 m), so a good walnut drops anyone. Home:
+  // fort · start · a rise with a snowy pine (a nut every turn) · the ledge at the chasm (lookout,
+  // and the thinnest ice of all).
+  snowcliff: {
+    top: [[2.2, 11.4], [3.4, 13.0], [13.0, 13.0], [17.4, 14.8], [21.0, 14.8], [23.4, 14.0], [27.0, 14.0], [36, 14.0]],
+    flat: [[3.4, 13.0], [17.4, 21.0], [23.4, 27.0]],
+    islands: [{ a: 2.3, b: 27.0, under: [[2.3, 11.6], [3.6, 10.4], [8, 10.0], [13, 10.0], [17, 11.6], [21, 11.8], [24.5, 11.4], [26.4, 12.0], [27.0, 13.2]] }],
+    base: 9.2, baseH: 13.0, midH: 14.0,
+    side({ X, span, side, team, ops, spots, forts }) {
+      ops.push({ type: 'add', x: X(5.4), y: 9.6, rx: 0.8, ry: 1.4 });
+      ops.push({ type: 'add', x: X(5.7), y: 8.4, rx: 0.4, ry: 0.8 });
+      ops.push({ type: 'add', x: X(15.0), y: 10.0, rx: 0.8, ry: 1.2 });
+      spots.push({ kind: 'tree', team, range: span(17.8, 20.6), sign: X(16.8), label: { name: '눈꽃 명당', desc: '내 차례가 시작될 때마다 특수 견과 +1. 땅이 얇으니 발밑을 조심해요' } });
+      spots.push({ kind: 'high', team, range: span(23.8, 26.4), sign: X(23.0), label: { name: '살얼음 전망대', desc: '조준선이 두 배로 길어져요. 얼음이 가장 얇은 벼랑 끝이에요' } });
+      forts.push({ back: X(3.8), facing: side });
+    },
+    center() {},
+    features: (W, M) => ({
+      trees: [19.2, W - 19.2].map((x) => ({ x, kind: 'snowpine', h: 4.6, canopyR: 1.8, nuts: 5, hive: false, web: false, room: 1.4 })),
+    }),
+  },
+
+  // 오로라 빙벽 (winter night) — over the wall. A tall ice wall stands in the middle: nothing flat
+  // gets past it, every shot is a high lob. Home: fort · start · a snowy oak (a nut every turn) ·
+  // the foot of the wall with a mushroom pad that throws you onto the top (lookout + a nut every
+  // turn, in everyone's sights), and a pad up there that throws you home.
+  aurora: {
+    top: [[2.2, 10.8], [3.4, 12.4], [21.6, 12.4], [24.0, 13.0], [31.0, 13.0], [32.6, 20.4], [33.4, 21.0], [36, 21.0]],
+    flat: [[3.4, 21.6], [24.0, 31.0], [33.4, 36]],
+    islands: [{ a: 2.3, b: 36, under: [[2.3, 11.0], [3.6, 9.6], [8, 9.0], [14, 9.0], [20, 8.8], [26, 8.2], [31, 7.4], [36, 7.0]] }],
+    base: 9.8, baseH: 12.4, midH: 21.0,
+    side({ X, span, side, team, ops, spots, forts }) {
+      ops.push({ type: 'add', x: X(5.8), y: 8.8, rx: 0.9, ry: 1.5 });
+      ops.push({ type: 'add', x: X(6.1), y: 7.4, rx: 0.45, ry: 0.85 });
+      ops.push({ type: 'add', x: X(23.0), y: 7.6, rx: 0.9, ry: 1.5 });
+      spots.push({ kind: 'tree', team, range: span(15.4, 17.8), sign: X(14.6), label: { name: '눈꽃 명당', desc: '내 차례가 시작될 때마다 특수 견과 +1' } });
+      spots.push({ kind: 'pad', team, range: span(28.0, 29.1), dir: side, to: { x: X(35.0), y: 21.0 }, apex: 25.6 });
+      spots.push({ kind: 'pad', team, range: span(33.6, 34.4), dir: -side, to: { x: X(13.0), y: 12.4 }, apex: 25.0 });
+      forts.push({ back: X(3.8), facing: side });
+    },
+    center({ M, W, ops, spots }) {
+      ops.push({ type: 'add', x: M, y: 5.4, rx: 1.4, ry: 2.2 });
+      ops.push({ type: 'add', x: M + 0.3, y: 3.6, rx: 0.6, ry: 1.0 });
+      spots.push({
+        kind: 'crown', team: -1, range: [34.6, W - 34.6], sign: null, signs: [34.8, W - 34.8],
+        label: { name: '빙벽 꼭대기', desc: '조준선 두 배 + 내 차례마다 특수 견과 +1. 좁고 높아서 다 보여요' },
+      });
+    },
+    features: (W, M) => ({
+      trees: [16.6, W - 16.6].map((x) => ({ x, kind: 'snowoak', h: 4.6, canopyR: 1.9, nuts: 5, hive: false, web: false, room: 1.4 })),
+    }),
+  },
+
+  // 무지개 바위다리 (summer) — the high road. A thick stone arch bridges the chasm between the two
+  // homes; its top is the only way across and the highest ground on the map. Home: fort · start ·
+  // a shade tree (a nut every turn) · the ramp up · the arch, with the lookout crown at its apex
+  // (a nut every turn, seen by everyone). Blow the arch out from under someone and they're gone.
+  arch: {
+    top: [[2.2, 10.8], [3.4, 12.4], [16.6, 12.4], [23.2, 15.0], [24.4, 15.1], [30.6, 17.9], [36, 18.2]],
+    flat: [[3.4, 16.6]],
+    islands: [{ a: 2.3, b: 36, under: [[2.3, 11.0], [3.6, 9.2], [8, 8.6], [14, 8.8], [20, 9.8], [24, 11.6], [28, 13.6], [32, 14.8], [36, 15.2]] }],
+    base: 9.6, baseH: 12.4, midH: 18.2,
+    side({ X, span, side, team, ops, spots, forts }) {
+      ops.push({ type: 'add', x: X(6.0), y: 8.4, rx: 0.9, ry: 1.5 });
+      ops.push({ type: 'add', x: X(6.3), y: 7.0, rx: 0.45, ry: 0.85 });
+      ops.push({ type: 'add', x: X(17.0), y: 8.6, rx: 1.0, ry: 1.5 });
+      ops.push({ type: 'add', x: X(17.3), y: 7.2, rx: 0.5, ry: 0.85 });
+      spots.push({ kind: 'tree', team, range: span(14.4, 16.6), sign: X(13.6), label: { name: '여름 그늘', desc: '내 차례가 시작될 때마다 특수 견과 +1. 나무가 내 높은 샷을 막기도 해요' } });
+      forts.push({ back: X(3.8), facing: side });
+    },
+    center({ M, W, spots }) {
+      spots.push({
+        kind: 'crown', team: -1, range: [33.4, W - 33.4], sign: null, signs: [33.0, W - 33.0],
+        label: { name: '바위다리 꼭대기', desc: '조준선 두 배 + 내 차례마다 특수 견과 +1. 다리를 깨면 그대로 떨어져요' },
+      });
+    },
+    features: (W, M) => ({
+      trees: [15.5, W - 15.5].map((x) => ({ x, kind: 'oak', h: 4.6, canopyR: 1.9, nuts: 5, hive: false, web: false, room: 1.3 })),
+      crates: [{ x: 28.0 }, { x: W - 28.0 }],
+    }),
+  },
+
+  // 이글루 마을 (winter) — duck into an igloo. A flat snowfield dotted with snow domes. The igloo in
+  // front of each start is a room with a low door on each side, the road runs through it (only flat
+  // shots get in, a drilled roof is a hole); a plain snow dome further on is cover from flat shots. A snowy pine
+  // between them gives a nut every turn, and a nut basket waits in the middle of the field.
+  igloo: {
+    top: [[2.2, 10.8], [3.4, 12.6], [36, 12.6]],
+    flat: [[3.4, 36]],
+    islands: [{ a: 2.3, b: 36, under: [[2.3, 11.0], [3.6, 9.4], [8, 8.8], [14, 8.8], [20, 8.6], [27, 8.2], [33, 8.6], [36, 8.8]] }],
+    base: 9.4, baseH: 12.6, midH: 12.6,
+    side({ X, span, side, team, ops, spots, forts }) {
+      // the igloo: a snow dome with a room inside and a low door on each side (drive through it)
+      ops.push({ type: 'add', x: X(16.6), y: 12.6, rx: 3.4, ry: 4.5 });
+      for (let x = 13.0; x <= 20.2 + 0.01; x += 0.4) {
+        const room = Math.abs(x - 16.6) <= 1.2, r = room ? 1.3 : 1.15; // room 2.6 m high, doors 2.3 m
+        ops.push({ type: 'sub', x: X(x), y: 12.6 + r, rx: r, ry: r });
+      }
+      // a plain snow dome further out: cover from flat shots, and a hump to drive over
+      ops.push({ type: 'add', x: X(27.4), y: 12.4, rx: 2.2, ry: 2.3 });
+      ops.push({ type: 'add', x: X(5.8), y: 8.6, rx: 0.9, ry: 1.5 });
+      ops.push({ type: 'add', x: X(6.1), y: 7.2, rx: 0.45, ry: 0.85 });
+      ops.push({ type: 'add', x: X(22.0), y: 8.0, rx: 0.9, ry: 1.4 });
+      spots.push({
+        kind: 'burrow', team, range: span(15.2, 17.6), sign: X(12.6), floor: 12.6, band: [11.8, 14.5],
+        label: { name: '이글루', desc: '눈 지붕이 위에서 오는 공격을 막아 줘요. 문으로 낮게 쏜 것만 드나들어요' },
+      });
+      spots.push({ kind: 'tree', team, range: span(22.0, 24.6), sign: X(21.2), label: { name: '눈꽃 명당', desc: '내 차례가 시작될 때마다 특수 견과 +1' } });
+      forts.push({ back: X(3.8), facing: side });
+    },
+    center({ M, ops }) {
+      ops.push({ type: 'add', x: M, y: 7.4, rx: 1.4, ry: 2.2 });
+    },
+    features: (W, M) => ({
+      trees: [23.3, W - 23.3].map((x) => ({ x, kind: 'snowpine', h: 4.6, canopyR: 1.8, nuts: 5, hive: false, web: false, room: 1.3 })),
+      crates: [{ x: M }],
+    }),
+    // the room inside, in cold shade
+    backs: (W) => [13.2, W - 20.0].map((x0) => ({ x0, x1: x0 + 6.8, y0: 12.6, y1: 15.2, color: 'rgba(74,100,138,0.95)' })),
+  },
 };
 
 function cosInterp(pts, x) {
@@ -1058,7 +1352,7 @@ function buildFixed(id, seed) {
   def.center({ M, W, ops, spots });
   return {
     heights, under, onIsland, spans, ops, bases: [def.base, W - def.base], baseH: [def.baseH, def.baseH], mid: M, midH: def.midH,
-    features: { ...def.features(W, M), fixed: true }, spots, forts, fixed: id,
+    features: { ...def.features(W, M), fixed: true }, spots, forts, fixed: id, backs: def.backs ? def.backs(W) : [],
   };
 }
 

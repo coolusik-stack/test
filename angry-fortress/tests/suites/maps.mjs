@@ -1,2 +1,2 @@
-// The four hand-made maps, in menu order.
-export const MAPS = ['oak', 'maple', 'pine', 'night'];
+// Every hand-made map, in menu order (through the year).
+export { THEME_ORDER as MAPS } from '../../js/levels.js';

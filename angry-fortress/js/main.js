@@ -1,6 +1,6 @@
 // Boot, screens, HUD binding and the main loop.
 import { Game } from './game.js';
-import { THEMES, THEME_ORDER } from './levels.js';
+import { THEMES, THEME_ORDER, SEASONS } from './levels.js';
 import { buildLandscape, WORLD } from './terrain.js';
 import * as Art from './art.js';
 import Sound from './audio.js';
@@ -131,6 +131,17 @@ function renderPips() {
   }
 }
 
+// a map's season, as a little tag on its picture
+function seasonTag(id) {
+  const season = THEMES[id] && THEMES[id].season;
+  if (!season) return null;
+  const tag = document.createElement('i');
+  tag.className = 'map-season';
+  tag.dataset.season = season;
+  tag.textContent = SEASONS[season];
+  return tag;
+}
+
 // the loser picks the next battlefield (and shoots first)
 function pickMap(title, sub, cb) {
   show('pickmap');
@@ -148,6 +159,8 @@ function pickMap(title, sub, cb) {
     const name = document.createElement('span');
     name.textContent = id === 'random' ? '랜덤' : THEMES[id].name;
     b.append(cv, name);
+    const tag = seasonTag(id);
+    if (tag) b.append(tag);
     b.addEventListener('click', () => {
       Sound.unlock();
       Sound.play('tap');
@@ -310,15 +323,16 @@ function renderCampaign() {
   const grid = $('#camp-grid');
   grid.innerHTML = '';
   const next = Camp.STAGES.findIndex((s, i) => Camp.isOpen(prog, i) && !Camp.starCount(prog, s.id));
-  for (const theme of THEME_ORDER) {
+  for (const season of Camp.SEASON_ORDER) {
     const row = document.createElement('div');
     row.className = 'camp-row';
+    row.dataset.season = season;
     const label = document.createElement('span');
     label.className = 'camp-map';
-    label.textContent = THEMES[theme].name;
+    label.textContent = SEASONS[season];
     row.append(label);
     Camp.STAGES.forEach((s, i) => {
-      if (s.theme !== theme) return;
+      if (s.season !== season) return;
       const b = document.createElement('button');
       const open = Camp.isOpen(prog, i);
       const got = Camp.starCount(prog, s.id);
@@ -326,7 +340,7 @@ function renderCampaign() {
       b.disabled = !open;
       b.dataset.stage = s.id;
       b.setAttribute('aria-label', `${Camp.stageName(s)}${open ? `, 별 ${got}개` : ', 잠김'}`);
-      b.innerHTML = `<b>${s.id.split('-')[1]}</b>${open ? `<span class="tile-stars">${'★'.repeat(got)}${'<i>★</i>'.repeat(3 - got)}</span>` : '<span>🔒</span>'}`;
+      b.innerHTML = `<b>${Camp.stageNumber(s)}</b><span class="tile-map">${THEMES[s.theme].name}</span>${open ? `<span class="tile-stars">${'★'.repeat(got)}${'<i>★</i>'.repeat(3 - got)}</span>` : '<span class="tile-stars">🔒</span>'}`;
       b.addEventListener('click', () => { Sound.play('tap'); openStage(s.id); });
       row.append(b);
     });
@@ -913,6 +927,8 @@ function renderMaps() {
       const desc = document.createElement('small');
       desc.textContent = id === 'random' ? '어디로 갈지 몰라요' : THEMES[id].desc;
       b.append(cv, name, desc);
+      const tag = seasonTag(id);
+      if (tag) b.append(tag);
       b.addEventListener('click', () => {
         Sound.unlock();
         Sound.play('tap');

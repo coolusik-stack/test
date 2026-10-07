@@ -547,7 +547,7 @@ export class Forest {
   // ------------------------------------------------------------------ drawing
   drawBehind(ctx) {
     if (!Art.drawHomeTree) return;
-    for (const h of this.homes) Art.drawHomeTree(ctx, { x: h.x, y: -h.y, team: h.team, facing: h.facing, time: this.g.time, seed: h.seed });
+    for (const h of this.homes) Art.drawHomeTree(ctx, { x: h.x, y: -h.y, team: h.team, facing: h.facing, time: this.g.time, seed: h.seed, season: this.g.theme.season });
   }
 
   drawFront(ctx, view) {

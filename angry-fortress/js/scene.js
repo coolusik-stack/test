@@ -29,7 +29,7 @@ export class Scene {
     }
     this.stars = Array.from({ length: 70 }, () => ({ x: r(), y: r() * 0.6, s: r.range(0.8, 1.8), ph: r() * TAU }));
     this.motes = [];
-    const n = theme.ambient === 'firefly' ? 34 : theme.ambient === 'mist' ? 10 : 42;
+    const n = theme.ambient === 'firefly' ? 34 : theme.ambient === 'mist' ? 10 : theme.ambient === 'snow' ? 90 : 42;
     for (let i = 0; i < n; i++) this.motes.push(this._mote(true));
     this.frame = this._canopyFrame(r);
     this.shore = null;
@@ -158,9 +158,13 @@ export class Scene {
     for (const m of this.motes) {
       m.ph += dt * (kind === 'firefly' ? 0.9 : 1.5);
       m.blink += dt * 2.2;
-      if (kind === 'leaf') {
-        m.y += 0.03 * m.v * dt;
-        m.x += (wind * 0.012 + Math.sin(m.ph) * 0.012) * dt * m.v;
+      if (kind === 'leaf' || kind === 'petal') {
+        m.y += (kind === 'petal' ? 0.022 : 0.03) * m.v * dt;
+        m.x += (wind * 0.012 + Math.sin(m.ph) * 0.012 + (kind === 'petal' ? 0.006 : 0)) * dt * m.v;
+      } else if (kind === 'snow') {
+        // big flakes near, small ones far: the near ones fall faster and sway more
+        m.y += (0.018 + 0.03 * m.s) * dt;
+        m.x += (wind * 0.01 * m.s + Math.sin(m.ph * 0.8) * 0.006 * m.s) * dt;
       } else if (kind === 'pollen') {
         m.y += Math.sin(m.ph * 0.7) * 0.006 * dt - 0.004 * dt;
         m.x += (wind * 0.006 + Math.cos(m.ph * 0.5) * 0.006) * dt;
@@ -171,7 +175,7 @@ export class Scene {
         m.x += (0.006 + wind * 0.004) * dt * m.v;
       }
       if (m.y > 1.05 || m.y < -0.08 || m.x > 1.1 || m.x < -0.1) {
-        Object.assign(m, this._mote(kind !== 'leaf'));
+        Object.assign(m, this._mote(kind !== 'leaf' && kind !== 'petal' && kind !== 'snow'));
         if (kind === 'mist') m.x = wind >= 0 ? -0.1 : 1.1;
       }
     }
@@ -195,6 +199,8 @@ export class Scene {
       }
       ctx.globalAlpha = 1;
     }
+    if (t.aurora) this._aurora(ctx, cam, vw, vh, time);
+    if (t.rainbow) this._rainbow(ctx, cam, vw, vh);
     // sun / moon
     const sx = vw * t.sun.x - (cam.x - WORLD.W / 2) * cam.zoom * 0.04;
     const sy = vh * t.sun.y + (cam.y - 14) * cam.zoom * 0.03;
@@ -461,6 +467,56 @@ export class Scene {
     }
   }
 
+  // A faint summer rainbow arching over the far side of the sky.
+  _rainbow(ctx, cam, vw, vh) {
+    const cx = vw * 0.66 - (cam.x - WORLD.W / 2) * cam.zoom * 0.03, cy = vh * 0.95, R = Math.max(vw, vh) * 0.62;
+    const cols = ['255,90,90', '255,170,60', '255,230,80', '110,220,110', '90,170,255', '160,120,240'];
+    ctx.save();
+    ctx.lineWidth = R * 0.022;
+    for (let i = 0; i < cols.length; i++) {
+      ctx.strokeStyle = `rgba(${cols[i]},0.2)`;
+      ctx.beginPath();
+      ctx.arc(cx, cy, R - i * ctx.lineWidth, Math.PI * 1.08, Math.PI * 1.92);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  // Northern lights: a few wavy curtains of green and violet light, slowly rippling.
+  _aurora(ctx, cam, vw, vh, time) {
+    const shift = -(cam.x - WORLD.W / 2) * cam.zoom * 0.03;
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    const bands = [
+      { y: 0.18, amp: 0.05, len: 0.9, col: [120, 255, 190], a: 0.38, sp: 0.18, ph: 0 },
+      { y: 0.27, amp: 0.04, len: 1.3, col: [90, 220, 255], a: 0.26, sp: -0.13, ph: 2.1 },
+      { y: 0.12, amp: 0.035, len: 0.7, col: [190, 140, 255], a: 0.24, sp: 0.1, ph: 4.2 },
+    ];
+    for (const b of bands) {
+      const top = [], bot = [];
+      for (let i = 0; i <= 24; i++) {
+        const u = i / 24, x = u * vw * 1.2 - vw * 0.1 + shift;
+        const w = Math.sin(u * TAU * b.len + time * b.sp + b.ph) * b.amp + Math.sin(u * 17 + time * 0.4 + b.ph) * 0.008;
+        const y = (b.y + w) * vh;
+        const tall = (0.09 + 0.05 * Math.sin(u * 9 + time * 0.3 + b.ph)) * vh;
+        top.push([x, y - tall]);
+        bot.push([x, y]);
+      }
+      const g = ctx.createLinearGradient(0, (b.y - 0.16) * vh, 0, (b.y + 0.06) * vh);
+      g.addColorStop(0, `rgba(${b.col},0)`);
+      g.addColorStop(0.7, `rgba(${b.col},${b.a})`);
+      g.addColorStop(1, `rgba(${b.col},0)`);
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.moveTo(top[0][0], top[0][1]);
+      for (const p of top) ctx.lineTo(p[0], p[1]);
+      for (let i = bot.length - 1; i >= 0; i--) ctx.lineTo(bot[i][0], bot[i][1] + 0.02 * vh);
+      ctx.closePath();
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+
   // ---------------------------------------------------------------- ambient (screen space, in front)
   drawAmbient(ctx, vw, vh, dpr, time) {
     const kind = this.t.ambient;
@@ -493,6 +549,24 @@ export class Scene {
         ctx.ellipse(0, 0, 4.5 * m.s, 2 * m.s, 0, 0, TAU);
         ctx.fill();
         ctx.restore();
+      } else if (kind === 'petal') {
+        // a cherry petal: a soft heart-ish oval tumbling as it falls
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.rotate(m.ph * 1.3);
+        ctx.scale(1, 0.55 + 0.45 * Math.abs(Math.sin(m.ph * 1.7)));
+        ctx.fillStyle = m.s > 1.1 ? 'rgba(255,214,228,0.95)' : 'rgba(250,170,200,0.85)';
+        ctx.beginPath();
+        ctx.moveTo(0, -3.4 * m.s);
+        ctx.quadraticCurveTo(3.2 * m.s, -2.4 * m.s, 0, 3 * m.s);
+        ctx.quadraticCurveTo(-3.2 * m.s, -2.4 * m.s, 0, -3.4 * m.s);
+        ctx.fill();
+        ctx.restore();
+      } else if (kind === 'snow') {
+        ctx.fillStyle = `rgba(255,255,255,${0.55 + 0.35 * Math.min(1, m.s - 0.4)})`;
+        ctx.beginPath();
+        ctx.arc(x, y, 1.1 + 1.9 * m.s, 0, TAU);
+        ctx.fill();
       } else if (kind === 'pollen') {
         ctx.fillStyle = `rgba(255,250,200,${0.35 + 0.35 * Math.sin(m.blink)})`;
         ctx.beginPath();

@@ -109,7 +109,7 @@ export class Game {
     this.world = new planck.World({ gravity: V(0, -GRAV) });
     const land = buildLandscape(this.theme.layout, this.seed);
     this.land = land;
-    this.terrain = new Terrain({ style: this.theme.ground, seed: this.seed, heights: land.heights, under: land.under, ops: land.ops });
+    this.terrain = new Terrain({ style: this.theme.ground, seed: this.seed, heights: land.heights, under: land.under, ops: land.ops, backs: land.backs });
     this.terrain.attach(this.world, planck);
     this.scene.setLand(land);
     this.pattern = makeDirtPattern(this.ctx, this.theme.ground, this.seed);
@@ -701,6 +701,12 @@ export class Game {
     this.emit('fired', { player: p.id, type });
   }
 
+  // where a cart stands, for spot lookups
+  _feet(p) {
+    const pos = p.body.getPosition();
+    return { x: pos.x, foot: pos.y - CART_R };
+  }
+
   restPos(p) {
     const pos = p.body.getPosition();
     const a = Art.slingAnchors(pos.x, -pos.y, p.facing);
@@ -817,7 +823,7 @@ export class Game {
   _spotReward(p) {
     if (p.dead || !this.land.spots) return;
     const pos = p.body.getPosition();
-    if (!hasSpot(this.land, pos.x, 'tree', 'crown') || Math.abs(p.body.getLinearVelocity().y) > 1) return;
+    if (!hasSpot(this.land, { x: pos.x, foot: pos.y - CART_R }, 'tree', 'crown') || Math.abs(p.body.getLinearVelocity().y) > 1) return;
     const r = rng(((this.seed ^ 0x7ee5) + Math.imul(this.turnNo, 977)) >>> 0);
     const open = SUPPLY.filter((t) => (p.ammo[t] || 0) < POCKET);
     if (!open.length) return;
@@ -1441,7 +1447,8 @@ export class Game {
       const moving = p === this.players[this.turn] && (this.state === 'aim' || this.state === 'ai-move') && p.moveDir && p.stamina > 0 && !p.dead && !p.remote;
       if (moving) {
         const grounded = Math.abs(v.y) < 2.5;
-        const pad = grounded && p.stamina >= PAD_COST ? padAt(this.land, p.body.getPosition().x, p.moveDir) : null;
+        const at = p.body.getPosition();
+        const pad = grounded && p.stamina >= PAD_COST ? padAt(this.land, { x: at.x, foot: at.y - CART_R }, p.moveDir) : null;
         if (pad) {
           this._padJump(p, pad);
           continue;
@@ -1831,7 +1838,7 @@ export class Game {
   _aiArrived(p) {
     if (this.silent || p.dead) return;
     const pos = p.body.getPosition();
-    const s = spotsAt(this.land, pos.x).find((q) => q.kind !== 'pad');
+    const s = spotsAt(this.land, { x: pos.x, foot: pos.y - CART_R }).find((q) => q.kind !== 'pad');
     if (!s) return;
     const info = infoOf(s);
     this.fx.text(pos.x, pos.y + 2.9, `${info.icon} ${info.name} 차지!`, info.color, 0.7, { life: 1.8 });
@@ -1842,7 +1849,7 @@ export class Game {
   _watchSpot() {
     const p = this.players[this.turn];
     if (!this.land.spots || this.silent || p.dead || p.isAI || p.remote || this.state !== 'aim' || p.padFlight) return;
-    const s = spotsAt(this.land, p.body.getPosition().x).find((q) => q.kind !== 'pad');
+    const s = spotsAt(this.land, this._feet(p)).find((q) => q.kind !== 'pad');
     const key = s ? s.kind : '';
     if (key === p.spotKey) return;
     p.spotKey = key;
@@ -2208,7 +2215,7 @@ export class Game {
     const showGuide = this.opts.guide !== false && !a.ai;
     if (showGuide && a.power > 0.1) {
       // Only the first part of the arc (no wind): skill still matters. A lookout shows twice as much.
-      const far = hasSpot(this.land, p.body.getPosition().x, 'high', 'crown');
+      const far = hasSpot(this.land, this._feet(p), 'high', 'crown');
       const steps = far ? 68 : 34;
       const h = 1 / 60;
       let n = 0;

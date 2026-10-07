@@ -30,18 +30,25 @@ export function infoOf(s) {
   return s.label ? { ...SPOT_INFO[s.kind], ...s.label } : SPOT_INFO[s.kind];
 }
 
-export function spotsAt(land, x) {
+// `at` is an x, or { x, foot } for a cart standing with its wheels at height `foot`. A spot with a
+// `band` [lo, hi] only counts for feet inside it: on 두더지 굴 산 the tunnel floor and the
+// mountain top share the same x, and only one of them is the lookout.
+const where = (at) => (typeof at === 'number' ? { x: at, foot: null } : at);
+const inBand = (s, foot) => foot == null || !s.band || (foot >= s.band[0] && foot <= s.band[1]);
+
+export function spotsAt(land, at) {
   if (!land || !land.spots) return [];
-  return land.spots.filter((s) => x >= s.range[0] && x <= s.range[1]);
+  const { x, foot } = where(at);
+  return land.spots.filter((s) => x >= s.range[0] && x <= s.range[1] && inBand(s, foot));
 }
 
-export function hasSpot(land, x, ...kinds) {
-  return spotsAt(land, x).some((s) => kinds.includes(s.kind));
+export function hasSpot(land, at, ...kinds) {
+  return spotsAt(land, at).some((s) => kinds.includes(s.kind));
 }
 
 // The pad under a cart driving in direction `dir`, if any.
-export function padAt(land, x, dir) {
-  return spotsAt(land, x).find((s) => s.kind === 'pad' && s.dir === dir) || null;
+export function padAt(land, at, dir) {
+  return spotsAt(land, at).find((s) => s.kind === 'pad' && s.dir === dir) || null;
 }
 
 // Launch velocity for a bounce from (x, y) (cart centre) that peaks at the pad's apex and lands

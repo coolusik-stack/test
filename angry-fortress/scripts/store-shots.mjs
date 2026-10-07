@@ -28,6 +28,14 @@ const SCENES = [
     },
   },
   {
+    name: 'seasons', caption: '봄부터 겨울까지, 열두 개의 숲',
+    async setup(page) {
+      await start(page, { mode: 'pvp', theme: 'igloo' });
+      await page.evaluate(() => window.__af.game.toggleOverview());
+      await page.waitForTimeout(1800);
+    },
+  },
+  {
     name: 'aim', caption: '끝까지 당겼다 놓으면, 깡!',
     async setup(page) {
       await start(page, { mode: 'cpu', theme: 'maple' });
