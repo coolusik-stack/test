@@ -303,7 +303,7 @@ export const THEMES = {
     id: 'snowcliff',
     season: 'winter',
     name: '살얼음 두 섬',
-    desc: '건너갈 수 없는 두 섬. 높고 얇은 섬, 낮고 넓은 섬',
+    desc: '차로는 못 건너는 두 섬. 틈새 얼음 조각을 밟고 튀어 넘어갈까',
     layout: { fixed: 'snowcliff' },
     sky: ['#8fb6d8', '#c9dcec', '#f2f6fa'],
     sun: { x: 0.25, y: 0.2, color: '#ffffff', glow: 'rgba(255,255,255,0.5)' },

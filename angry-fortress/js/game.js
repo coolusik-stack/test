@@ -1853,7 +1853,7 @@ export class Game {
     const p = this.players[this.turn];
     if (!this.land.spots || this.silent || p.dead || p.isAI || p.remote || this.state !== 'aim' || p.padFlight) return;
     const s = spotsAt(this.land, this._feet(p)).find((q) => q.kind !== 'pad');
-    const key = s ? s.kind : '';
+    const key = s ? this.land.spots.indexOf(s) : -1; // each spot once: a pad can carry you from one lookout to another
     if (key === p.spotKey) return;
     p.spotKey = key;
     if (s) {
