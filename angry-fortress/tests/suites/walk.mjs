@@ -37,7 +37,7 @@ const ROUTES = {
   },
   pine: {
     0: [[23.0, 'edge', '벼랑 끝'], [10.2, 'home', null]],
-    1: [[66, 'pad→pine rock', '솔바위', true, 'once'], [50, 'pad→home', null, true, 'once'], [66, 'pad→pine rock', '솔바위', true, 'once'], [40, 'pad→foot', null, true, 'once'], [31.8, 'tree', '절벽 밑 소나무'], [20, 'pad→plateau', null, true, 'once']],
+    1: [[31.8, 'tree', '절벽 밑 소나무'], [20, 'pad→plateau', null, true, 'once']],
   },
   snowcliff: {
     0: [[21.0, 'edge', '살얼음 벼랑 끝'], [24, 'pad→floe', null, true, 'once'], [35, 'pad→right island', null, true, 'once'], [40.7, 'tree', '눈꽃 명당'], [30, 'pad→floe', null, true, 'once'], [20, 'pad→left island', null, true, 'once'], [10.0, 'home', null]],

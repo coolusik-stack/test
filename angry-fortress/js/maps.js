@@ -333,7 +333,8 @@ export const MAPS = {
   // the plateau, shooting down, with a lookout at the cliff's thin lip; there is no way down. Right
   // home: the lowland, thick ground, a pine at the cliff's foot (a nut every turn, right under the
   // plateau's guns) and, right at the foot, a mushroom pad that throws you up onto the plateau.
-  // Behind the right home a pad throws you onto a pine rock in the sky, higher than the plateau.
+  // The map is its own two floors (the plateau and the lowland, joined by that pad): a rock in the
+  // sky here would sit right in the plateau's lane down to the lowland.
   pine: () => ({
     top: [[2.2, 15.8], [3.4, 17.6], [24.6, 17.6], [25.4, 17.4], [27.2, 11.8], [27.8, 11.6], [68.4, 11.6], [69.6, 10.0]],
     flat: [[3.4, 24.6], [27.8, 68.4]],
@@ -343,15 +344,11 @@ export const MAPS = {
     }],
     bases: [10.2, 61.2],
     forts: [{ back: 4.4, facing: 1 }, { back: 67.8, facing: -1 }],
-    ops: [...crag(8.0, 12.4), ...crag(18.0, 12.2, 0.9), ...crag(40.0, 6.4, 1.2), ...crag(55.0, 6.8, 1.0), ...ledge(44.0, 19.8, 6.0)],
+    ops: [...crag(8.0, 12.4), ...crag(18.0, 12.2, 0.9), ...crag(40.0, 6.4, 1.2), ...crag(55.0, 6.8, 1.0)],
     spots: [
       { kind: 'high', team: 0, range: [21.6, 24.4], sign: 20.8, label: { name: '벼랑 끝', desc: '조준선이 두 배로 길어져요. 벼랑 끝이라 땅이 얇아요' } },
       { kind: 'tree', team: 1, range: [30.4, 33.2], sign: 34.0, label: { name: '절벽 밑 소나무', desc: '내 차례가 시작될 때마다 특수 견과 +1. 벼랑 위에서 다 내려다봐요' } },
       { kind: 'pad', team: 1, range: [28.4, 29.2], dir: -1, to: { x: 16.0, y: 17.6 }, apex: 22.4 },
-      { kind: 'pad', team: 1, range: [64.6, 65.4], dir: 1, to: { x: 44.0, y: 19.8 }, apex: 23.2 },
-      { kind: 'high', team: 1, range: [41.6, 46.4], sign: null, ...on(19.8), label: { name: '솔바위', desc: '벼랑보다 높아요. 조준선 두 배, 얇고 훤히 보여요' } },
-      { kind: 'pad', team: -1, range: [42.4, 43.0], dir: -1, to: { x: 35.0, y: 11.6 }, apex: 22.4, ...on(19.8) },
-      { kind: 'pad', team: -1, range: [45.0, 45.6], dir: 1, to: { x: 58.4, y: 11.6 }, apex: 22.4, ...on(19.8) },
     ],
     features: { trees: [tree(31.8, 'pine', { h: 5.0, canopyR: 1.9 })] },
   }),
