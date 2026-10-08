@@ -11,14 +11,18 @@
  *   Sound.setSfx(on) / Sound.setMusic(on), Sound.sfxOn / Sound.musicOn
  *   Sound.play(name, { vol, pitch, pan })
  *   Sound.stretch(t | null)           slingshot rubber-band creak while aiming
- *   Sound.music('menu'|'battle'|'victory'|null)
+ *   Sound.music('menu'|'battle'|'battle_spring'|'battle_summer'|'battle_autumn'|'battle_winter'|'victory'|null)
+ *   Sound.intensity(0|1|2)            adaptive battle music: 0 calm (aiming), 1 normal (shot in the air),
+ *                                     2 high (a few seconds after a big hit / K.O.); layers ramp in and out
  *   Sound.duck(amount = 0.4, seconds = 0.6)   lower music by `amount` (0..1) for `seconds`
  *   Sound.pause() / Sound.resume()
  *
  * Signal flow:
  *   sfx voices ─┬─────────────────────────► sfxBus ─┐
  *               └► reverb send ► convolver ─► sfxBus │
- *   music notes ► trackBus (per track, crossfaded) ► musicBus ► duck ─┤
+ *   music notes ► layer bus (0 base / 1 / 2, ramped by intensity) ► shelf ► trackBus (per track, crossfaded) ► musicBus ► duck ─┤
+ *        └► layer send ─┬► echo ► trackBus
+ *                       └► reverb fader ► music convolver ► musicBus
  *   stretch creak ─────────────────────────► sfxBus ─┤
  *                                                     └► compressor ► master ► destination
  */
@@ -29,6 +33,15 @@ const MUSIC_LEVEL = 0.35; // music bus gain relative to sfx
 const XFADE = 0.8; // music crossfade seconds
 const LOOKAHEAD = 0.12; // music scheduler lookahead (s)
 const TICK_MS = 25; // music scheduler timer period
+const LAYERS = 3; // music layer buses per track: 0 base (always), 1 normal+, 2 high only
+const LAYER_MIX = [
+  [0.62, 0, 0], // 0 calm: lead + bass + light texture, softer
+  [1, 1, 0], // 1 normal
+  [1.08, 1.2, 1.3], // 2 high: everything, the band digs in
+];
+const LAYER_SHELF = [-4, 0, 0]; // dB high-shelf on the dry mix per level (calm sits a little further back)
+const LAYER_UP = 0.45; // s ramp when a layer comes in
+const LAYER_DOWN = 0.8; // s ramp when a layer drops out
 
 const HAS_WIN = typeof window !== 'undefined';
 const ACtor = HAS_WIN ? window.AudioContext || window.webkitAudioContext : null;
@@ -47,6 +60,7 @@ let gesturesHooked = false;
 let duckUntil = 0;
 let duckLevel = 1;
 let stretchState = null;
+let musicLvl = 1; // adaptive music intensity 0..2 (kept while no track plays; new players start at it)
 
 const voices = []; // active sfx voices, oldest first
 const players = []; // active music track players
@@ -203,6 +217,20 @@ function buildChain(c) {
   music.connect(duckG);
   duckG.connect(comp);
 
+  // music reverb: its own convolver into the music bus, so it follows music on/off and ducking
+  const mRev = c.createGain();
+  try {
+    const conv = c.createConvolver();
+    conv.buffer = makeIR(c, 1.3);
+    const mOut = c.createGain();
+    mOut.gain.value = 0.9;
+    mRev.connect(conv);
+    conv.connect(mOut);
+    mOut.connect(music);
+  } catch (e) {
+    /* no music reverb */
+  }
+
   const revIn = c.createGain();
   try {
     const conv = c.createConvolver();
@@ -215,7 +243,7 @@ function buildChain(c) {
   } catch (e) {
     /* no reverb: sends go nowhere */
   }
-  return { c, comp, master, out: clip, sfx, music, duckG, revIn };
+  return { c, comp, master, out: clip, sfx, music, duckG, revIn, mRev };
 }
 
 let CEILING = null;
@@ -1425,6 +1453,91 @@ const INST = {
     v.noise({ k: 'w', a: 0.003, d: 1.4, g: 0.14 * vel, ft: 'highpass', f: 4500 });
     v.noise({ k: 'p', a: 0.003, d: 0.6, g: 0.1 * vel, ft: 'bandpass', f: 3000, Q: 0.5 });
   },
+  // FM steelpan: ratio-1 FM "ping" that mellows, a strong octave partial and a stick tick
+  steel(v, f, len, vel) {
+    const d = Math.min(1.1, 0.4 + len * 0.6);
+    arr(f).forEach((fr) => {
+      const osc = v.tone({ f: fr, a: 0.004, d, g: 0.3 * vel });
+      const m = v.c.createOscillator();
+      m.frequency.value = fr;
+      const mg = v.gain(0);
+      mg.gain.setValueAtTime(fr * 1.5, v.t0);
+      mg.gain.exponentialRampToValueAtTime(fr * 0.2, v.t0 + 0.2);
+      m.connect(mg);
+      mg.connect(osc.frequency);
+      v.src(m, 0, d + 0.01);
+      v.tone({ f: fr * 2, a: 0.003, d: d * 0.4, g: 0.1 * vel });
+      v.tone({ f: fr * 3, a: 0.001, d: 0.05, g: 0.035 * vel });
+    });
+    v.noise({ k: 'w', a: 0.0006, d: 0.012, g: 0.05 * vel, ft: 'bandpass', f: 3000, Q: 1.5 });
+  },
+  // accordion: two reeds a few cents apart (musette beating) through a reedy formant
+  reed(v, f, len, vel) {
+    const lp = v.filter('lowpass', 2600, 0.7);
+    const pk = v.filter('peaking', 1250, 1.3);
+    pk.gain.value = 5;
+    lp.connect(pk);
+    pk.connect(v.out);
+    const fs = arr(f);
+    const k = 1 / Math.sqrt(fs.length);
+    const h = Math.max(0.03, len - 0.04);
+    fs.forEach((fr) => {
+      v.tone({ type: 'sawtooth', f: fr, det: -7, a: 0.015, h, d: 0.07, g: 0.075 * vel * k, out: lp });
+      v.tone({ wave: pulseWave(v.c), f: fr, det: 7, a: 0.02, h, d: 0.07, g: 0.07 * vel * k, out: lp });
+    });
+  },
+  // celesta: soft bell bar, round fundamental with a short metallic tink
+  celesta(v, f, len, vel) {
+    v.tone({ f, a: 0.002, d: 0.75 + len * 0.3, g: 0.26 * vel });
+    v.tone({ f: f * 2, a: 0.002, d: 0.22, g: 0.06 * vel });
+    v.tone({ f: f * 3.9, a: 0.001, d: 0.05, g: 0.035 * vel });
+  },
+  // soft detuned pad chord (slow attack, long release)
+  pad(v, f, len, vel) {
+    const lp = v.filter('lowpass', 1200, 0.5);
+    lp.connect(v.out);
+    const a = Math.min(0.35, len * 0.3);
+    const h = Math.max(0, len - a);
+    arr(f).forEach((fr) => {
+      v.tone({ type: 'sawtooth', f: fr, det: -9, a, h, d: 0.6, g: 0.03 * vel, out: lp });
+      v.tone({ type: 'sawtooth', f: fr, det: 9, a, h, d: 0.6, g: 0.03 * vel, out: lp });
+      v.tone({ f: fr, a, h, d: 0.6, g: 0.045 * vel });
+    });
+  },
+  // marimba note / chord
+  mari(v, f, len, vel) {
+    arr(f).forEach((fr) => mallet(v, 0, fr, 0.28 * vel, 0.3));
+  },
+  // sleigh bells / tambourine: a shake of bright jingles
+  sleigh(v, f, len, vel) {
+    [0, 0.012, 0.026].forEach((t, i) => v.noise({ t, k: 'w', a: 0.002, d: 0.045 + 0.02 * i, g: (0.17 - 0.04 * i) * vel, ft: 'bandpass', f: 7500, Q: 1.8 }));
+    [5300, 6750, 8600].forEach((fr, i) => v.tone({ t: i * 0.009, f: fr, a: 0.001, d: 0.08, g: 0.03 * vel }));
+  },
+  clap(v, f, len, vel) {
+    [0, 0.009, 0.019].forEach((t) => v.noise({ t, k: 'w', a: 0.0008, d: 0.012, g: 0.15 * vel, ft: 'bandpass', f: 1300, Q: 1.1 }));
+    v.noise({ t: 0.026, k: 'w', a: 0.001, d: 0.1, g: 0.12 * vel, ft: 'bandpass', f: 1500, Q: 0.9 });
+  },
+  // hand drum (bongo / conga); pitch from the note, default high bongo
+  bongo(v, f, len, vel) {
+    const fr = f || 420;
+    v.tone({ f: fr * 1.35, f1: fr, glide: 0.025, a: 0.001, d: 0.13, g: 0.3 * vel });
+    v.tone({ f: fr * 2.3, a: 0.0008, d: 0.03, g: 0.06 * vel });
+    v.noise({ k: 'w', a: 0.0005, d: 0.01, g: 0.07 * vel, ft: 'bandpass', f: 2200, Q: 1.5 });
+  },
+  // woody upright pizzicato: rounder and longer-ringing than pizz, octave partial for small speakers
+  upright(v, f, len, vel) {
+    const d = 0.7 + len * 0.3;
+    const lp = v.filter('lowpass', 1300, 2);
+    v.sweep(lp.frequency, 0, 1300, 320, d);
+    lp.connect(v.out);
+    v.tone({ type: 'sawtooth', f, a: 0.004, d: d * 0.6, g: 0.2 * vel, out: lp });
+    v.tone({ type: 'triangle', f, a: 0.004, d, g: 0.36 * vel });
+    v.tone({ f: f * 2, a: 0.003, d: d * 0.5, g: 0.12 * vel });
+  },
+  // woodblock tick (pitch from the note)
+  block(v, f, len, vel) {
+    knock(v, 0, f || 900, 0.3 * vel, 0.06);
+  },
 };
 
 /* ------------------------------------------------------------------------ */
@@ -1443,10 +1556,10 @@ function bars(list, start = 0) {
   list.forEach((bar, bi) => bar.forEach((e) => out.push([(start + bi) * 16 + e[0], e[1], e[2], e[3]])));
   return out;
 }
-/** Repeat a 16-step percussion pattern [[step, vel], ...] over bar indices. */
+/** Repeat a 16-step percussion pattern [[step, vel, note?], ...] over bar indices. */
 function perc(barIdx, pattern) {
   const out = [];
-  barIdx.forEach((b) => pattern.forEach(([s, vel]) => out.push([b * 16 + s, 0, 1, vel])));
+  barIdx.forEach((b) => pattern.forEach(([s, vel, n]) => out.push([b * 16 + s, n || 0, 1, vel])));
   return out;
 }
 const range = (a, b) => {
@@ -1454,6 +1567,63 @@ const range = (a, b) => {
   for (let i = a; i < b; i++) r.push(i);
   return r;
 };
+/**
+ * Compact phrase: bars split by '|', tokens 'NOTE[:len[:vel]]' with len in 16ths (default 2),
+ * '-' a rest, 'C4+E4+G4' a chord. Returns [step, note, len, vel] from bar `start`.
+ */
+function ph(src, start = 0) {
+  const out = [];
+  src.split('|').forEach((bar, bi) => {
+    let s = 0;
+    bar.trim().split(/\s+/).forEach((tok) => {
+      if (!tok) return;
+      const [n, l, vl] = tok.split(':');
+      const len = l ? +l : 2;
+      if (n !== '-') out.push([(start + bi) * 16 + s, n.replace(/\+/g, ' '), len, vl ? +vl : 1]);
+      s += len;
+    });
+  });
+  return out;
+}
+/** Chord progression, one token per bar ('C,G' = two chords in one bar); '|' is only a visual separator. */
+const prog = (s) => s.split(/[\s|]+/).filter(Boolean).map((x) => (x.indexOf(',') >= 0 ? x.split(',') : x));
+/** Chord table from 'root fifth | voicing | arpeggio | sparkle' strings (o = root an octave up). */
+function ctab(o) {
+  const T = {};
+  for (const k in o) {
+    const [rf, v, a, h] = o[k].split('|').map((x) => x.trim());
+    const [r, f] = rf.split(' ');
+    T[k] = { r, f, o: nm(r) + 12, v, a, h };
+  }
+  return T;
+}
+/**
+ * Chord-driven accompaniment: on each bar in `bs`, play `pat` ([step, key, len, vel]) using that bar's
+ * chord from `pr` / table `tab`. key: r root, f fifth, o octave, v voicing, 'a.2' / 'h.0' = one note of a list.
+ */
+function comp(pr, tab, bs, pat) {
+  const out = [];
+  bs.forEach((b) => {
+    const ch = pr[b];
+    if (!ch) return;
+    pat.forEach(([s, key, len, vel]) => {
+      const C = tab[Array.isArray(ch) ? ch[s < 8 ? 0 : 1] : ch];
+      const k = key.split('.');
+      const n = k.length > 1 ? (C[k[0]] || '').split(' ')[+k[1]] : C[key];
+      if (n) out.push([b * 16 + s, n, len, vel != null ? vel : 1]);
+    });
+  });
+  return out;
+}
+/** Transpose a single-note line by `semis` (octave doublings). */
+const oct = (list, semis) => list.map(([s, n, len, vel]) => [s, nm(n) + semis, len, vel]);
+/** Deterministic hash in [-1, 1): humanizing is identical on every loop and every playback. */
+function hum(a, b) {
+  let h = Math.imul(a + 0x9e37, 0x85ebca6b) ^ Math.imul(b + 0x632b, 0xc2b2ae35);
+  h = Math.imul(h ^ (h >>> 15), 0x2c1b3c6d);
+  h ^= h >>> 13;
+  return ((h >>> 0) % 20000) / 10000 - 1;
+}
 
 /* ---- MENU: relaxed island-y C major, 100 BPM, 8-bar phrase played twice with a different last 2 bars ---- */
 const MENU_A = [
@@ -1591,12 +1761,255 @@ const BATTLE = {
   parts: [
     { i: 'toy', v: 1, send: 0.15, n: bars(BATTLE_LEAD) },
     { i: 'pizz', v: 1, n: bars(BATTLE_BASS) },
-    { i: 'stab', v: 1, n: battleStabs() },
-    { i: 'kick', v: 0.8, n: perc(range(0, 16), [[0, 1], [8, 0.85]]) },
-    { i: 'snare', v: 0.8, n: [...perc(NOFILL, [[4, 0.9], [12, 1]]), ...perc([7, 15], [[4, 0.9], [12, 0.55], [13, 0.6], [14, 0.75], [15, 0.95]])] },
-    { i: 'hat', v: 1, n: perc(range(0, 16), [[0, 0.35], [2, 0.7], [4, 0.35], [6, 0.7], [8, 0.35], [10, 0.7], [12, 0.35], [14, 0.7]]) },
-    { i: 'shaker', v: 0.8, n: perc(range(8, 16), [[1, 0.3], [3, 0.4], [5, 0.3], [7, 0.4], [9, 0.3], [11, 0.4], [13, 0.3], [15, 0.4]]) },
-    { i: 'crash', v: 0.6, n: [[0, 0, 1, 0.8], [128, 0, 1, 1]] },
+    { i: 'stab', v: 1, layer: 1, n: battleStabs() },
+    { i: 'kick', v: 0.8, layer: 1, n: perc(range(0, 16), [[0, 1], [8, 0.85]]) },
+    { i: 'snare', v: 0.8, layer: 1, n: [...perc(NOFILL, [[4, 0.9], [12, 1]]), ...perc([7, 15], [[4, 0.9], [12, 0.55], [13, 0.6], [14, 0.75], [15, 0.95]])] },
+    { i: 'hat', v: 1, layer: 1, n: perc(range(0, 16), [[0, 0.35], [2, 0.7], [4, 0.35], [6, 0.7], [8, 0.35], [10, 0.7], [12, 0.35], [14, 0.7]]) },
+    { i: 'shaker', v: 0.8, layer: 2, n: perc(range(0, 16), [[1, 0.3], [3, 0.4], [5, 0.3], [7, 0.4], [9, 0.3], [11, 0.4], [13, 0.3], [15, 0.4]]) },
+    { i: 'crash', v: 0.6, layer: 2, n: [[0, 0, 1, 0.8], [128, 0, 1, 1]] },
+  ],
+  hit: 'crash',
+};
+
+/*
+ * ---- SEASONAL BATTLE TRACKS ----
+ * All four share one 34-bar form: a 2-bar intro heard once, then a 32-bar loop
+ *   A (8) · A' (8, new ending) · B (8, legato contrast) · C (4, half-time breakdown) · T (4, build back to A).
+ * Layers (Sound.intensity): 0 = lead, bass, light texture · 1 = drums, chords, counter-melody ·
+ * 2 = extra percussion, crashes, lead octave doubling.
+ */
+const SEC = { intro: [0, 1], a: range(2, 18), b: range(18, 26), c: range(26, 30), t: range(30, 34), loop: range(2, 34) };
+const FILLS = [9, 17, 25]; // last bar of A, A', B
+const CRASH_BARS = [2, 10, 18, 30];
+const notIn = (list, ex) => list.filter((b) => ex.indexOf(b) < 0);
+const EIGHTHS = [0, 2, 4, 6, 8, 10, 12, 14];
+const HAT8 = EIGHTHS.map((s) => [s, s % 4 ? 0.7 : 0.35]);
+const HAT16 = range(0, 16).map((s) => [s, s % 2 ? 0.25 : s % 4 ? 0.5 : 0.35]);
+const FILL = [[4, 0.9], [10, 0.5], [12, 0.6], [13, 0.65], [14, 0.8], [15, 0.95]];
+const ROLL = [[0, 0.35], [2, 0.4], [4, 0.45], [6, 0.5], [8, 0.55], [9, 0.55], [10, 0.62], [11, 0.66], [12, 0.74], [13, 0.8], [14, 0.88], [15, 1]];
+/** The shared drum kit for one track: o = { kick, snare, hat } patterns for the main sections. */
+function kit(o) {
+  const main = notIn([...SEC.a, ...SEC.b], FILLS);
+  return [
+    { i: 'kick', v: o.kv || 0.8, layer: 1, tight: 1, n: [...perc([0], [[0, 1]]), ...perc([1, ...main, ...FILLS], o.kick), ...perc(SEC.c, [[0, 1], [10, 0.5]]), ...perc(SEC.t, [[0, 1], [4, 0.8], [8, 0.9], [12, 0.8]])] },
+    { i: o.sn || 'snare', v: o.sv || 0.7, layer: 1, n: [...perc([1], [[8, 0.5], [10, 0.6], [12, 0.75], [13, 0.8], [14, 0.9], [15, 1]]), ...perc(main, o.snare), ...perc(FILLS, FILL), ...perc(SEC.c, [[12, 0.85]]), ...perc(range(30, 33), [[4, 0.85], [12, 1]]), ...perc([33], ROLL)] },
+    { i: 'hat', v: o.hv || 0.8, layer: 1, n: [...perc([...SEC.a, ...SEC.b, ...SEC.t], o.hat || HAT8), ...perc(SEC.c, [[0, 0.4], [4, 0.6], [8, 0.4], [12, 0.6]])] },
+    { i: 'crash', v: 0.55, layer: 2, n: perc(CRASH_BARS, [[0, 1]]) },
+  ];
+}
+
+/* ---- SPRING: bright, bouncy G major, 118 BPM. Uke-pluck lead, glock sparkle, marimba counter ---- */
+const SPRING_PROG = prog('G D7 | G C D G Em C A7 D7 | G C D B7 Em C D7 G | C D Bm Em Am D G B7 | Em C G D | C D C D7');
+const SPC = ctab({
+  G: 'G2 D3 | G3 B3 D4 G4 | G4 B4 D5 B4 | B5 D6',
+  C: 'C3 G2 | G3 C4 E4 G4 | E4 G4 C5 G4 | C6 E6',
+  D: 'D3 A2 | F#3 A3 D4 F#4 | F#4 A4 D5 A4 | A5 D6',
+  D7: 'D3 A2 | F#3 C4 D4 F#4 | F#4 A4 C5 A4 | A5 C6',
+  Em: 'E3 B2 | G3 B3 E4 G4 | E4 G4 B4 G4 | G5 B5',
+  A7: 'A2 E3 | G3 C#4 E4 A4 | E4 G4 C#5 G4 | C#6 E6',
+  B7: 'B2 F#2 | F#3 A3 B3 D#4 | D#4 F#4 A4 F#4 | B5 D#6',
+  Bm: 'B2 F#2 | F#3 B3 D4 F#4 | D4 F#4 B4 F#4 | B5 D6',
+  Am: 'A2 E3 | A3 C4 E4 A4 | E4 A4 C5 A4 | A5 C6',
+});
+const SPRING_LEAD = ph(
+  '-:16 | -:8 A4 B4 C5 C#5 |' + // intro pickup
+  'D5 G5 B5:3 A5:1 G5 D5 E5 G5 | E5 G5 C6:3 B5:1 A5 G5 E5:4 | F#5 A5 D6:3 C6:1 B5 A5 F#5 A5 | G5:3 F#5:1 G5 B5 D5:4 -:2 D5:1 E5:1 |' + // A
+  'G5 B5 E6:3 D6:1 B5 G5 E5 G5 | A5 G5 E5 C5 E5 G5 C6:4 | C#6 B5:1 A5:1 G5 E5 C#5 E5 A5 G5 | F#5:3 E5:1 D5 C5 A4 F#4 A4:1 B4:1 C5:1 C#5:1 |' +
+  'D5 G5 B5:3 A5:1 G5 D5 E5 G5 | E5 G5 C6:3 B5:1 A5 G5 E5:4 | F#5 A5 D6:3 C6:1 B5 A5 F#5:4 | D#5 F#5 B5:3 A5:1 F#5 D#5 B4 D#5 |' + // A'
+  'E5:3 G5:1 B5 E6 D6 B5 G5 E5 | C6:3 B5:1 A5 G5 A5 C6 E6:4 | D6 C6:1 B5:1 A5 F#5 A5 C6 B5 A5 | G5:4 D5 G5 B5:4 -:2 G5:1 A5:1 |' +
+  'B5:4 C6 E6:6 D6 C6 | D6:4 A5 F#5:6 E5 F#5 | F#5:4 B5 D6:6 C#6 B5 | B5:6 G5 E5:8 |' + // B
+  'C6:4 B5 A5:6 G5 A5 | F#5:4 G5 A5:6 D6 C6 | B5:4 A5 G5:4 D5 G5 B5 | A5 F#5 D#5 F#5 B5:6 -:2 |' +
+  'E5 - G5 - B5:4 A5 G5 | E5 - G5 - C6:4 B5 A5 | B5 - A5 - G5:4 F#5 G5 | A5:6 -:2 D5:1 E5:1 F#5:1 G5:1 A5 B5 |' + // C
+  'C6 G5 E5 G5 C6 G5 E6:4 | D6 A5 F#5 A5 D6 A5 F#6:4 | E6 D6 C6 B5 A5 G5 F#5 E5 | D5 F#5 A5 C6 B5:1 A5:1 G5:1 F#5:1 E5:1 D5:1 C5:1 C#5:1' // T
+);
+const BATTLE_SPRING = {
+  bpm: 118,
+  gain: 1.12,
+  steps: 34 * 16,
+  intro: 32,
+  loop: true,
+  swing: 0.06,
+  hum: 0.07,
+  jit: 0.004,
+  rev: 0.6,
+  echo: { beats: 0.75, fb: 0.22, wet: 0.35 },
+  hit: 'crash',
+  parts: [
+    // layer 0
+    { i: 'pluck', v: 1, send: 0.22, n: SPRING_LEAD },
+    { i: 'sbass', v: 0.62, n: [...comp(SPRING_PROG, SPC, [0, 1, ...SEC.a, ...SEC.b], [[0, 'r', 3, 1], [6, 'r', 1, 0.55], [8, 'f', 3, 0.9], [12, 'o', 2, 0.6], [14, 'f', 2, 0.6]]), ...comp(SPRING_PROG, SPC, SEC.c, [[0, 'r', 6, 1], [8, 'f', 6, 0.8]]), ...comp(SPRING_PROG, SPC, SEC.t, EIGHTHS.map((s) => [s, s % 4 ? 'o' : s === 12 ? 'f' : 'r', 2, s % 4 ? 0.6 : 0.9]))] },
+    { i: 'glock', v: 0.65, send: 0.35, n: [...ph('G5 B5 D6 G6:6 -:4'), ...comp(SPRING_PROG, SPC, [...SEC.a, ...SEC.b], [[3, 'h.0', 2, 0.7], [11, 'h.1', 2, 0.6]]), ...comp(SPRING_PROG, SPC, SEC.c, [[2, 'h.0', 2, 0.8], [6, 'h.1', 2, 0.7]])] },
+    { i: 'shaker', v: 1.6, n: perc(SEC.loop, [[2, 0.5], [6, 0.4], [10, 0.5], [14, 0.4]]) },
+    { i: 'pad', v: 0.5, send: 0.3, n: comp(SPRING_PROG, SPC, SEC.c, [[0, 'v', 16, 1]]) },
+    // layer 1
+    { i: 'uke', v: 0.6, layer: 1, n: [...comp(SPRING_PROG, SPC, [0, 1, ...SEC.a, ...SEC.b], [[0, 'v', 2, 0.8], [4, 'v', 1, 0.5], [6, 'v', 2, 0.7], [10, 'v', 2, 0.6], [12, 'v', 1, 0.5], [14, 'v', 2, 0.7]]), ...comp(SPRING_PROG, SPC, SEC.c, [[0, 'v', 8, 0.7], [8, 'v', 8, 0.55]]), ...comp(SPRING_PROG, SPC, SEC.t, EIGHTHS.map((s) => [s, 'v', 2, s % 4 ? 0.5 : 0.75]))] },
+    { i: 'mari', v: 0.85, send: 0.15, layer: 1, n: [...comp(SPRING_PROG, SPC, SEC.a, [[2, 'a.0', 2, 0.7], [6, 'a.1', 2, 0.6], [10, 'a.2', 2, 0.75], [14, 'a.3', 2, 0.6]]), ...comp(SPRING_PROG, SPC, [...SEC.b, ...SEC.t], EIGHTHS.map((s, i) => [s, 'a.' + [0, 1, 2, 1, 0, 1, 2, 3][i], 2, s % 4 ? 0.45 : 0.6]))] },
+    ...kit({ kick: [[0, 1], [8, 0.85]], snare: [[4, 0.9], [12, 1]] }),
+    // layer 2
+    { i: 'glock', v: 0.5, send: 0.2, layer: 2, n: oct(SPRING_LEAD, 12) },
+    { i: 'clap', v: 1, layer: 2, n: perc([...SEC.a, ...SEC.b, ...SEC.t], [[4, 0.9], [12, 1]]) },
+    { i: 'sleigh', v: 0.7, layer: 2, n: perc(SEC.loop, HAT16.filter(([st]) => st % 2)) },
+  ],
+};
+
+/* ---- SUMMER: sunny calypso in F, 124 BPM. Steelpan lead, syncopated bass, marimba, bongos ---- */
+const SUMMER_PROG = prog('F C7 | F Bb C7 F F Dm G7 C7 | F Bb C7 F Dm Gm,C7 F F | Bb C Am Dm Bb C7 F D7 | Gm C Am D7 | Bb C7 Bb,C C7');
+const SUC = ctab({
+  F: 'F2 C3 | A3 C4 F4 | F4 A4 C5 A4 | A5 C6',
+  Bb: 'Bb2 F2 | Bb3 D4 F4 | F4 Bb4 D5 Bb4 | Bb5 D6',
+  C7: 'C3 G2 | G3 Bb3 E4 | E4 G4 Bb4 G4 | G5 Bb5',
+  C: 'C3 G2 | G3 C4 E4 | E4 G4 C5 G4 | G5 C6',
+  Dm: 'D3 A2 | A3 D4 F4 | D4 F4 A4 F4 | F5 A5',
+  G7: 'G2 D3 | B3 D4 F4 | D4 F4 B4 F4 | B5 D6',
+  Am: 'A2 E3 | A3 C4 E4 | E4 A4 C5 A4 | A5 C6',
+  Gm: 'G2 D3 | Bb3 D4 G4 | D4 G4 Bb4 G4 | Bb5 D6',
+  D7: 'D3 A2 | F#3 C4 D4 | D4 F#4 A4 C5 | F#5 A5',
+});
+const SUMMER_LEAD = ph(
+  '-:8 C5:1 D5:1 E5:1 F5:1 G5:1 A5:1 Bb5:1 B5:1 | C6:3 A5:3 G5 E5:3 C5:3 -:2 |' + // intro run
+  'A5:3 F5:3 A5 C6:3 A5:3 F5 | D6:3 Bb5:3 F5 G5 A5 Bb5:4 | C6:3 G5:3 E5 G5 Bb5 A5 G5 | A5:4 F5 C5 F5:6 -:2 |' + // A
+  'C5 F5:1 G5:1 A5 C6:3 D6:3 C6 A5 | D6:3 C6:3 A5 F5:3 D5:3 F5 | G5:3 F5:1 G5 B5 D6:3 B5:3 G5 | C6 Bb5 G5 E5 C5:4 -:2 C5:1 E5:1 |' +
+  'A5:3 F5:3 A5 C6:3 A5:3 F5 | D6:3 Bb5:3 F5 G5 A5 Bb5:4 | C6:3 G5:3 E5 G5 Bb5 A5 G5 | A5 C6 F6:4 C6 A5 F5:4 |' + // A'
+  'F5:3 A5:3 D6 C6 A5 F5 D5 | G5:3 Bb5:3 D6 C6:3 Bb5:3 G5 | A5:3 G5:3 F5:4 -:2 F5:1 G5:1 A5 | F5:4 -:4 D5 F5 G5 A5 |' +
+  'Bb5:6 A5 Bb5 D6:6 | C6:6 Bb5 A5 G5:6 | A5:6 G5 A5 C6:6 | D6:4 C6 A5 F5:6 -:2 |' + // B
+  'F5 Bb5 D6:4 F6:4 D6 Bb5 | E6:4 D6 C6 Bb5:4 G5:4 | A5:3 C6:3 F6 E6 D6 C6 A5 | F#5:3 A5:3 C6 D6:6 -:2 |' +
+  'G5 -:1 G5:1 Bb5 - D6:4 -:4 | E6 -:1 E6:1 D6 - C6:4 -:4 | C6 -:1 C6:1 A5 - E5:4 -:4 | F#5 -:1 F#5:1 A5 - C6 D6 C6 A5 |' + // C
+  'D6:3 Bb5:3 F5 D6:3 Bb5:3 F5 | E6:3 C6:3 G5 E6:3 C6:3 G5 | F6:3 D6:3 Bb5 G6:3 E6:3 C6 | Bb5 G5 E5 C5 -:4 C5:1 E5:1 G5:1 Bb5:1' // T
+);
+const CALYPSO_BASS = [[0, 'r', 3, 1], [6, 'f', 2, 0.8], [8, 'r', 3, 0.9], [11, 'f', 1, 0.55], [12, 'o', 2, 0.7], [14, 'f', 2, 0.65]];
+const BATTLE_SUMMER = {
+  bpm: 124,
+  gain: 1.06,
+  steps: 34 * 16,
+  intro: 32,
+  loop: true,
+  swing: 0.05,
+  hum: 0.07,
+  jit: 0.004,
+  rev: 0.55,
+  echo: { beats: 0.75, fb: 0.2, wet: 0.35 },
+  hit: 'crash',
+  parts: [
+    // layer 0
+    { i: 'steel', v: 1, send: 0.22, n: SUMMER_LEAD },
+    { i: 'sbass', v: 0.62, n: [...comp(SUMMER_PROG, SUC, [0, 1, ...SEC.a, ...SEC.b], CALYPSO_BASS), ...comp(SUMMER_PROG, SUC, SEC.c, [[0, 'r', 6, 1], [10, 'f', 2, 0.7], [12, 'r', 4, 0.8]]), ...comp(SUMMER_PROG, SUC, SEC.t, [[0, 'r', 2, 1], [3, 'r', 1, 0.5], [4, 'f', 2, 0.85], [6, 'o', 2, 0.6], [8, 'r', 2, 0.95], [11, 'r', 1, 0.5], [12, 'f', 2, 0.85], [14, 'o', 2, 0.65]])] },
+    { i: 'shaker', v: 1.5, n: perc(SEC.loop, [[0, 0.35], [2, 0.6], [3, 0.2], [4, 0.35], [6, 0.6], [7, 0.2], [8, 0.35], [10, 0.6], [11, 0.2], [12, 0.35], [14, 0.6], [15, 0.25]]) },
+    { i: 'glock', v: 0.45, send: 0.35, n: comp(SUMMER_PROG, SUC, SEC.c, [[10, 'h.0', 2, 0.7], [12, 'h.1', 2, 0.7]]) },
+    { i: 'pad', v: 0.55, send: 0.3, n: comp(SUMMER_PROG, SUC, SEC.c, [[0, 'v', 16, 1]]) },
+    // layer 1
+    { i: 'uke', v: 0.6, layer: 1, n: [...comp(SUMMER_PROG, SUC, [...SEC.a, ...SEC.b], [[2, 'v', 1, 0.7], [3, 'v', 1, 0.4], [6, 'v', 2, 0.75], [10, 'v', 1, 0.7], [11, 'v', 1, 0.4], [14, 'v', 2, 0.75]]), ...comp(SUMMER_PROG, SUC, SEC.c, [[0, 'v', 8, 0.6], [8, 'v', 8, 0.5]]), ...comp(SUMMER_PROG, SUC, SEC.t, EIGHTHS.map((s) => [s, 'v', 2, s % 4 ? 0.7 : 0.5]))] },
+    { i: 'mari', v: 0.85, send: 0.15, layer: 1, n: [...comp(SUMMER_PROG, SUC, SEC.a, [[2, 'a.0', 2, 0.6], [5, 'a.1', 1, 0.5], [6, 'a.2', 2, 0.65], [10, 'a.1', 2, 0.6], [13, 'a.2', 1, 0.5], [14, 'a.3', 2, 0.6]]), ...comp(SUMMER_PROG, SUC, [...SEC.b, ...SEC.t], EIGHTHS.map((s, i) => [s, 'a.' + [0, 1, 2, 3, 2, 1, 0, 1][i], 2, s % 4 ? 0.45 : 0.6]))] },
+    ...kit({ kick: [[0, 1], [8, 0.9]], sn: 'rim', sv: 1.1, snare: [[4, 0.8], [12, 1], [14, 0.4]] }),
+    { i: 'snare', v: 0.6, layer: 1, n: perc(FILLS, [[12, 0.6], [13, 0.65], [14, 0.8], [15, 0.95]]) },
+    // layer 2
+    { i: 'pluck', v: 0.4, layer: 2, n: oct(SUMMER_LEAD, -12) },
+    { i: 'bongo', v: 0.8, layer: 2, n: perc(SEC.loop, [[2, 0.7, 'A4'], [3, 0.5, 'A4'], [6, 0.8, 'E4'], [10, 0.7, 'A4'], [11, 0.5, 'A4'], [14, 0.8, 'E4'], [15, 0.5, 'A4']]) },
+    { i: 'sleigh', v: 0.5, layer: 2, n: perc(SEC.loop, EIGHTHS.map((s) => [s, s % 4 ? 0.8 : 0.4])) },
+  ],
+};
+
+/* ---- AUTUMN: folksy, sneaky A minor / C major, 112 BPM. Accordion lead, pizzicato bass, woodblock ---- */
+const AUTUMN_PROG = prog('Am E7 | Am E7 Am E7 Am Dm E7 Am | Am E7 Am G7 C Dm E7 Am | F G C Am Dm G7 C E7 | Dm Am Dm E7 | F E7 F E7');
+const AUC = ctab({
+  Am: 'A2 E2 | C4 E4 A4 | A3 C4 E4 C4',
+  E7: 'E2 B2 | B3 D4 G#4 | G#3 B3 D4 B3',
+  Dm: 'D3 A2 | A3 D4 F4 | F3 A3 D4 A3',
+  G7: 'G2 D3 | B3 D4 F4 | G3 B3 D4 F4',
+  C: 'C3 G2 | C4 E4 G4 | G3 C4 E4 C4',
+  F: 'F2 C3 | A3 C4 F4 | A3 C4 F4 C4',
+  G: 'G2 D3 | B3 D4 G4 | G3 B3 D4 B3',
+});
+const AUTUMN_LEAD = ph(
+  '-:8 E4:1 -:1 E4:1 -:1 E4:1 F4:1 F#4:1 G#4:1 | B4:1 -:1 B4:1 -:1 G#4 - E4 - D5:1 C5:1 B4:1 G#4:1 |' + // intro tiptoe
+  'A4:1 -:1 C5:1 -:1 E5 - D#5:1 E5:1 F5:1 E5:1 C5 A4 | G#4:1 -:1 B4:1 -:1 D5 - C#5:1 D5:1 E5:1 D5:1 B4 G#4 | A4:1 -:1 C5:1 -:1 E5 A5 G#5:1 A5:1 B5:1 A5:1 E5 C5 | B4 D5 G#4 B4 E4:4 - E5:1 D#5:1 |' + // A
+  'E5:3 C5:1 A4 C5 E5 A5 G#5 A5 | F5:3 D5:1 A4 D5 F5 A5 G#5:1 A5:1 F5 | E5 D5:1 C5:1 B4 G#4 E4 G#4 B4 D5 | A4:4 - E4:1 -:1 A4:1 -:1 C5:1 -:1 E5 - |' +
+  'A4:1 -:1 C5:1 -:1 E5 - D#5:1 E5:1 F5:1 E5:1 C5 A4 | G#4:1 -:1 B4:1 -:1 D5 - C#5:1 D5:1 E5:1 D5:1 B4 G#4 | A4:1 -:1 C5:1 -:1 E5 A5 G#5:1 A5:1 B5:1 A5:1 E5 C5 | B4 D5 G5 F5 D5:4 - B4:1 G4:1 |' + // A'
+  'C5:1 -:1 E5:1 -:1 G5 - F#5:1 G5:1 A5:1 G5:1 E5 C5 | D5:1 -:1 F5:1 -:1 A5 - G#5:1 A5:1 B5:1 A5:1 F5 D5 | B4 D5 E5 G#5 B5:3 A5:1 G#5 E5 | A5:4 E5 C5 A4:4 - G4:1 G#4:1 |' +
+  'A4 C5 F5:6 E5 F5 A5 | G5:6 F5 E5 D5 B4:4 | C5 E5 G5:6 F5 G5 C6 | A5:6 G5 E5 C5 A4:4 |' + // B
+  'D5 F5 A5:6 G5 F5 A5 | B5:6 A5 G5 F5 D5:4 | E5 G5 C6:4 B5 G5 E5:4 | G#5 E5 D5 B4 G#4:4 - E4:1 -:1 |' +
+  'D5:1 -:3 E5:1 -:1 F5:1 -:3 F#5:1 -:1 G5:1 -:1 G#5:1 -:1 | A5 - E5:1 -:1 C5:1 -:1 A4 -:6 | D5:1 -:3 F5:1 -:1 A5:1 -:3 G#5:1 -:1 A5:1 -:1 F5:1 -:1 | E5 - D5:1 -:1 B4:1 -:1 G#4 - G#4:1 A4:1 B4:1 C5:1 |' + // C
+  'C5 F5 A5 C6 A5 F5 C5 A4 | B4 E5 G#5 B5 G#5 E5 B4 G#4 | A4:1 C5:1 F5:1 A5:1 C6:4 A5:1 F5:1 C5:1 A4:1 F4 - | G#4:1 B4:1 E5:1 G#5:1 B5:4 - B4:1 -:1 G#4:1 -:1 E4:1 G#4:1' // T
+);
+const BATTLE_AUTUMN = {
+  bpm: 112,
+  gain: 1.25,
+  steps: 34 * 16,
+  intro: 32,
+  loop: true,
+  swing: 0.1,
+  hum: 0.08,
+  jit: 0.005,
+  rev: 0.65,
+  echo: { beats: 0.5, fb: 0.18, wet: 0.3 },
+  hit: 'crash',
+  parts: [
+    // layer 0
+    { i: 'reed', v: 1.15, send: 0.2, n: AUTUMN_LEAD },
+    { i: 'upright', v: 1, n: [...comp(AUTUMN_PROG, AUC, [0, 1, ...SEC.a], [[0, 'r', 2, 1], [8, 'f', 2, 0.85], [14, 'f', 1, 0.45]]), ...comp(AUTUMN_PROG, AUC, SEC.b, [[0, 'r', 2, 1], [4, 'o', 2, 0.7], [8, 'f', 2, 0.85], [12, 'o', 2, 0.65]]), ...comp(AUTUMN_PROG, AUC, SEC.c, [[0, 'r', 1, 1], [4, 'r', 1, 0.6], [8, 'f', 1, 0.8], [12, 'f', 1, 0.6]]), ...comp(AUTUMN_PROG, AUC, SEC.t, EIGHTHS.map((s) => [s, s % 4 ? 'o' : s === 12 ? 'f' : 'r', 2, s % 4 ? 0.6 : 0.9]))] },
+    { i: 'pad', v: 0.55, send: 0.3, n: comp(AUTUMN_PROG, AUC, SEC.c, [[0, 'v', 16, 1]]) },
+    { i: 'block', v: 0.9, n: [...perc([...SEC.a, ...SEC.b, ...SEC.t], [[4, 0.55, 'B5'], [12, 0.5, 'F#5']]), ...perc(SEC.c, [[6, 0.6, 'B5'], [10, 0.5, 'F#5'], [14, 0.6, 'B5']])] },
+    // layer 1
+    { i: 'reed', v: 0.85, layer: 1, n: [...comp(AUTUMN_PROG, AUC, [0, 1, ...SEC.a], [[4, 'v', 1, 0.8], [12, 'v', 1, 0.8]]), ...comp(AUTUMN_PROG, AUC, SEC.b, [[2, 'v', 1, 0.55], [4, 'v', 2, 0.8], [10, 'v', 1, 0.55], [12, 'v', 2, 0.8]]), ...comp(AUTUMN_PROG, AUC, SEC.c, [[4, 'v', 1, 0.6]]), ...comp(AUTUMN_PROG, AUC, SEC.t, EIGHTHS.map((s) => [s + 1, 'v', 1, 0.6]))] },
+    { i: 'pluck', v: 0.7, send: 0.15, layer: 1, n: [...comp(AUTUMN_PROG, AUC, SEC.a, [[2, 'a.0', 1, 0.7], [6, 'a.1', 1, 0.6], [10, 'a.2', 1, 0.7], [14, 'a.3', 1, 0.6]]), ...comp(AUTUMN_PROG, AUC, [...SEC.b, ...SEC.t], EIGHTHS.map((s, i) => [s, 'a.' + [0, 1, 2, 3, 2, 1, 0, 1][i], 2, s % 4 ? 0.45 : 0.6]))] },
+    ...kit({ kick: [[0, 1], [8, 0.85]], snare: [[4, 0.75], [12, 0.9]], sv: 0.55, hv: 0.6 }),
+    // layer 2
+    { i: 'toy', v: 0.45, send: 0.15, layer: 2, n: oct(AUTUMN_LEAD, 12) },
+    { i: 'sleigh', v: 0.6, layer: 2, n: perc(SEC.loop, EIGHTHS.map((s) => [s, s % 4 ? 0.8 : 0.45])) },
+    { i: 'clap', v: 0.9, layer: 2, n: perc([...SEC.a, ...SEC.b], [[4, 0.8], [12, 1]]) },
+  ],
+};
+
+/* ---- WINTER: crisp, sparkly D major, 108 BPM. Celesta lead, soft pads, sleigh bells, harp-pluck arps ---- */
+const WINTER_PROG = prog('D A7 | D Bm G A D Bm Em A7 | D F#m G A Bm G A7 D | G A F#m Bm Em A7 D D7 | G Gm D B7 | Em A7 G A7');
+const WIC = ctab({
+  D: 'D3 A2 | A3 D4 F#4 | D4 F#4 A4 D5',
+  A: 'A2 E3 | A3 C#4 E4 | A3 C#4 E4 A4',
+  A7: 'A2 E3 | G3 C#4 E4 | A3 C#4 E4 G4',
+  Bm: 'B2 F#2 | B3 D4 F#4 | B3 D4 F#4 B4',
+  G: 'G2 D3 | B3 D4 G4 | G3 B3 D4 G4',
+  Em: 'E2 B2 | B3 E4 G4 | B3 E4 G4 B4',
+  'F#m': 'F#2 C#3 | A3 C#4 F#4 | F#3 A3 C#4 F#4',
+  D7: 'D3 A2 | C4 F#4 A4 | D4 F#4 A4 C5',
+  Gm: 'G2 D3 | Bb3 D4 G4 | G3 Bb3 D4 G4',
+  B7: 'B2 F#2 | A3 D#4 F#4 | B3 D#4 F#4 A4',
+});
+const WINTER_LEAD = ph(
+  'A6:1 F#6:1 D6:1 A5:1 F#5:1 D5:1 A4 -:8 | -:4 E5 - A4 C#5 E5 G5 |' + // intro twinkle
+  'F#5:3 A5:1 D6 A5 F#5 E5 D5 F#5 | F#5:3 D5:1 B4 D5 F#5:4 E5 D5 | G5:3 B5:1 D6 B5 G5 F#5 E5 G5 | A5:6 G5 E5:4 - C#5:1 E5:1 |' + // A
+  'F#5:3 A5:1 D6 F#6 E6 D6 A5 F#5 | B5:3 A5:1 F#5 D5 B4:4 C#5 D5 | E5 G5 B5 E6 D6 B5 G5 E5 | C#6:4 B5 A5 G5 E5 C#5 A4 |' +
+  'F#5:3 A5:1 D6 A5 F#5 E5 D5 F#5 | F#5:3 C#5:1 A4 C#5 F#5 A5 F#5 E5 | G5:3 B5:1 D6 B5 G5 F#5 E5 G5 | A5:3 C#6:1 E6 C#6 A5:4 - A5:1 B5:1 |' + // A'
+  'B5:3 C#6:1 D6 F#6 E6 D6 C#6 B5 | D6:3 B5:1 G5 B5 D6 G6:4 F#6 | E6 C#6 A5 G5 E5 G5 C#6 E6 | D6:4 A5 F#5 D5:4 - D5:1 E5:1 |' +
+  'D5 G5 B5:8 A5 G5 | A5 C#6 E6:8 D6 C#6 | C#6:6 A5 F#5:6 E5 | F#5:4 B5:4 D6:6 C#6 |' + // B
+  'B5 G5 E5:4 G5 B5 E6:4 | E6:4 C#6 A5 G5:4 E5:4 | F#5 A5 D6:6 F#6 E6 D6 | C6:4 A5 F#5 D5:4 -:4 |' +
+  'B5:6 A5 G5:8 | Bb5:6 A5 G5:8 | F#5:4 A5:4 D6:8 | D#6:4 C#6 B5 A5:4 F#5:4 |' + // C
+  'E5 G5 B5 E6 B5 G5 E5 G5 | C#5 E5 A5 C#6 A5 E5 C#5 E5 | D5 G5 B5 D6 G6:4 F#6 E6 | C#6 A5 E5 C#5 A4 C#5 E5 G5' // T
+);
+const BATTLE_WINTER = {
+  bpm: 108,
+  gain: 1.06,
+  steps: 34 * 16,
+  intro: 32,
+  loop: true,
+  swing: 0,
+  hum: 0.07,
+  jit: 0.004,
+  rev: 0.7,
+  echo: { beats: 0.75, fb: 0.25, wet: 0.4 },
+  hit: 'crash',
+  parts: [
+    // layer 0
+    { i: 'celesta', v: 1, send: 0.28, n: WINTER_LEAD },
+    { i: 'sbass', v: 0.62, n: [...comp(WINTER_PROG, WIC, [0, 1, ...SEC.a], [[0, 'r', 3, 1], [3, 'r', 1, 0.5], [6, 'f', 2, 0.8], [8, 'r', 3, 0.9], [11, 'r', 1, 0.5], [14, 'f', 2, 0.75]]), ...comp(WINTER_PROG, WIC, SEC.b, [[0, 'r', 4, 1], [6, 'f', 2, 0.7], [8, 'o', 4, 0.85], [14, 'f', 2, 0.6]]), ...comp(WINTER_PROG, WIC, SEC.c, [[0, 'r', 8, 1], [8, 'f', 8, 0.8]]), ...comp(WINTER_PROG, WIC, SEC.t, EIGHTHS.map((s) => [s, s % 4 ? 'o' : s === 12 ? 'f' : 'r', 2, s % 4 ? 0.6 : 0.9]))] },
+    { i: 'pad', v: 0.6, send: 0.3, n: comp(WINTER_PROG, WIC, range(0, 34), [[0, 'v', 16, 1]]) },
+    { i: 'sleigh', v: 0.8, n: perc(SEC.loop, [[0, 0.45], [4, 0.6], [8, 0.45], [12, 0.6]]) },
+    // layer 1
+    { i: 'sleigh', v: 0.8, layer: 1, n: perc([...SEC.a, ...SEC.b, ...SEC.t], [[2, 0.6], [6, 0.55], [10, 0.6], [14, 0.55]]) },
+    { i: 'pluck', v: 0.6, send: 0.2, layer: 1, n: [...comp(WINTER_PROG, WIC, SEC.a, EIGHTHS.map((s, i) => [s, 'a.' + [0, 1, 2, 3, 2, 1, 2, 1][i], 2, s % 4 ? 0.45 : 0.65])), ...comp(WINTER_PROG, WIC, SEC.b, [[0, 'a.0', 3, 0.65], [3, 'a.1', 3, 0.5], [6, 'a.2', 2, 0.55], [8, 'a.3', 3, 0.6], [11, 'a.2', 3, 0.5], [14, 'a.1', 2, 0.5]]), ...comp(WINTER_PROG, WIC, SEC.t, EIGHTHS.map((s, i) => [s, 'a.' + [0, 1, 2, 3, 0, 1, 2, 3][i], 2, 0.4 + i * 0.05]))] },
+    ...kit({ kick: [[0, 1], [8, 0.85], [10, 0.35]], snare: [[4, 0.85], [12, 1]], sv: 0.65 }),
+    // layer 2
+    { i: 'glock', v: 0.48, send: 0.2, layer: 2, n: oct(WINTER_LEAD, 12) },
+    { i: 'hat', v: 0.6, layer: 2, n: perc(SEC.loop, HAT16) },
+    { i: 'timp', v: 0.6, layer: 2, n: [...comp(WINTER_PROG, WIC, CRASH_BARS, [[0, 'r', 2, 1]]), ...comp(WINTER_PROG, WIC, [33], [[8, 'r', 1, 0.6], [12, 'r', 1, 0.8], [14, 'r', 1, 1]])] },
   ],
 };
 
@@ -1626,7 +2039,15 @@ const VICTORY = {
   ],
 };
 
-const TRACKS = { menu: MENU, battle: BATTLE, victory: VICTORY };
+const TRACKS = {
+  menu: MENU,
+  battle: BATTLE,
+  battle_spring: BATTLE_SPRING,
+  battle_summer: BATTLE_SUMMER,
+  battle_autumn: BATTLE_AUTUMN,
+  battle_winter: BATTLE_WINTER,
+  victory: VICTORY,
+};
 
 function toHz(n) {
   if (typeof n === 'number') return n > 0 ? mtof(n) : 0;
@@ -1638,15 +2059,21 @@ function toHz(n) {
     const T = TRACKS[k];
     T.sd = 60 / T.bpm / 4;
     T.ev = new Array(T.steps);
-    T.parts.forEach((part) => {
+    T.layered = T.parts.some((p) => p.layer);
+    if (T.echo && T.echo.beats) T.echo.time = (T.echo.beats * 60) / T.bpm;
+    T.parts.forEach((part, pi) => {
       part.n.forEach(([s, n, len, vel]) => {
         if (s < 0 || s >= T.steps) return;
+        // humanize: small velocity wobble + timing jitter, hashed from (part, step) so every loop matches
         (T.ev[s] || (T.ev[s] = [])).push({
           i: part.i,
           f: toHz(n),
           len: len || 1,
-          vel: (vel != null ? vel : 1) * (part.v != null ? part.v : 1),
+          vel: (vel != null ? vel : 1) * (part.v != null ? part.v : 1) * (1 + hum(pi, s) * (T.hum || 0)),
           send: part.send || 0,
+          l: part.layer || 0,
+          p: pi,
+          dt: part.tight ? 0 : hum(pi + 97, s) * (T.jit || 0),
         });
       });
     });
@@ -1657,12 +2084,24 @@ function toHz(n) {
 /* Music player / scheduler                                                  */
 /* ------------------------------------------------------------------------ */
 
-function makePlayer(ch, name, startTime) {
+function makePlayer(ch, name, startTime, lvl = musicLvl) {
   const c = ch.c;
   const def = TRACKS[name];
   const bus = c.createGain();
   bus.gain.value = 0;
   bus.connect(ch.music);
+  // the reverb feed has its own fader so a crossfade also fades what goes into the shared convolver
+  const rvBus = c.createGain();
+  rvBus.gain.value = 0;
+  rvBus.connect(ch.mRev || ch.music);
+  const rv = c.createGain();
+  rv.gain.value = def.rev || 0;
+  rv.connect(rvBus);
+  const shelf = c.createBiquadFilter();
+  shelf.type = 'highshelf';
+  shelf.frequency.value = 3200;
+  shelf.gain.value = 0;
+  shelf.connect(bus);
   const e = def.echo || {};
   const dIn = c.createGain();
   const dl = c.createDelay(1.5);
@@ -1680,7 +2119,70 @@ function makePlayer(ch, name, startTime) {
   fb.connect(dl);
   dlp.connect(wet);
   wet.connect(bus);
-  return { name, def, ch, bus, dIn, fx: [bus, dIn, dl, fb, dlp, wet], step: 0, next: startTime, stopAt: Infinity, ended: false };
+  const fx = [bus, rvBus, rv, shelf, dIn, dl, fb, dlp, wet];
+  // per-layer dry + send buses: intensity ramps these, notes are never cut
+  const lay = [];
+  for (let k = 0; k < LAYERS; k++) {
+    const dry = c.createGain();
+    dry.connect(shelf);
+    const snd = c.createGain();
+    snd.connect(dIn);
+    snd.connect(rv);
+    lay.push({ dry, snd, r: { v0: 1, t0: 0, v1: 1, t1: 0 }, on: true, until: 0 });
+    fx.push(dry, snd);
+  }
+  const pl = { name, def, ch, bus, faders: [bus.gain, rvBus.gain], shelf, shelfR: { v0: 0, t0: 0, v1: 0, t1: 0 }, lay, lvl: -1, t0: startTime, fx, step: 0, next: startTime, stopAt: Infinity, ended: false, all: false, only: null };
+  setLevel(pl, lvl, startTime, true);
+  return pl;
+}
+
+/**
+ * Ramp params (all following ramp record r) to g over [t, t + dur]. The ramp is anchored at its true
+ * value at t, computed from r: a bare linearRamp would start from the previous event (possibly long
+ * ago) and jump, and cancelAndHoldAtTime alone adds no anchor when no ramp spans t.
+ */
+function rampTo(params, r, g, t, dur) {
+  const cur = t >= r.t1 ? r.v1 : t <= r.t0 ? r.v0 : r.v0 + ((r.v1 - r.v0) * (t - r.t0)) / (r.t1 - r.t0);
+  params.forEach((p) => {
+    holdParam(p, t);
+    p.setValueAtTime(cur, t);
+    p.linearRampToValueAtTime(g, t + dur);
+  });
+  r.v0 = cur;
+  r.t0 = t;
+  r.v1 = g;
+  r.t1 = t + dur;
+}
+
+/**
+ * Move a player's layer buses to intensity `lvl` at time t (ramped; `instant` for a fresh player).
+ * Unlayered tracks (menu, victory) always sit at the normal mix.
+ */
+function setLevel(pl, lvl, t, instant) {
+  const L = pl.def.layered ? lvl : 1;
+  if (L === pl.lvl) return;
+  const mix = LAYER_MIX[L];
+  pl.lay.forEach((ly, k) => {
+    const g = mix[k];
+    const dur = g > ly.r.v1 ? LAYER_UP : LAYER_DOWN;
+    if (instant) {
+      ly.dry.gain.value = ly.snd.gain.value = g;
+      ly.r = { v0: g, t0: t, v1: g, t1: t };
+    } else rampTo([ly.dry.gain, ly.snd.gain], ly.r, g, t, dur);
+    ly.on = g > 0;
+    ly.until = instant ? 0 : t + dur + 0.05;
+  });
+  if (instant) {
+    pl.shelf.gain.value = LAYER_SHELF[L];
+    pl.shelfR = { v0: LAYER_SHELF[L], t0: t, v1: LAYER_SHELF[L], t1: t };
+  } else rampTo([pl.shelf.gain], pl.shelfR, LAYER_SHELF[L], t, LAYER_DOWN);
+  // a big moment: the band answers with a crash on the next beat
+  if (!instant && L === 2 && pl.lvl < 2 && pl.def.hit && INST[pl.def.hit]) {
+    const beat = pl.def.sd * 4;
+    const at = pl.t0 + Math.ceil((t + 0.03 - pl.t0) / beat) * beat;
+    INST[pl.def.hit](new Voice(pl.ch, pl.lay[0].dry, at, 1, null), 0, beat, 0.75);
+  }
+  pl.lvl = L;
 }
 
 function playStep(pl, s, time) {
@@ -1690,12 +2192,17 @@ function playStep(pl, s, time) {
     const e = evs[i];
     const fn = INST[e.i];
     if (!fn) continue;
-    const v = new Voice(pl.ch, pl.bus, time, 1, null);
+    const ly = pl.lay[e.l];
+    const t = time + e.dt;
+    // a muted layer schedules nothing once its fade-out is over (saves voices while calm)
+    if (!pl.all && !ly.on && t > ly.until) continue;
+    if (pl.only && pl.only.indexOf(e.p) < 0) continue;
+    const v = new Voice(pl.ch, ly.dry, t, 1, null);
     fn(v, e.f, e.len * pl.def.sd, e.vel);
     if (e.send) {
       const sg = v.gain(e.send);
       v.out.connect(sg);
-      sg.connect(pl.dIn);
+      sg.connect(ly.snd);
     }
   }
 }
@@ -1712,7 +2219,8 @@ function advance(pl, horizon, t) {
   }
   while (!pl.ended && pl.next < horizon && pl.next < pl.stopAt) {
     if (pl.step >= def.steps) {
-      if (def.loop) pl.step %= def.steps;
+      // loop back past the intro (heard once)
+      if (def.loop) pl.step = (def.intro || 0) + ((pl.step - (def.intro || 0)) % (def.steps - (def.intro || 0)));
       else {
         pl.ended = true;
         pl.stopAt = Math.min(pl.stopAt, pl.next + (def.tail || 1));
@@ -1767,10 +2275,12 @@ function holdParam(param, t) {
 function fadeOutPlayer(pl, dur) {
   const t = ctx.currentTime;
   if (pl.stopAt <= t + dur) return;
-  quiet(() => {
-    holdParam(pl.bus.gain, t);
-    pl.bus.gain.linearRampToValueAtTime(0, t + dur);
-  });
+  quiet(() =>
+    pl.faders.forEach((p) => {
+      holdParam(p, t);
+      p.linearRampToValueAtTime(0, t + dur);
+    })
+  );
   pl.stopAt = t + dur + 0.02;
 }
 
@@ -1784,12 +2294,10 @@ function switchTo(track) {
   if (track && musicEnabled) {
     const pl = makePlayer(chain, track, t + (isFanfare ? 0.12 : 0.06));
     const lvl = pl.def.gain || 1;
-    if (isFanfare) {
-      pl.bus.gain.setValueAtTime(lvl, t);
-    } else {
-      pl.bus.gain.setValueAtTime(0, t);
-      pl.bus.gain.linearRampToValueAtTime(lvl, t + XFADE);
-    }
+    pl.faders.forEach((p) => {
+      p.setValueAtTime(isFanfare ? lvl : 0, t);
+      if (!isFanfare) p.linearRampToValueAtTime(lvl, t + XFADE);
+    });
     players.push(pl);
   }
   ensureTimer();
@@ -2084,6 +2592,34 @@ function music(track) {
   }
 }
 
+/** Adaptive music: 0 calm (aiming), 1 normal (shot in flight), 2 high (big hit / K.O.). Safe any time. */
+function intensity(level) {
+  try {
+    musicLvl = clamp(Math.round(fin(+level, 1)), 0, 2);
+    if (!ctx || !chain) return;
+    const t = ctx.currentTime;
+    players.forEach((p) => {
+      if (p.stopAt === Infinity) setLevel(p, musicLvl, t, false);
+    });
+  } catch (e) {
+    /* ignore */
+  }
+}
+
+const hasTrack = (name) => typeof name === 'string' && Object.prototype.hasOwnProperty.call(TRACKS, name);
+
+// the duck gain's planned shape: from v0 at t0 down to lvl in 40 ms, held until `hold`, back to 1 in 0.45 s
+let duckShape = null;
+function duckValueAt(t) {
+  const d = duckShape;
+  if (!d) return 1;
+  if (t <= d.t0) return d.v0;
+  if (t < d.t0 + 0.04) return d.v0 + ((d.lvl - d.v0) * (t - d.t0)) / 0.04;
+  if (t < d.hold) return d.lvl;
+  if (t < d.hold + 0.45) return d.lvl + ((1 - d.lvl) * (t - d.hold)) / 0.45;
+  return 1;
+}
+
 function duck(amount = 0.4, seconds = 0.6) {
   try {
     if (!ctx || !chain) return;
@@ -2094,10 +2630,15 @@ function duck(amount = 0.4, seconds = 0.6) {
     duckLevel = active ? Math.min(duckLevel, lvl) : lvl;
     duckUntil = Math.max(active ? duckUntil : 0, t + secs);
     const p = chain.duckG.gain;
+    // anchor the dip at the level the gain really has now (cancelAndHoldAtTime adds no anchor
+    // when nothing is ramping, and a bare ramp would start from a stale event and snap)
+    const cur = duckValueAt(t);
     holdParam(p, t);
+    p.setValueAtTime(cur, t);
     p.linearRampToValueAtTime(duckLevel, t + 0.04);
     p.setValueAtTime(duckLevel, Math.max(t + 0.04, duckUntil));
     p.linearRampToValueAtTime(1, duckUntil + 0.45);
+    duckShape = { t0: t, v0: cur, lvl: duckLevel, hold: Math.max(t + 0.04, duckUntil) };
   } catch (e) {
     /* ignore */
   }
@@ -2172,6 +2713,11 @@ export const Sound = {
   play,
   stretch,
   music,
+  hasTrack,
+  intensity,
+  get level() {
+    return musicLvl;
+  },
   duck,
   pause,
   resume,
@@ -2189,6 +2735,7 @@ export const Sound = {
       voices: voices.length,
       players: players.map((p) => ({ name: p.name, step: p.step, fading: p.stopAt !== Infinity })),
       wantTrack,
+      intensity: musicLvl,
       stretching: !!stretchState,
       paused,
     };
@@ -2216,16 +2763,31 @@ export const Sound = {
     d.fn(v);
     return c.startRendering();
   },
-  /** Render `seconds` of a music track offline through the full chain (music bus level included). */
-  _renderMusic(track, seconds = 8) {
+  /**
+   * Render `seconds` of a music track offline through the full chain (music bus level included).
+   * opts: { intensity: 0..2 (default 1), changes: [[time, level], ...] mid-render switches, only: [part index] }
+   */
+  _renderMusic(track, seconds = 8, opts = {}) {
     const c = offlineCtx(seconds);
-    if (!c || !TRACKS[track]) return Promise.reject(new Error('cannot render ' + track));
+    if (!c || !hasTrack(track)) return Promise.reject(new Error('cannot render ' + track));
     const ch = buildChain(c);
     ch.music.gain.value = MUSIC_LEVEL;
-    const pl = makePlayer(ch, track, 0.05);
-    pl.bus.gain.value = pl.def.gain || 1;
+    const lv = (x) => clamp(Math.round(fin(x, 1)), 0, 2);
+    const pl = makePlayer(ch, track, 0.05, lv(opts.intensity));
+    pl.faders.forEach((p) => (p.value = pl.def.gain || 1));
+    const changes = opts.changes || [];
+    pl.all = changes.length > 0; // everything is scheduled up front, so let the buses do all the gating
+    pl.only = opts.only || null;
     advance(pl, seconds, 0);
+    changes.forEach(([t, l]) => setLevel(pl, lv(l), t, false));
     return c.startRendering();
+  },
+  /** Timing of a track: intro / loop length in seconds and its parts (for offline checks). */
+  _trackInfo(track) {
+    const T = TRACKS[track];
+    if (!T) return null;
+    const intro = T.intro || 0;
+    return { bpm: T.bpm, bars: T.steps / 16, introSec: intro * T.sd, loopSec: (T.steps - intro) * T.sd, startAt: 0.05, parts: T.parts.map((p, i) => ({ i, inst: p.i, layer: p.layer || 0 })) };
   },
 };
 
