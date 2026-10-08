@@ -174,7 +174,7 @@ export class Forest {
   }
 
   _stumpFor(tree) {
-    const stump = { x: tree.x, ground: tree.ground, w: 0.95, h: 0.6, kind: tree.kind, seed: tree.seed };
+    const stump = { x: tree.x, ground: tree.ground, w: 0.95, h: 0.6, kind: tree.kind, seed: tree.seed, tree };
     stump.body = this.g.world.createBody({ type: 'static', position: V(tree.x, tree.ground) });
     stump.body.createFixture(planck.Box(0.45, 0.4, V(0, 0.2), 0), { friction: 0.9 });
     stump.body.setUserData({ kind: 'stump' });
@@ -185,7 +185,7 @@ export class Forest {
   // ------------------------------------------------------------------ lockstep state
   state() {
     return {
-      t: this.trees.map((t) => [Math.round(t.hp * 100), t.nuts, t.dead ? 1 : 0, t.hive ? (t.hive.released ? 2 : 1) : 0]),
+      t: this.trees.map((t) => [Math.round(t.hp * 100), t.nuts, t.dead ? (t.uprooted ? 2 : 1) : 0, t.hive ? (t.hive.released ? 2 : 1) : 0]),
       w: this.webs.map((w) => (w.torn ? 1 : 0)),
       d: this.dandelions.map((d) => (d.done ? 1 : 0)),
     };
@@ -199,8 +199,9 @@ export class Forest {
       tree.hp = hp / 100;
       tree.nuts = nuts;
       tree.dead = !!dead;
+      tree.uprooted = dead === 2;
       tree.body = tree.canopy = null;
-      if (tree.dead) this._stumpFor(tree);
+      if (tree.dead && !tree.uprooted) this._stumpFor(tree);
       else this._treeBodies(tree);
       if (tree.hive) {
         const blk = blockById.get(tree.hive.blockId);
@@ -437,8 +438,9 @@ export class Forest {
       this._tearWeb(tree.web);
     }
     this._dropNuts(tree, tree.nuts, g.players[g.turn]);
-    // stump stays behind
-    this._stumpFor(tree);
+    // the stump stays behind, unless the ground it stood on is gone too
+    if (this._footing(tree.x, tree.ground)) this._stumpFor(tree);
+    else tree.uprooted = true;
     // the felled trunk is a heavy dynamic log that crashes down
     const len = Math.max(2.4, tree.h - 0.2);
     const B = g._makeBlock('trunk', 'box', tree.x, tree.ground + 0.65 + len / 2, len, 0.7, 0, Math.PI / 2);
@@ -474,17 +476,34 @@ export class Forest {
       this.terrainVersion = g.terrain.version;
       for (const tree of this.trees) {
         if (tree.dead) continue;
-        const t = g.terrain;
-        const y = tree.ground - 0.3;
-        if (!t.solid(tree.x, y) && !t.solid(tree.x - 0.35, y) && !t.solid(tree.x + 0.35, y)) {
+        if (!this._footing(tree.x, tree.ground)) {
           tree.dead = true;
           g.afterStep.push(() => this._topple(tree, this.r() < 0.5 ? -1 : 1));
         }
       }
+      // a stump left hanging in the air crumbles away
+      for (const st of this.stumps) {
+        if (!st.body || this._footing(st.x, st.ground)) continue;
+        g.world.destroyBody(st.body);
+        st.body = null;
+        if (st.tree) st.tree.uprooted = true;
+        g.fx.burst(st.x, st.ground + 0.3, 'wood', 8, { speed: 3 });
+        g.fx.burst(st.x, st.ground, 'dirt', 6, { speed: 2, color: g.theme.ground.dirtDark });
+      }
+      this.stumps = this.stumps.filter((st) => st.body);
       for (const d of this.dandelions) {
         if (!d.done && !g.terrain.solid(d.x, d.ground - 0.2)) this._blowDandelion(d, 0);
       }
     }
+  }
+
+  // Is there still ground under something rooted at (x, ground)? Most of a root's width has to rest
+  // on solid earth: a tree or stump on a sliver of ground goes.
+  _footing(x, ground) {
+    const t = this.g.terrain, y = ground - 0.3;
+    let n = 0;
+    for (const dx of [-0.45, -0.22, 0, 0.22, 0.45]) if (t.solid(x + dx, y)) n++;
+    return n >= 3;
   }
 
   // Keep a caught nut pinned in the web; called every physics step.

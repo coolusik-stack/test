@@ -323,6 +323,7 @@ export const THEMES = {
     abyss: { cloud: '#ffffff', shade: '#dde8f2', deep: '#9fb4c8', water: 'rgba(240,248,255,0.88)' },
     ground: {
       ...PAL.soil,
+      drip: 'ice', // icicles hang under the islands
       dirt: '#6e5446', dirtLight: '#8a6e5e', dirtDark: '#463228',
       pebble: '#c4c0bc', pebble2: '#9a948e',
       grass: '#f4f8ff', grassDark: '#b4c8de', grassLight: '#ffffff',
@@ -355,6 +356,7 @@ export const THEMES = {
     abyss: { cloud: '#ffffff', shade: '#e0eaf4', deep: '#a8bcd0', water: 'rgba(240,248,255,0.88)' },
     ground: {
       ...PAL.soil,
+      drip: 'ice', // icicles hang under the islands
       dirt: '#6a5448', dirtLight: '#866e60', dirtDark: '#44322a',
       pebble: '#c4c0bc', pebble2: '#9a948e',
       grass: '#f6faff', grassDark: '#b8cce2', grassLight: '#ffffff',
@@ -389,6 +391,7 @@ export const THEMES = {
     abyss: { cloud: '#a8b8e0', shade: '#6a7ab4', deep: '#16204a', water: 'rgba(200,225,255,0.75)' },
     ground: {
       ...PAL.soil,
+      drip: 'ice', // icicles hang under the islands
       dirt: '#4e4450', dirtLight: '#62566a', dirtDark: '#2e2834',
       pebble: '#9aa2b8', pebble2: '#7a8098',
       grass: '#dfe9f8', grassDark: '#8fa4c4', grassLight: '#ffffff',

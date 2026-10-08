@@ -363,6 +363,7 @@ export class Terrain {
     const bush = new Path2D(), bushHi = new Path2D();
     const clover = new Path2D(), needles = new Path2D();
     const roots = new Path2D(), vines = new Path2D(), vineLeaves = new Path2D();
+    const rim = new Path2D(), drips = new Path2D(); // the underside's sky-lit edge, and moss or icicles hanging off it
     const flowers = [], shrooms = [], leaves = [], sunflowers = [];
     const { stride, cell, scar } = this;
     const st = this.style;
@@ -447,8 +448,30 @@ export class Terrain {
         const nyUp = -dx / len; // outward (right-hand) normal y component
         const mx = (x0 + x1) / 2, my = (y0 + y1) / 2;
         if (nyUp < -0.45 && !isScar(mx, my)) {
+          rim.moveTo(x0, -y0);
+          rim.lineTo(x1, -y1);
           // roots and vines dangling from the underside of the island
           const lo = Math.min(x0, x1), hi = Math.max(x0, x1);
+          for (let slot = Math.ceil(lo / SLOT); slot * SLOT < hi; slot++) {
+            if (hash(slot, 41) > 0.5) continue;
+            const tx = slot * SLOT + (hash(slot, 42) - 0.5) * 0.2;
+            const t = (tx - x0) / dx;
+            if (t < 0 || t > 1) continue;
+            const ty = -(y0 + dy * t) - 0.06;
+            if (st.drip === 'ice') {
+              // icicles: thin, a few long ones
+              const L = 0.15 + Math.pow(hash(slot, 43), 2.2) * 0.75, w = 0.05 + hash(slot, 44) * 0.06;
+              drips.moveTo(tx - w, ty);
+              drips.lineTo(tx + (hash(slot, 45) - 0.5) * 0.05, ty + L);
+              drips.lineTo(tx + w, ty);
+              drips.closePath();
+            } else {
+              // moss: a soft scalloped fringe, now and then a longer tuft
+              const rr = 0.09 + hash(slot, 43) * 0.1, L = hash(slot, 44) < 0.25 ? 0.18 + hash(slot, 45) * 0.3 : 0;
+              drips.moveTo(tx + rr, ty);
+              drips.ellipse(tx, ty, rr, rr * 0.9 + L * 0.5, 0, 0, Math.PI);
+            }
+          }
           for (let slot = Math.ceil(lo / SLOT); slot * SLOT < hi; slot++) {
             if (hash(slot, 31) > 0.2) continue;
             const tx = slot * SLOT;
@@ -519,7 +542,7 @@ export class Terrain {
     this.flowers = flowers;
     this.sunflowers = sunflowers;
     this.decor = { fern, fernHi, bush, bushHi, clover, needles, shrooms, leaves };
-    this.hanging = { roots, vines, vineLeaves };
+    this.hanging = { roots, vines, vineLeaves, rim, drips };
   }
 
   // Part of the ground painted as something else (already clipped to what's left of the ground):
@@ -565,6 +588,17 @@ export class Terrain {
     ctx.restore();
   }
 
+  // The stone under the topsoil: everything more than ~1.2–1.8 m below the original surface (the
+  // terrain clip keeps it inside whatever ground is left).
+  _stoneLayer() {
+    const p = new Path2D(), h = this.heights, n = noise1D(this.seed + 91);
+    p.moveTo(-2, 2);
+    for (let x = -2; x <= WORLD.W + 2; x += 0.25) p.lineTo(x, -(h(x) - 1.5 - n(x * 0.35) * 0.35 - Math.sin(x * 1.7) * 0.08));
+    p.lineTo(WORLD.W + 2, 2);
+    p.closePath();
+    return p;
+  }
+
   draw(ctx, style, pattern, view) {
     const s = style;
     ctx.save();
@@ -583,8 +617,25 @@ export class Terrain {
       g.addColorStop(1, s.deep || 'rgba(20,8,0,0.45)');
       this._depthGrad = g;
     }
+    // below the topsoil: a band of stone, its upper edge following the original surface
+    if (!this._rock) this._rock = makeRockPattern(ctx, s, this.seed);
+    if (!this._rockPath) this._rockPath = this._stoneLayer();
+    ctx.fillStyle = this._rock;
+    ctx.fill(this._rockPath);
+    // soil spilling over the top of the stone, so the two blend instead of meeting at a line
+    ctx.lineWidth = 0.7;
+    ctx.globalAlpha = 0.7;
+    ctx.strokeStyle = pattern || s.dirt;
+    ctx.stroke(this._rockPath);
+    ctx.globalAlpha = 1;
     ctx.fillStyle = this._depthGrad;
     ctx.fillRect(-2, -WORLD.H, WORLD.W + 4, WORLD.H + 2);
+    // the underside catches a little light from the sky below
+    if (this.hanging) {
+      ctx.lineWidth = 0.55;
+      ctx.strokeStyle = s.rim || 'rgba(205,232,255,0.32)';
+      ctx.stroke(this.hanging.rim);
+    }
     for (const p of this.paints) this._paint(ctx, p);
     ctx.lineWidth = 0.55;
     ctx.strokeStyle = s.bevel || 'rgba(0,0,0,0.2)';
@@ -607,6 +658,9 @@ export class Terrain {
     ctx.stroke(this.path);
     const hg = this.hanging;
     if (hg) {
+      ctx.fillStyle = s.drip === 'ice' ? 'rgba(232,244,255,0.92)' : s.grassDark;
+      ctx.fill(hg.drips);
+      if (s.drip === 'ice') { ctx.lineWidth = 0.025; ctx.strokeStyle = 'rgba(150,185,220,0.8)'; ctx.stroke(hg.drips); }
       ctx.lineCap = 'round';
       ctx.strokeStyle = s.root || '#3e2210';
       ctx.lineWidth = 0.075;
@@ -845,6 +899,54 @@ function cosInterp(pts, x) {
     }
   }
   return pts[pts.length - 1][1];
+}
+
+const hex2 = (c) => [1, 3, 5].map((i) => parseInt(c.slice(i, i + 2), 16));
+const rgba = (c, a) => `rgba(${hex2(c).join(',')},${a})`;
+const mixHex = (a, b, t) => '#' + hex2(a).map((v, i) => Math.round(v + (hex2(b)[i] - v) * t).toString(16).padStart(2, '0')).join('');
+
+// Tileable stone texture for the island's deep rock, 64px per meter: packed boulders of mixed size,
+// each with a lit top and a shaded bottom, in the soil's own tones pulled toward warm grey.
+export function makeRockPattern(ctx, style, seed) {
+  const S = 256;
+  const c = document.createElement('canvas');
+  c.width = c.height = S;
+  const g = c.getContext('2d');
+  const r = rng(seed + 7);
+  const base = mixHex(style.dirtDark, '#7d7680', 0.45);
+  const joint = mixHex(base, '#1e1a1c', 0.35);
+  const tones = [base, mixHex(base, style.dirt, 0.35), mixHex(base, '#8a8590', 0.25)];
+  g.fillStyle = joint;
+  g.fillRect(0, 0, S, S);
+  // pack boulders: biggest first, each kept off the others
+  const stones = [];
+  for (let tries = 0; tries < 1400 && stones.length < 60; tries++) {
+    const rad = stones.length < 12 ? 22 + r() * 16 : 9 + r() * 14;
+    const x = r() * S, y = r() * S;
+    let ok = true;
+    for (const q of stones) {
+      for (const ox of [-S, 0, S]) for (const oy of [-S, 0, S]) {
+        if (Math.hypot(x - q.x - ox, y - q.y - oy) < rad + q.rad + 2) ok = false;
+      }
+      if (!ok) break;
+    }
+    if (ok) stones.push({ x, y, rad, sq: 0.7 + r() * 0.25, rot: (r() - 0.5) * 0.6, tone: tones[Math.floor(r() * tones.length)] });
+  }
+  for (const q of stones) {
+    for (const ox of [-S, 0, S]) for (const oy of [-S, 0, S]) {
+      const x = q.x + ox, y = q.y + oy;
+      if (x < -q.rad * 2 || x > S + q.rad * 2 || y < -q.rad * 2 || y > S + q.rad * 2) continue;
+      g.fillStyle = q.tone;
+      g.beginPath(); g.ellipse(x, y, q.rad, q.rad * q.sq, q.rot, 0, Math.PI * 2); g.fill();
+      g.fillStyle = 'rgba(0,0,0,0.16)'; // shaded underside
+      g.beginPath(); g.ellipse(x + 1, y + q.rad * q.sq * 0.35, q.rad * 0.85, q.rad * q.sq * 0.55, q.rot, 0, Math.PI * 2); g.fill();
+      g.fillStyle = 'rgba(255,255,255,0.13)'; // lit top
+      g.beginPath(); g.ellipse(x - q.rad * 0.2, y - q.rad * q.sq * 0.4, q.rad * 0.55, q.rad * q.sq * 0.28, q.rot, 0, Math.PI * 2); g.fill();
+    }
+  }
+  const pat = ctx.createPattern(c, 'repeat');
+  if (pat.setTransform) pat.setTransform(new DOMMatrix().scale(1 / 64));
+  return pat;
 }
 
 // Tileable dirt texture as a CanvasPattern mapped at 64px per meter.

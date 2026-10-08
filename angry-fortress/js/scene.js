@@ -200,8 +200,10 @@ export class Scene {
     if (t.aurora) this._aurora(ctx, cam, vw, vh, time);
     if (t.rainbow) this._rainbow(ctx, cam, vw, vh);
     // sun / moon
-    const sx = vw * t.sun.x - (cam.x - WORLD.W / 2) * cam.zoom * 0.04;
-    const sy = vh * t.sun.y + (cam.y - 14) * cam.zoom * 0.03;
+    // the sun hangs far away over one side of the map: pan to the other side and it slides off the
+    // screen like the far islands do, instead of riding along with the camera
+    const sx = vw * t.sun.x - (cam.x - WORLD.W / 2) * cam.zoom * 0.35;
+    const sy = vh * t.sun.y + (cam.y - 14) * cam.zoom * 0.25;
     const sr = Math.max(24, Math.min(vw, vh) * 0.07);
     const glow = ctx.createRadialGradient(sx, sy, sr * 0.6, sx, sy, sr * 3.6);
     glow.addColorStop(0, t.sun.glow);

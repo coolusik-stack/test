@@ -7,9 +7,10 @@ import shop from './shop.mjs';
 import walk from './walk.mjs';
 import shots from './shots.mjs';
 import lockstep from './lockstep.mjs';
+import rooted from './rooted.mjs';
 import online from './online.mjs';
 import relay from './relay.mjs';
 import cpu from './cpu.mjs';
 import perf from './perf.mjs';
 
-export const SUITES = [boot, ui, tutorial, campaign, shop, walk, shots, lockstep, online, relay, cpu, perf];
+export const SUITES = [boot, ui, tutorial, campaign, shop, walk, shots, lockstep, rooted, online, relay, cpu, perf];
