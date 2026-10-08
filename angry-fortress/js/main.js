@@ -290,7 +290,8 @@ function startBattle(opts) {
   $('#btn-restart').hidden = !!g.online;
   setupHud();
   Sound.play('start');
-  Sound.music(settings.music ? 'battle' : null);
+  musicLevel = -1;
+  Sound.music(settings.music ? battleTrack() : null);
   updateRotateHint();
 }
 
@@ -1642,7 +1643,7 @@ function applySettings() {
   Sound.setMusic(!!settings.music);
   prefs.vibe = !!settings.vibe;
   if (settings.music) {
-    const track = ['title', 'setup', 'campaign', 'stagecard', 'closet'].includes(screen) ? 'menu' : screen === 'result' ? null : 'battle';
+    const track = ['title', 'setup', 'campaign', 'stagecard', 'closet'].includes(screen) ? 'menu' : screen === 'result' ? null : battleTrack();
     if (track) Sound.music(track);
   } else Sound.music(null);
 }
@@ -1665,10 +1666,30 @@ function frame(now) {
       hudTimer -= dt;
       syncHud(false);
       if (hudTimer <= 0) hudTimer = 0.25;
+      musicFollows(dt);
     }
   }
   requestAnimationFrame(frame);
 }
+
+// The battle music pushes and pulls with the match: thin and quiet while someone lines up a shot,
+// full while it flies, everything for a few seconds after a big hit, a K.O. or a fall (the moments
+// the game slows down for).
+let musicLevel = -1, bigT = 0;
+function musicFollows(dt) {
+  if (!Sound.intensity || !game) return;
+  if (game.timeScale < 0.8 || game.fallcam) bigT = 2.5;
+  else bigT = Math.max(0, bigT - dt);
+  const s = game.state;
+  const level = bigT > 0 ? 2 : s === 'flight' || s === 'settle' ? 1 : game.over ? 1 : 0;
+  if (level !== musicLevel) { musicLevel = level; Sound.intensity(level); }
+}
+
+// each season has its own battle tune
+const battleTrack = () => {
+  const season = game && game.theme && game.theme.season;
+  return season && Sound.hasTrack && Sound.hasTrack('battle_' + season) ? 'battle_' + season : 'battle';
+};
 
 async function boot() {
   resize();
