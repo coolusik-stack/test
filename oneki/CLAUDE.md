@@ -1,0 +1,40 @@
+# ONEKI brand site (`oneki/`)
+
+A one-page brand intro that follows **ONEKI Brand Book v4.1** (24 spreads, 起承轉結). It is static HTML/CSS/JS with no build step. It lives apart from the repo's other site, so nothing here should touch files outside `oneki/`.
+
+## Files
+- `index.html`: all copy. Section comments use the brand book spread numbers (01 COVER … 24 BACK COVER).
+- `css/oneki.css`: brand tokens and layout. Desktop positions are mapped from the 1836×1170 spread grid. Below 1024px the layout collapses to a single column.
+- `js/oneki.js`:
+  - Data-driven parts: the scene callouts, the 12 rituals and the BHAG posters.
+  - All scroll motion: GSAP ScrollTrigger plus Lenis.
+  - Motion is skipped entirely under `prefers-reduced-motion`.
+- `vendor/`: libraries served from the project itself (gsap 3.12.5, ScrollTrigger, lenis 1.1.20).
+- `fonts/`: self-hosted fonts. The Korean fonts are subset to the page's glyphs, so **run `tools/subset-fonts.sh` after changing Korean copy**.
+- `tools/localize-images.sh`: downloads the images, which are currently hotlinked from the Higgsfield CDN, into `img/` and rewrites the references.
+
+## Brand rules (do not break)
+- **Name:** ONEKI = One Ki (一氣), read as 원기(元氣). KI also reads as Key. The logo is the gold ensō (일원상). Never redesign it.
+- **Positioning:** Blue Energy ("The hottest flame is blue." / "가장 뜨거운 불꽃은 파랗다.").
+- **Moment:** The Moment Before (직전의 순간). Slogan: Keep Calm. Go Crazy. / 차분하게, 미쳐라.
+- **Colors:**
+  - Cobalt `#2743B0`, gold `#B39A5C`, ink `#1C1B1D`, dark `#231F20`, black `#0C0C0D`.
+  - Secondary: blue2 `#6F8BFF`, pink `#F4ACA4`.
+  - **Red is forbidden.**
+- **Fonts:**
+  - Hanken Grotesk 800 for display.
+  - Newsreader for serif.
+  - Pretendard for Korean sans.
+  - Noto Serif KR for Korean body.
+  - Londrina Solid 900 for hand caps.
+- **Ritual:** "톡" / "기 트자". The stick is what snaps, and the 기 is what opens. **Never write "기를 꺾다".** Timing: "들어가기 30분 전, 톡".
+- **Banned wording (general food, 일반식품):**
+  - 폭발시킨다, 고카페인 (as a claim), 풀파워, 공부/성적
+  - 긴장 완화, 불안 해소, 피로회복, 숙취해소, 집중력 향상
+  - Any efficacy claim.
+  - The names 청심환/청심원/맥문동탕/생맥산. 靑心 may be used only as a worldview metaphor.
+- **Trademark:** the ONEKI mark has not been cleared by a 변리사.
+  - Keep `noindex` on the page.
+  - Don't add it to the repo's `sitemap.xml`.
+  - Don't fix a domain or channel IDs until the trademark is cleared.
+- **Visuals:** people and scenes are illustrations, not real guests, and the footer note says so. 한방 appears only as an accent.
