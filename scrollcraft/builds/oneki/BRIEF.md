@@ -69,3 +69,21 @@ Act 4 is deliberate. It is a dark ground with a single line, about 0.8 viewport-
 ## What the visitor does next
 
 Nothing transactional yet. The trademark is not cleared, so there is no sign-up form and no shop link. The close resolves on the brand line, with the company colophon in small type. When pre-launch sign-up opens, it replaces the colophon line. It is the single action, labelled "알림 받기" everywhere.
+
+## Feel check (2026-10-12, after build)
+
+I scrolled the built page cold and wrote one word per act, then compared it with the intended curve.
+
+| # | Intended | Felt | Change made |
+|---|---|---|---|
+| 0 | Hush, curiosity | curiosity | Faded the hard top and bottom edges of the haze plate, which read as a glitch rather than calm |
+| 1 | Unease | unease | Moved the copy onto a paper panel, because it was unreadable over the floor; the panel now fades with the copy so no empty card is left behind |
+| 2 | Intimacy | *(nothing on the first pass)* | The Q&A and the name breakdown never revealed: a stagger parent was missing its `data-sc-in`. After the fix it reads as intimacy |
+| 3 | Conviction | conviction | None |
+| 4 | Held breath | held breath | None. The silence is authored and the harness did not flag it |
+| 5 | Release (peak) | release | None. It is the largest visual change on the sheet (cobalt bloom plus the gauge turning blue) and the longest span |
+| 6 | Belonging | *(nothing on the first pass)* | Manifesto lines and rituals were invisible for the same `data-sc-in` reason. After the fix it reads as belonging |
+| 7 | Resolve | resolve | None |
+| 8 | Calm, carried | calm | None. The last screen holds the ensō, "Refill, never borrow." and the colophon |
+
+**Deviation from the brand book, on purpose.** The intertitles are reordered to Pause 起 / Breathe in 承 / Snap 轉 / Breathe out 結, so the snap is the turn (轉) and the exhale is the resolution (結). The brand book had Breathe out before Snap. The feeling curve needs release before belonging.

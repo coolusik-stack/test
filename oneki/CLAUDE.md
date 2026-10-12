@@ -3,15 +3,18 @@
 A one-page brand intro that follows **ONEKI Brand Book v4.1** (24 spreads, 起承轉結). It is static HTML/CSS/JS with no build step. It lives apart from the repo's other site, so nothing here should touch files outside `oneki/`.
 
 ## Files
-- `index.html`: all copy. Section comments use the brand book spread numbers (01 COVER … 24 BACK COVER).
-- `css/oneki.css`: brand tokens and layout. Desktop positions are mapped from the 1836×1170 spread grid. Below 1024px the layout collapses to a single column.
-- `js/oneki.js`:
-  - Data-driven parts: the scene callouts, the 12 rituals and the BHAG posters.
-  - All scroll motion: GSAP ScrollTrigger plus Lenis.
-  - Motion is skipped entirely under `prefers-reduced-motion`.
-- `vendor/`: libraries served from the project itself (gsap 3.12.5, ScrollTrigger, lenis 1.1.20).
-- `fonts/`: self-hosted fonts. The Korean fonts are subset to the page's glyphs, so **run `tools/subset-fonts.sh` after changing Korean copy**.
-- `tools/localize-images.sh`: downloads the images, which are currently hotlinked from the Higgsfield CDN, into `img/` and rewrites the references.
+- **Rebuild:** built with the scroll-craft skill. The brief, plan and feel check are in `../scrollcraft/builds/oneki/` (BRIEF.md, PLAN.md). The structure is the **Breath cycle**: nine acts, about 14 viewport-heights, holds and releases alternating, and a single peak (the snap).
+- **`index.html`:** all copy and the act markup, using `data-sc-*` attributes that the engine reads.
+- **`engine/`:** the scroll-craft engine (MIT). **Never edit it.** Bespoke behaviour goes in `js/oneki.js`.
+- **`css/oneki.css`:** brand tokens, the hero layer positions (a 16:10 scene box on desktop and a separate portrait composition on phones), and per-act layout.
+- **`js/oneki.js`:** builds the scene callouts, the 12 rituals and the 4 BHAG posters before the engine mounts. It also runs the signature move:
+  - Scroll velocity becomes `--heat`, which drives the gauge, its °C readout, the grain and the flame.
+  - The peak switches the page into `.is-snapped` (cobalt, gauge locked at 1,900°C).
+- **`img/`:** self-hosted, optimized assets.
+  - Generated with Higgsfield: `stick.webp` and `hand.webp` (alpha cutouts), `haze.webp`, `flame-amber.jpg`, and `snap/d|m/*.webp` (a 62-frame sequence from the snap clip; `m` is the portrait crop).
+  - From the brand book: everything else.
+- **`fonts/`:** self-hosted. Korean fonts are subset to the page's glyphs, so **run `tools/subset-fonts.sh` after changing Korean copy**.
+- **Verification:** the scroll-craft harness (`shoot.mjs`), run at desktop, 390px and reduced-motion.
 
 ## Brand rules (do not break)
 - **Name:** ONEKI = One Ki (一氣), read as 원기(元氣). KI also reads as Key. The logo is the gold ensō (일원상). Never redesign it.

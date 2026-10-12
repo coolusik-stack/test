@@ -28,9 +28,8 @@ changes only grammar and world will fail it.
 
 | Build | Grammar | Nav treatment | Hero device | Act-sequence shape | Close pattern | Signature move | World | Port |
 |---|---|---|---|---|---|---|---|---|
+| oneki (2026-10-12) | Breath cycle (new): four intertitled breaths, holds and releases alternate, hard-cut grounds | Fixed right-margin flame gauge (mobile: bottom bar): °C readout + 起承轉結 jump ticks, no top bar | Pinned layered cover plate: dot grid / haze / alpha gold stick / alpha hand closing on the notch / front mist, headline between planes | parallax-pin → pin+line-draw → flow → reveal+count → authored silence → pin+image-sequence scrub (peak, 3vh) → flow stagger → reveal ×4 → hold; 9 acts ≈ 14vh | Exhale: ensō + gradient line + colophon holds on the last screen, no button | Scroll velocity drives page heat: calm = blue 1,900°C, fast = amber flicker; the snap locks it and regrades to cobalt | Photographic studio still life on off-black, cobalt + gold | oneki/ |
 
-*(empty: your first build has nothing to clear, so build whatever the interview
-points at. From the second onwards, this table is the constraint.)*
 
 ---
 
@@ -41,7 +40,10 @@ reusing: a grammar, a nav treatment, a close pattern, a signature move, an
 act-count-and-length band. The shared columns are what the next build inherits
 as a constraint, so writing them down is the whole point.
 
-Nothing is taken yet.
+- **Breath cycle** grammar (intertitle-led hold/release alternation)
+- **Margin gauge nav** that doubles as a live readout
+- **Velocity-to-temperature** signature (scroll speed as a page-wide variable)
+- **9 acts ≈ 14vh** band with a single 3vh image-sequence peak
 
 ---
 

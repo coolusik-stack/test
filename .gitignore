@@ -1,2 +1,6 @@
 firebase-debug.log
 firebase.json
+node_modules/
+scrollcraft/builds/*/lab/
+scrollcraft/builds/*/raw/
+scrollcraft/builds/*/out/
