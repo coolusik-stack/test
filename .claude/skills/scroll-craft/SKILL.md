@@ -5,7 +5,8 @@ description: >
   drink brands. Plan the visitor journey, page grammar, emotional peak, and
   bespoke signature move. Create dimensional heroes with independent visual
   planes, restrained motion, and separate mobile composition. Use supplied
-  photos and footage or generate photoreal assets through kie.ai, write semantic
+  photos and footage or generate photoreal assets through Higgsfield (MCP) or
+  kie.ai, write semantic
   HTML, and verify desktop, mobile, and reduced-motion scroll states visually.
   Use for "scrollcraft", "scroll craft", "layered hero", "premium hero",
   "cinematic hero", "scrollytelling", "scroll animation site", "a site where
@@ -195,9 +196,12 @@ project root pointing at it and nothing moves.
 
 ### The rest
 
-1. `KIE_AI_API_KEY`, **only if you are generating assets.** A build from the
+1. A generation provider, **only if you are generating assets.** A build from the
    user's own photos and footage needs no key and no spend, and that is a
-   first-class route, not a fallback. Confirm balance with
+   first-class route, not a fallback. If the Higgsfield MCP tools
+   (`mcp__Higgsfield__*`) are connected, use them and check the balance with
+   `balance`; see [references/higgsfield.md](references/higgsfield.md).
+   Otherwise set `KIE_AI_API_KEY` and confirm the balance with
    `node <skill>/scripts/kie.mjs probe`. A still costs cents and a 5s clip costs
    more; a six-act page with two clips is a small spend, not a large one.
 2. A brand kit if one exists (colours, logo, type, existing product shots). If
@@ -311,8 +315,11 @@ Checks before you build:
 ## Step 3: Generate the assets
 
 Full pipeline, prompt scaffolds and model notes: [references/assets.md](references/assets.md).
+With Higgsfield connected, generate through its MCP tools instead of `kie.mjs`
+and download the results into `out/`: [references/higgsfield.md](references/higgsfield.md).
+The encode and poster steps are the same either way.
 
-Short version:
+Short version (kie.ai):
 
 ```bash
 node <skill>/scripts/kie.mjs still "<style preamble>\n\n<scene>" out/01-hero.png --ar 16:9 [--ref brand-can.png]

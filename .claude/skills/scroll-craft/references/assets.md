@@ -1,7 +1,10 @@
 # Assets
 
 Generation through kie.ai, then encoding for scrubbing. All of it via
-`scripts/kie.mjs` and `scripts/encode.sh`.
+`scripts/kie.mjs` and `scripts/encode.sh`. If the Higgsfield MCP tools are
+connected, generate through them instead ([higgsfield.md](higgsfield.md)). Every
+rule below about prompts, posters, encoding and seams still applies, but the
+model, aspect-ratio and credit notes are kie.ai-specific.
 
 ```bash
 node <skill>/scripts/kie.mjs probe                     # credit check first

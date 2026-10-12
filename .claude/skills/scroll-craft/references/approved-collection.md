@@ -76,7 +76,8 @@ Pause offscreen/hidden rendering, cap pixel density, and avoid permanent
 
 ## 4. Generate assets for compositing, then inspect the result
 
-Use the authorized provider, including Kie.ai when requested. Specify the full
+Use the authorized provider: Higgsfield when its MCP tools are connected
+(see [higgsfield.md](higgsfield.md)), or Kie.ai when requested. Specify the full
 subject, camera, consistent light direction, clear silhouette, and generous
 safe margins. A label, wheel, flower, or handle cropped by the generated frame
 cannot be repaired by moving the image in CSS. Regenerate incomplete subjects.

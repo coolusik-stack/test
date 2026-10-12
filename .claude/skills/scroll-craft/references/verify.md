@@ -208,7 +208,7 @@ as a native scroll region, so confirm on the sheet that the rail shows real
 content and that items past the fold can still be got to. Nothing in the harness
 reports this; it reads as a page behaving correctly.
 
-**Credit accounting.** `kie.mjs probe` reports a balance, not a delta, so a
+**Credit accounting.** `kie.mjs probe` (or Higgsfield's `balance`) reports a balance, not a delta, so a
 build's spend is a before-and-after subtraction. That subtraction is only valid
 if nothing else is generating against the same key. When builds run in parallel,
 or when a settlement lands late, the deltas overlap and each build will claim
