@@ -106,6 +106,14 @@
   var SECTIONS = $$('main > section, footer'); // page order, captured before pinning wraps sections
   var gsap = window.gsap, ST = window.ScrollTrigger;
   gsap.registerPlugin(ST);
+  ST.config({ ignoreMobileResize: true });
+
+  // heavy brand images fade in once decoded instead of popping in line by line
+  $$('main img, footer img').forEach(function (img) {
+    if (img.complete && img.naturalWidth) return;
+    img.classList.add('is-loading');
+    img.addEventListener('load', function () { img.classList.remove('is-loading'); }, { once: true });
+  });
 
   // smooth scroll, driven by GSAP's ticker so ScrollTrigger stays in sync
   if (window.Lenis) {
@@ -119,7 +127,9 @@
         var t = id === '#top' ? 0 : $(id);
         if (t === null) return;
         e.preventDefault();
-        lenis.scrollTo(t, { duration: 1.4 });
+        // land where a pinned chapter word has settled, not at the start of its pin
+        var pin = t && ST.getAll().find(function (st) { return st.pin === t; });
+        lenis.scrollTo(pin ? pin.start + (pin.end - pin.start) * 0.7 : t, { duration: 1.4 });
       });
     });
   }
@@ -190,11 +200,13 @@
     // 06-07 origins: a horizontal walk through the interview
     var track = $('.origins__track');
     var dist = function () { return track.scrollWidth - window.innerWidth; };
-    gsap.to(track, { x: function () { return -dist(); }, ease: 'none', scrollTrigger: { trigger: '.origins', start: 'top top', end: function () { return '+=' + dist(); }, pin: true, scrub: 1, invalidateOnRefresh: true } });
+    gsap.to(track, { x: function () { return -dist(); }, ease: 'none', scrollTrigger: { trigger: '.origins', start: 'top top', end: function () { return '+=' + dist(); }, pin: true, scrub: 1, invalidateOnRefresh: true,
+      onUpdate: function (self) { gsap.set('.origins__bar span', { scaleX: self.progress }); } } });
 
     // 08 snap: the line lands, then the story
     var snap = gsap.timeline({ scrollTrigger: { trigger: '.snap', start: 'top top', end: '+=90%', pin: true, scrub: 0.6 } });
     snap.from('.snap__quote .ln', { yPercent: 60, opacity: 0, stagger: 0.25, duration: 0.5 })
+      .fromTo('.snap__ring', { scale: 0.2, opacity: 0.9 }, { scale: 3.2, opacity: 0, stagger: 0.12, duration: 0.6, ease: 'power2.out' }) // the 톡
       .from(['.snap__cap', '.snap__lead'], { opacity: 0, y: 20, stagger: 0.1, duration: 0.3 })
       .from('.snap__steps li', { opacity: 0, x: -20, stagger: 0.12, duration: 0.25 }, '<')
       .from('.snap__img', { scale: 0.7, rotate: -8, opacity: 0, transformOrigin: '80% 90%', duration: 0.5, ease: 'back.out(1.6)' }, '<');
