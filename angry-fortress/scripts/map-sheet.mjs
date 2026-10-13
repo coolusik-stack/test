@@ -29,7 +29,9 @@ for (const theme of maps) {
     for (const el of document.querySelectorAll('#hud, #hint, #banner, #tip')) el.style.visibility = 'hidden';
     const g = window.__af.game;
     g.cam.manual = 0;
-    g.cam.focus(36, 14, g.cam.fitZoom * 1.02, 30);
+    // frame the ground and the homes: a map built in tall floors sits higher
+    const top = Math.max(...g.players.map((p) => p.body.getPosition().y));
+    g.cam.focus(36, top > 20 ? 17 : 14, g.cam.fitZoom * 1.02, 30);
   });
   await page.waitForTimeout(1200);
   await page.screenshot({ path: join(out, `${theme}.png`) });

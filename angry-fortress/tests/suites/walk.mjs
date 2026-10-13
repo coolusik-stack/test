@@ -27,6 +27,13 @@ const ROUTES = {
     0: [[26, 'pad→arch', '무지개 꼭대기', true, 'once'], [30, 'pad→home', null, true, 'once']],
     1: [[56.0, 'tree', '여름 그늘'], [45, 'pad→arch', '무지개 꼭대기', true, 'once'], [50, 'pad→field', null, true, 'once']],
   },
+  tiers: {
+    0: [[21, 'pad→middle', null, true, 'once'], [29, 'pad→top', null, true, 'once'], [21, 'pad→middle', null, true, 'once'], [17.0, 'under the top shelf', '처마 밑'], [10, 'pad→basement', null, true, 'once'],
+      [30, 'pad→crossing', null, true, 'once'], [64, 'pad→right middle', '선반 밑', true, 'once'], [30, 'pad→right top', null, true, 'once'], [46.0, 'tree', '선반 위 명당'],
+      [40, 'pad→right middle', null, true, 'once'], [55, 'pad→right basement', null, true, 'once'], [30, 'pad→crossing back', null, true, 'once'], [1, 'pad→home shelf', null, true, 'once'], [13.0, 'home', null]],
+    1: [[46.0, 'tree', '선반 위 명당'], [40, 'pad→middle', null, true, 'once'], [50.0, 'under the top shelf', '선반 밑'], [55, 'pad→basement', null, true, 'once'],
+      [64, 'pad→middle', null, true, 'once'], [30, 'pad→top', null, true, 'once'], [60.0, 'home', null]],
+  },
   maple: {
     0: [[5, 'pad→sky stone', '단풍 구름섬', true, 'once'], [45, 'pad→right side', null, true, 'once'], [46.0, 'tree', '단풍 명당'], [35.0, 'bridge', '흙다리'], [26.6, 'bluff', '벼랑 전망대'], [10.0, 'home', null]],
     1: [[66, 'pad→sky stone', '단풍 구름섬', true, 'once'], [25, 'pad→left rim', null, true, 'once'], [26.6, 'bluff', '벼랑 전망대'], [35.0, 'bridge', '흙다리'], [46.0, 'tree', '단풍 명당'], [61.6, 'home', null]],

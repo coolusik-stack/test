@@ -402,8 +402,11 @@ export const THEMES = {
   },
 };
 
+// 층층 구름섬 wears the summer sky of 무지개 하늘다리 (its own map, the arch's colours).
+THEMES.tiers = { ...THEMES.arch, id: 'tiers', name: '층층 구름섬', desc: '세 층으로 쌓인 섬. 맨 위에서 쏠까, 아래층에 숨을까', layout: { fixed: 'tiers' }, rainbow: false };
+
 // Menu order: through the year, spring to winter.
-export const THEME_ORDER = ['oak', 'blossom', 'mole', 'sunflower', 'night', 'arch', 'maple', 'ginkgo', 'pine', 'snowcliff', 'igloo', 'aurora'];
+export const THEME_ORDER = ['oak', 'blossom', 'mole', 'sunflower', 'night', 'arch', 'tiers', 'maple', 'ginkgo', 'pine', 'snowcliff', 'igloo', 'aurora'];
 export const SEASONS = { spring: '봄', summer: '여름', autumn: '가을', winter: '겨울' };
 
 // Fort blueprints. x is measured from the fort's back edge toward the enemy,

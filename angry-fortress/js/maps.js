@@ -6,7 +6,8 @@
 // (height costs ground under you or cover; cover costs reach; nuts cost a drive). Which player gets
 // which home is down to the draw (terrain.js flips the map), and every map keeps one idea:
 //   도토리 숲 a hill · 벚꽃 분지 a bowl · 두더지 굴 산 a tunnel · 해바라기 비탈 a tilted island ·
-//   반딧불 징검다리 stepping stones · 무지개 하늘다리 a rock arch in the sky · 단풍 협곡 a bridge ·
+//   반딧불 징검다리 stepping stones · 무지개 하늘다리 a rock arch in the sky · 층층 구름섬 shelves ·
+//   단풍 협곡 a bridge ·
 //   은행나무 참호 trenches · 소나무 절벽 a cliff · 살얼음 두 섬 two islands · 이글루 눈처마 an
 //   overhang and an igloo · 오로라 호수 thin lake ice
 // Nothing stands in the exact middle just for show, and no map stacks more than one or two kinds
@@ -57,6 +58,25 @@ const ledge = (cx, top, w, { deep = 2.2, crag: cx2 = cx + w * 0.12 } = {}) => {
 const on = (top) => ({ top: top + 1, band: [top - 0.8, top + 1.6] });
 // …and to the ground under one (not its top)
 const below = (ground) => ({ band: [ground - 0.8, ground + 1.6] });
+// a long floating shelf: its top follows `pts` ([x, y] points joined by cosine curves), `deep`
+// thick under its whole length and rounding off over the last 2 m at each end; crags hang under it
+// at the x's in `crags`. A row of circles, so its underside stays as even as its top.
+const cosAt = (pts, x) => {
+  for (let i = 1; i < pts.length; i++) {
+    const [ax, ay] = pts[i - 1], [bx, by] = pts[i];
+    if (x <= bx) return ay + (by - ay) * (1 - Math.cos(Math.PI * Math.max(0, (x - ax) / (bx - ax)))) / 2;
+  }
+  return pts[pts.length - 1][1];
+};
+const shelf = (pts, deep, crags = []) => {
+  const ops = [], x0 = pts[0][0], x1 = pts[pts.length - 1][0];
+  for (let x = x0 + 0.3; x <= x1 - 0.3 + 1e-6; x += 0.3) {
+    const t = Math.max(0.8, deep * Math.min(1, Math.sqrt(Math.min(x - x0, x1 - x) / 2)));
+    ops.push({ type: 'add', x, y: cosAt(pts, x) - t / 2, rx: t / 2, ry: t / 2 });
+  }
+  for (const c of crags) ops.push(...crag(c, cosAt(pts, c) - deep + 0.5, 0.8));
+  return ops;
+};
 // a snow dome with a room inside and a low door on each side; the road runs through it
 const igloo = (cx, ground) => {
   const ops = [{ type: 'add', x: cx, y: ground, rx: 3.4, ry: 4.5 }];
@@ -265,6 +285,56 @@ export const MAPS = {
     ],
     features: { trees: [tree(56.0, 'oak', { h: 4.8, canopyR: 2.0 })] },
     paints: [{ kind: 'rainbow', x: 39.0, y: 22.0, rx: 10.0, ry: 6.0, w: 1.9 }],
+  }),
+
+  // 층층 구름섬 (summer) — the shelves. Three floors of floating rock on each side, the homes on the
+  // top floor, mushroom pads between the floors and one low crossing between the two bottom floors
+  // under everything (drawn from a player's sketch). Lobs between the homes are always open; the
+  // floors below are where you go to hide, to flank or to drop someone a floor (a fall of a floor
+  // hurts, it does not knock out). Left home: a short top shelf 2.5 m lower, with a roofed ledge
+  // right under it and the middle floor a hop away. Right home: a long high shelf whose front edge
+  // stops flat shots, with a nut tree on it; under it an S-shaped middle floor (roofed) and below
+  // that the basement.
+  tiers: () => ({
+    top: [[1.6, 7.4], [2.4, 9.0], [30.0, 9.0], [31.0, 7.6], [39.0, 9.0], [40.0, 10.5], [65.0, 10.5], [66.0, 9.0]],
+    flat: [[2.4, 30.0], [40.0, 65.0]],
+    islands: [
+      { a: 1.6, b: 31.0, under: [[1.6, 7.6], [3.4, 6.0], [10, 4.6], [16, 4.0], [22, 4.8], [28, 6.2], [31.0, 7.4]] },
+      { a: 39.0, b: 66.0, under: [[39.0, 9.0], [41, 7.6], [48, 6.6], [56, 6.4], [62, 7.0], [66.0, 8.8]] },
+    ],
+    bases: [13.0, 60.0],
+    forts: [{ back: 6.9, facing: 1 }, { back: 67.0, facing: -1 }],
+    ops: [
+      ...shelf([[6.5, 21.5], [20.0, 21.5]], 3.0, [9.0]), // left top (home)
+      ...shelf([[14.0, 16.0], [30.0, 16.0]], 2.0, [27.0]), // left middle
+      ...shelf([[41.0, 24.0], [67.5, 24.0]], 2.6, []), // right top (home)
+      ...shelf([[35.0, 19.6], [39.5, 19.6], [44.5, 18.0], [56.0, 18.0]], 2.0, []), // right middle, the S
+      ...crag(8.0, 4.4), ...crag(20.0, 4.6, 0.9), ...crag(47.0, 6.6, 1.0), ...crag(60.0, 6.8, 0.8),
+    ],
+    spots: [
+      // left: top ↔ middle, middle → basement, basement → top, and the low crossing
+      { kind: 'pad', team: 0, range: [17.6, 18.2], dir: 1, to: { x: 22.5, y: 16.0 }, apex: 23.5, ...on(21.5) },
+      { kind: 'pad', team: 0, range: [28.0, 28.6], dir: 1, to: { x: 16.5, y: 21.5 }, apex: 25.5, ...on(16.0) },
+      { kind: 'pad', team: 0, range: [15.0, 15.6], dir: -1, to: { x: 7.5, y: 9.0 }, apex: 17.0, ...on(16.0) },
+      { kind: 'pad', team: 0, range: [3.0, 3.6], dir: -1, to: { x: 11.0, y: 21.5 }, apex: 29.0, ...on(9.0) },
+      { kind: 'pad', team: -1, range: [28.4, 29.0], dir: 1, to: { x: 45.0, y: 10.5 }, apex: 12.4, ...on(9.0) },
+      {
+        kind: 'burrow', team: 0, range: [14.6, 19.6], sign: 21.0, ...below(16.0),
+        label: { name: '처마 밑', desc: '바로 위 선반이 지붕이 되어 높이 쏜 공격을 막아 줘요. 낮게 쏜 건 들어와요' },
+      },
+      // right: top ↔ middle, middle ↔ basement, and the crossing back
+      { kind: 'pad', team: 1, range: [43.4, 44.0], dir: -1, to: { x: 37.6, y: 19.6 }, apex: 26.0, ...on(24.0) },
+      { kind: 'pad', team: 1, range: [36.2, 36.8], dir: -1, to: { x: 42.6, y: 24.0 }, apex: 27.5, ...on(19.6) },
+      { kind: 'pad', team: 1, range: [52.4, 53.0], dir: 1, to: { x: 60.5, y: 10.5 }, apex: 20.0, ...on(18.0) },
+      { kind: 'pad', team: 1, range: [62.4, 63.0], dir: 1, to: { x: 51.0, y: 18.0 }, apex: 20.0, ...on(10.5) },
+      { kind: 'pad', team: -1, range: [40.0, 40.6], dir: -1, to: { x: 23.0, y: 9.0 }, apex: 12.4, ...on(10.5) },
+      {
+        kind: 'burrow', team: 1, range: [44.5, 52.0], sign: 54.4, ...below(18.0),
+        label: { name: '선반 밑', desc: '위 선반이 지붕이 되어 높이 쏜 공격을 막아 줘요. 낮게 쏜 건 들어와요' },
+      },
+      { kind: 'tree', team: 1, range: [44.8, 47.2], sign: 48.0, ...on(24.0), label: { name: '선반 위 명당', desc: '내 차례가 시작될 때마다 특수 견과 +1. 맨 위층이라 다 보여요' } },
+    ],
+    features: { trees: [tree(46.0, 'oak', { h: 4.6, canopyR: 1.9 })] },
   }),
 
   // 단풍 협곡 (autumn) — cross, or cut? Two landmasses over a bottomless canyon, joined by one thin

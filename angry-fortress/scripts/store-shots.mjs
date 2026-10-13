@@ -28,7 +28,7 @@ const SCENES = [
     },
   },
   {
-    name: 'seasons', caption: '봄부터 겨울까지, 열두 개의 숲',
+    name: 'seasons', caption: '봄부터 겨울까지, 열세 개의 숲',
     async setup(page) {
       await start(page, { mode: 'pvp', theme: 'igloo' });
       await page.evaluate(() => window.__af.game.toggleOverview());

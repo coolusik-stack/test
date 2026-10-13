@@ -1014,12 +1014,18 @@ function drawMapPreview(cv, id) {
     for (let x = sp.a + 0.4; x <= sp.b - 0.4; x += 0.5) g.lineTo(x * sx, toY(land.heights(x)));
     g.stroke();
   }
+  // the top surface at x: the ground, or a floating shelf above it
+  const surf = (x) => {
+    let y = land.onIsland(x) ? land.heights(x) : 0;
+    for (const op of land.ops) if (op.type === 'add' && Math.abs(x - op.x) < op.rx) y = Math.max(y, op.y + op.ry * Math.sqrt(1 - ((x - op.x) / op.rx) ** 2));
+    return y;
+  };
   for (const bx of land.bases) {
     g.fillStyle = bx < WORLD.W / 2 ? TEAM[0].color : TEAM[1].color;
     g.strokeStyle = '#2b1a12';
     g.lineWidth = 2;
     g.beginPath();
-    g.arc(bx * sx, toY(land.heights(bx)) - 5, 5, 0, Math.PI * 2);
+    g.arc(bx * sx, toY(surf(bx)) - 5, 5, 0, Math.PI * 2);
     g.fill();
     g.stroke();
   }
@@ -1029,7 +1035,7 @@ function drawMapPreview(cv, id) {
     if (s.kind === 'pad') {
       g.fillStyle = '#ff5a6e';
       g.beginPath();
-      g.ellipse(x * sx, toY(land.heights(x)) - 1, 4, 3, 0, Math.PI, Math.PI * 2);
+      g.ellipse(x * sx, toY(s.top != null ? s.top - 1 : land.heights(x)) - 1, 4, 3, 0, Math.PI, Math.PI * 2);
       g.fill();
       continue;
     }
