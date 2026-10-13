@@ -378,8 +378,13 @@ export function* planMove(game, me, difficulty) {
   const quick = (c) => {
     let v = 0;
     const th = Math.min(...[-0.45, 0, 0.45].map((dx) => ter.thicknessBelow(c.x + dx, c.foot + 0.1)));
-    if (th < CRUMBLE) v -= 45;
-    else if (th < THIN_GROUND) v -= (THIN_GROUND - th) * 14;
+    // thin ground only costs what falling through it costs: a floor below catches the cart (a
+    // fall's damage), the clouds don't
+    const under = ter.surfaceY(c.x, c.foot - th - 0.3);
+    const drop = under > WORLD.SEA + 0.5 ? c.foot - under : Infinity;
+    const fall = drop === Infinity ? 45 : Math.min(45, 4 + 1.2 * Math.max(0, (Math.sqrt(2 * GRAV * drop) - 7.5) * 2.5));
+    if (th < CRUMBLE) v -= fall;
+    else if (th < THIN_GROUND) v -= (THIN_GROUND - th) * 14 * (fall / 45);
     const edge = edgeDist(ter, c.x, c.foot);
     if (edge < 1.8) v -= (1.8 - edge) * 7;
     const here = spotsAt(land, { x: c.x, foot: c.foot }).filter((s) => s.kind !== 'pad');

@@ -138,7 +138,9 @@ function seasonTag(id) {
   const tag = document.createElement('i');
   tag.className = 'map-season';
   tag.dataset.season = season;
-  tag.textContent = SEASONS[season];
+  // a map built in floors says so: 층층 (where you start is drawn each match)
+  const floored = !!buildLandscape(THEMES[id].layout, 1).starts;
+  tag.textContent = SEASONS[season] + (floored ? ' · 층층' : '');
   return tag;
 }
 

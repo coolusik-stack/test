@@ -837,7 +837,9 @@ function simplifyLoop(l, eps) {
 // The battlefield of a map (see maps.js), whole, left to right. `flip` swaps the two homes: every
 // x becomes W − x and the left home's team becomes the right one's, so a match can put either
 // player on either side of a map that is not a mirror image.
-export function buildLandscape(layout, seed, flip = false) {
+// `pick` [k0, k1] forces which of a floored map's starts each side gets (tests); otherwise the seed
+// draws them.
+export function buildLandscape(layout, seed, flip = false, pick = null) {
   const { W } = WORLD;
   const raw = MAPS[layout.fixed](W);
   const def = flip ? flipped(raw, W) : raw;
@@ -857,8 +859,22 @@ export function buildLandscape(layout, seed, flip = false) {
   };
   const onIsland = (x) => under(x) < Infinity;
   const spans = def.islands.map((i) => ({ a: i.a, b: i.b })).sort((p, q) => p.a - q.a);
+  // where each cart starts. A map built in floors lists a few places per side (`starts`, the first
+  // on the home floor) and the seed draws one for each side, so two phones agree; the home tree and
+  // the fort stay on the home floor whichever one the cart starts on.
+  const home = def.starts ? def.starts.map((l) => l[0].x) : def.bases;
+  let bases = home, baseY = [null, null], startAt = [0, 0];
+  if (def.starts) {
+    startAt = [0, 1].map((t) => {
+      const n = def.starts[t].length;
+      return pick ? pick[t] % n : (Math.imul((seed >>> 0) ^ Math.imul(t + 1, 0x9e3779b9), 0x85ebca6b) >>> 16) % n;
+    });
+    bases = startAt.map((k, t) => def.starts[t][k].x);
+    baseY = startAt.map((k, t) => def.starts[t][k].y);
+  }
   return {
-    heights, under, onIsland, spans, ops: def.ops, bases: def.bases, mid: W / 2,
+    heights, under, onIsland, spans, ops: def.ops, bases, baseY, startAt, homes: [home[0] - 2.9, home[1] + 2.9], mid: W / 2,
+    starts: def.starts || null, streams: def.streams || [],
     features: { ...(def.features || {}), fixed: true }, spots: def.spots, forts: def.forts,
     fixed: layout.fixed, backs: def.backs || [], paints: def.paints || [], flip,
   };
@@ -874,7 +890,9 @@ function flipped(d, W) {
   o.top = pts(d.top);
   o.flat = d.flat.map(fr);
   o.islands = d.islands.map((i) => ({ ...i, a: fx(i.b), b: fx(i.a), under: pts(i.under), calm: i.calm && fr(i.calm) }));
-  o.bases = [fx(d.bases[1]), fx(d.bases[0])];
+  if (d.bases) o.bases = [fx(d.bases[1]), fx(d.bases[0])];
+  if (d.starts) o.starts = [d.starts[1], d.starts[0]].map((l) => l.map((st) => ({ ...st, x: fx(st.x) })));
+  o.streams = (d.streams || []).map((st) => ({ ...st, x: fx(st.x), dir: -st.dir }));
   o.ops = d.ops.map((op) => ({ ...op, x: fx(op.x) }));
   o.spots = d.spots.map((s) => ({
     ...s, team: team(s.team), range: fr(s.range),

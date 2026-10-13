@@ -405,8 +405,17 @@ export const THEMES = {
 // 층층 구름섬 wears the summer sky of 무지개 하늘다리 (its own map, the arch's colours).
 THEMES.tiers = { ...THEMES.arch, id: 'tiers', name: '층층 구름섬', desc: '세 층으로 쌓인 섬. 맨 위에서 쏠까, 아래층에 숨을까', layout: { fixed: 'tiers' }, rainbow: false };
 
+// 다랑이 논 wears the spring sky of 벚꽃 분지.
+THEMES.paddy = { ...THEMES.blossom, id: 'paddy', name: '다랑이 논', desc: '계단처럼 쌓인 논. 물이 층층이 흘러내려요. 얇은 논은 한 방에 깨져요', layout: { fixed: 'paddy' } };
+
+// 단풍 벼랑 선반 wears the autumn of 단풍 협곡.
+THEMES.cliffs = { ...THEMES.maple, id: 'cliffs', name: '단풍 벼랑 선반', desc: '두 벼랑에 매달린 선반. 상대 선반을 깨서 아래로 떨어뜨려요', layout: { fixed: 'cliffs' } };
+
+// 얼음 누각 wears the winter day of 살얼음 두 섬.
+THEMES.pavilion = { ...THEMES.snowcliff, id: 'pavilion', name: '얼음 누각', desc: '가운데 떠 있는 3층 얼음 누각. 위층일수록 받쳐 줄 층이 많아요', layout: { fixed: 'pavilion' } };
+
 // Menu order: through the year, spring to winter.
-export const THEME_ORDER = ['oak', 'blossom', 'mole', 'sunflower', 'night', 'arch', 'tiers', 'maple', 'ginkgo', 'pine', 'snowcliff', 'igloo', 'aurora'];
+export const THEME_ORDER = ['oak', 'blossom', 'paddy', 'mole', 'sunflower', 'night', 'arch', 'tiers', 'maple', 'cliffs', 'ginkgo', 'pine', 'snowcliff', 'igloo', 'pavilion', 'aurora'];
 export const SEASONS = { spring: '봄', summer: '여름', autumn: '가을', winter: '겨울' };
 
 // Fort blueprints. x is measured from the fort's back edge toward the enemy,

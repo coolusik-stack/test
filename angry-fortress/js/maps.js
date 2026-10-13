@@ -5,11 +5,11 @@
 // different heights on different ground, and each side pays for what it has in another currency
 // (height costs ground under you or cover; cover costs reach; nuts cost a drive). Which player gets
 // which home is down to the draw (terrain.js flips the map), and every map keeps one idea:
-//   도토리 숲 a hill · 벚꽃 분지 a bowl · 두더지 굴 산 a tunnel · 해바라기 비탈 a tilted island ·
+//   도토리 숲 a hill · 벚꽃 분지 a bowl · 다랑이 논 terraces · 두더지 굴 산 a tunnel · 해바라기 비탈 a tilted island ·
 //   반딧불 징검다리 stepping stones · 무지개 하늘다리 a rock arch in the sky · 층층 구름섬 shelves ·
-//   단풍 협곡 a bridge ·
+//   단풍 협곡 a bridge · 단풍 벼랑 선반 cliff ledges ·
 //   은행나무 참호 trenches · 소나무 절벽 a cliff · 살얼음 두 섬 two islands · 이글루 눈처마 an
-//   overhang and an igloo · 오로라 호수 thin lake ice
+//   overhang and an igloo · 얼음 누각 an ice pavilion · 오로라 호수 thin lake ice
 // Nothing stands in the exact middle just for show, and no map stacks more than one or two kinds
 // of spot.
 //
@@ -68,6 +68,11 @@ const cosAt = (pts, x) => {
   }
   return pts[pts.length - 1][1];
 };
+// how thick a floor with another floor under it is: thinner than CRUMBLE (config.js), so a hit
+// close to a cart standing on one breaks it and drops the cart to the floor below
+const THIN = 1.3;
+// …and the floor a home stands on: thick enough that the first shot of a match can't drop you
+const HOME = 1.8;
 const shelf = (pts, deep, crags = []) => {
   const ops = [], x0 = pts[0][0], x1 = pts[pts.length - 1][0];
   for (let x = x0 + 0.3; x <= x1 - 0.3 + 1e-6; x += 0.3) {
@@ -142,6 +147,59 @@ export const MAPS = {
       { kind: 'high', team: 1, range: [49.8, 52.6], sign: 53.4, label: { name: '분지 전망대', desc: '조준선이 두 배로 길어져요. 분지가 한눈에 내려다보여요' } },
     ],
     features: { trees: [tree(29.6, 'blossom', { h: 5.2, canopyR: 2.3, nuts: 6, room: 2.0 })] },
+  }),
+
+  // 다랑이 논 (spring) — the terraced paddies. Thin paddy terraces step down toward the middle from
+  // both homes, the water running from the top paddy down every step and off into the clouds.
+  // Left home: four small steps, 2 m each, so a cart rolls down them freely (a pad climbs back),
+  // over a cellar floor that catches anyone who breaks through and opens toward the enemy. Right
+  // home: three tall terraces, 1 m higher at the top, the middle one roofed by the one above, pads
+  // between them. Each side starts on a terrace or (left) in the cellar; a pad at the bottom of
+  // each side hops the crack in the middle.
+  paddy: () => ({
+    top: [[1.6, 9.4], [2.4, 11.0], [34.2, 11.0], [34.8, 9.6], [36.0, 10.9], [36.8, 12.5], [65.2, 12.5], [66.0, 10.9]],
+    flat: [[2.4, 34.2], [36.8, 65.2]],
+    islands: [
+      { a: 1.6, b: 34.8, under: [[1.6, 9.6], [3.5, 8.0], [9, 6.6], [15, 6.2], [22, 6.4], [29, 7.2], [34.8, 9.4]] }, // the cellar under the paddies
+      { a: 36.0, b: 66.0, under: [[36.0, 11.0], [38, 9.0], [45, 7.6], [55, 7.4], [62, 8.2], [66.0, 10.8]] },
+    ],
+    starts: [
+      [{ x: 13.0, y: 22.0 }, { x: 24.8, y: 18.0 }, { x: 20.0, y: 11.0 }],
+      [{ x: 60.0, y: 23.0 }, { x: 47.0, y: 18.2 }, { x: 46.0, y: 12.5 }],
+    ],
+    forts: [{ back: 6.4, facing: 1 }, { back: 67.2, facing: -1 }],
+    ops: [
+      ...shelf([[6.0, 22.0], [17.0, 22.0]], HOME), // left paddies, top (home) to bottom
+      ...shelf([[14.0, 20.0], [22.0, 20.0]], THIN),
+      ...shelf([[19.0, 18.0], [27.0, 18.0]], THIN),
+      ...shelf([[24.0, 16.0], [31.0, 16.0]], THIN),
+      ...shelf([[51.0, 23.0], [69.0, 23.0]], HOME), // right terraces
+      ...shelf([[43.0, 18.2], [56.0, 18.2]], THIN),
+      ...crag(9.0, 5.6, 0.9), ...crag(26.0, 5.8, 0.8), ...crag(45.0, 6.6, 1.0), ...crag(58.0, 6.6, 0.9),
+    ],
+    streams: [{ x: 13.6, y: 22.0, dir: 1 }, { x: 54.0, y: 23.0, dir: -1 }],
+    spots: [
+      // left: the steps roll down; the bottom paddy climbs back up or drops to the cellar; the cellar
+      // climbs out behind the home or hops the crack
+      { kind: 'pad', team: 0, range: [28.0, 28.6], dir: -1, to: { x: 13.0, y: 22.0 }, apex: 26.6, ...on(16.0) },
+      { kind: 'pad', team: 0, range: [29.8, 30.4], dir: 1, to: { x: 32.2, y: 11.0 }, apex: 20.0, ...on(16.0) },
+      { kind: 'pad', team: 0, range: [2.6, 3.2], dir: -1, to: { x: 11.0, y: 22.0 }, apex: 31.0, ...on(11.0) },
+      { kind: 'pad', team: -1, range: [32.8, 33.4], dir: 1, to: { x: 40.0, y: 12.5 }, apex: 14.6, ...on(11.0) },
+      {
+        kind: 'burrow', team: 0, range: [19.0, 30.4], sign: 31.6, ...below(11.0),
+        label: { name: '논 밑 움', desc: '위 논이 지붕이 되어 높이 쏜 공격을 막아 줘요. 오른쪽으로 트여 있어 낮게 쏠 수 있어요' },
+      },
+      // right: down the terraces, back up, and across
+      { kind: 'pad', team: 1, range: [52.6, 53.2], dir: -1, to: { x: 46.0, y: 18.2 }, apex: 25.0, ...on(23.0) },
+      { kind: 'pad', team: 1, range: [44.6, 45.2], dir: -1, to: { x: 39.5, y: 12.5 }, apex: 19.8, ...on(18.2) },
+      { kind: 'pad', team: 1, range: [38.4, 39.0], dir: 1, to: { x: 58.0, y: 23.0 }, apex: 27.0, ...on(12.5) },
+      { kind: 'pad', team: -1, range: [37.0, 37.6], dir: -1, to: { x: 32.2, y: 11.0 }, apex: 15.0, ...on(12.5) },
+      {
+        kind: 'burrow', team: 1, range: [51.6, 55.6], sign: 50.4, ...below(18.2),
+        label: { name: '논둑 밑', desc: '위 논이 지붕이 되어 높이 쏜 공격을 막아 줘요. 낮게 쏜 건 들어와요' },
+      },
+    ],
+    features: {},
   }),
 
   // 두더지 굴 산 (spring) — through, or over? A flat-topped mountain stands left of the middle, too
@@ -302,29 +360,35 @@ export const MAPS = {
       { a: 1.6, b: 31.0, under: [[1.6, 7.6], [3.4, 6.0], [10, 4.6], [16, 4.0], [22, 4.8], [28, 6.2], [31.0, 7.4]] },
       { a: 39.0, b: 66.0, under: [[39.0, 9.0], [41, 7.6], [48, 6.6], [56, 6.4], [62, 7.0], [66.0, 8.8]] },
     ],
-    bases: [13.0, 60.0],
+    // each side starts on one of its three floors (drawn per match); the home stays on top
+    starts: [
+      [{ x: 13.0, y: 20.8 }, { x: 25.0, y: 16.0 }, { x: 12.0, y: 9.0 }],
+      [{ x: 60.0, y: 23.4 }, { x: 48.5, y: 18.0 }, { x: 55.0, y: 10.5 }],
+    ],
     forts: [{ back: 6.9, facing: 1 }, { back: 67.0, facing: -1 }],
     ops: [
-      ...shelf([[6.5, 21.5], [20.0, 21.5]], 3.0, [9.0]), // left top (home)
-      ...shelf([[14.0, 16.0], [30.0, 16.0]], 2.0, [27.0]), // left middle
-      ...shelf([[41.0, 24.0], [67.5, 24.0]], 2.6, []), // right top (home)
-      ...shelf([[35.0, 19.6], [39.5, 19.6], [44.5, 18.0], [56.0, 18.0]], 2.0, []), // right middle, the S
+      ...shelf([[6.5, 20.8], [20.0, 20.8]], HOME), // left top (home)
+      ...shelf([[14.0, 16.0], [30.0, 16.0]], THIN), // left middle
+      ...shelf([[41.0, 23.4], [67.5, 23.4]], HOME), // right top (home)
+      ...shelf([[35.0, 19.6], [39.5, 19.6], [44.5, 18.0], [56.0, 18.0]], THIN), // right middle, the S
       ...crag(8.0, 4.4), ...crag(20.0, 4.6, 0.9), ...crag(47.0, 6.6, 1.0), ...crag(60.0, 6.8, 0.8),
     ],
+    // a spring on each top floor: down onto the middle floor, along it, and on down
+    streams: [{ x: 16.0, y: 20.8, dir: 1 }, { x: 44.6, y: 23.4, dir: -1 }],
     spots: [
       // left: top ↔ middle, middle → basement, basement → top, and the low crossing
-      { kind: 'pad', team: 0, range: [17.6, 18.2], dir: 1, to: { x: 22.5, y: 16.0 }, apex: 23.5, ...on(21.5) },
-      { kind: 'pad', team: 0, range: [28.0, 28.6], dir: 1, to: { x: 16.5, y: 21.5 }, apex: 25.5, ...on(16.0) },
-      { kind: 'pad', team: 0, range: [15.0, 15.6], dir: -1, to: { x: 7.5, y: 9.0 }, apex: 17.0, ...on(16.0) },
-      { kind: 'pad', team: 0, range: [3.0, 3.6], dir: -1, to: { x: 11.0, y: 21.5 }, apex: 29.0, ...on(9.0) },
+      { kind: 'pad', team: 0, range: [17.6, 18.2], dir: 1, to: { x: 22.5, y: 16.0 }, apex: 23.0, ...on(20.8) },
+      { kind: 'pad', team: 0, range: [28.0, 28.6], dir: 1, to: { x: 16.5, y: 20.8 }, apex: 25.0, ...on(16.0) },
+      { kind: 'pad', team: 0, range: [15.0, 15.6], dir: -1, to: { x: 7.5, y: 9.0 }, apex: 16.8, ...on(16.0) },
+      { kind: 'pad', team: 0, range: [3.0, 3.6], dir: -1, to: { x: 11.0, y: 20.8 }, apex: 28.5, ...on(9.0) },
       { kind: 'pad', team: -1, range: [28.4, 29.0], dir: 1, to: { x: 45.0, y: 10.5 }, apex: 12.4, ...on(9.0) },
       {
         kind: 'burrow', team: 0, range: [14.6, 19.6], sign: 21.0, ...below(16.0),
         label: { name: '처마 밑', desc: '바로 위 선반이 지붕이 되어 높이 쏜 공격을 막아 줘요. 낮게 쏜 건 들어와요' },
       },
       // right: top ↔ middle, middle ↔ basement, and the crossing back
-      { kind: 'pad', team: 1, range: [43.4, 44.0], dir: -1, to: { x: 37.6, y: 19.6 }, apex: 26.0, ...on(24.0) },
-      { kind: 'pad', team: 1, range: [36.2, 36.8], dir: -1, to: { x: 42.6, y: 24.0 }, apex: 27.5, ...on(19.6) },
+      { kind: 'pad', team: 1, range: [43.4, 44.0], dir: -1, to: { x: 37.6, y: 19.6 }, apex: 25.5, ...on(23.4) },
+      { kind: 'pad', team: 1, range: [36.2, 36.8], dir: -1, to: { x: 42.6, y: 23.4 }, apex: 27.0, ...on(19.6) },
       { kind: 'pad', team: 1, range: [52.4, 53.0], dir: 1, to: { x: 60.5, y: 10.5 }, apex: 20.0, ...on(18.0) },
       { kind: 'pad', team: 1, range: [62.4, 63.0], dir: 1, to: { x: 51.0, y: 18.0 }, apex: 20.0, ...on(10.5) },
       { kind: 'pad', team: -1, range: [40.0, 40.6], dir: -1, to: { x: 23.0, y: 9.0 }, apex: 12.4, ...on(10.5) },
@@ -332,7 +396,7 @@ export const MAPS = {
         kind: 'burrow', team: 1, range: [44.5, 52.0], sign: 54.4, ...below(18.0),
         label: { name: '선반 밑', desc: '위 선반이 지붕이 되어 높이 쏜 공격을 막아 줘요. 낮게 쏜 건 들어와요' },
       },
-      { kind: 'tree', team: 1, range: [44.8, 47.2], sign: 48.0, ...on(24.0), label: { name: '선반 위 명당', desc: '내 차례가 시작될 때마다 특수 견과 +1. 맨 위층이라 다 보여요' } },
+      { kind: 'tree', team: 1, range: [44.8, 47.2], sign: 48.0, ...on(23.4), label: { name: '선반 위 명당', desc: '내 차례가 시작될 때마다 특수 견과 +1. 맨 위층이라 다 보여요' } },
     ],
     features: { trees: [tree(46.0, 'oak', { h: 4.6, canopyR: 1.9 })] },
   }),
@@ -364,6 +428,56 @@ export const MAPS = {
       { kind: 'tree', team: 1, range: [44.8, 47.4], sign: 48.2, label: { name: '단풍 명당', desc: '내 차례가 시작될 때마다 특수 견과 +1. 다리 바로 앞이에요' } },
     ],
     features: { trees: [tree(46.0, 'maple', { h: 4.8, canopyR: 2.0 })] },
+  }),
+
+  // 단풍 벼랑 선반 (autumn) — the cliff ledges. Two rock pillars face each other over a bottomless
+  // gorge, homes on top, thin ledges clinging to each cliff face like balconies, a thick one at the
+  // bottom. Nobody crosses: it is a duel from ledge to ledge, and a nut that breaks your ledge drops
+  // you onto the one below. A spring on each pillar spills over the cliff and down every ledge.
+  // Left home: the higher pillar (1.5 m up) with three ledges, the middle one roofed by the top one.
+  // Right home: the lower, wider pillar with two ledges, the bottom one roofed. Each side starts on
+  // its pillar or one of its ledges; pads step down the ledges and one climbs back to the top.
+  cliffs: () => ({
+    top: [[4.8, 22.4], [5.6, 24.0], [13.8, 24.0], [14.0, 23.6], [56.0, 22.1], [56.2, 22.5], [66.4, 22.5], [67.4, 20.9]],
+    flat: [[5.6, 13.8], [56.2, 66.4]],
+    islands: [
+      { a: 4.8, b: 14.0, calm: [13.0, 14.0], under: [[4.8, 22.0], [5.4, 15.0], [6.6, 8.0], [9.0, 4.6], [12.0, 4.4], [13.6, 5.4], [14.0, 6.0]] },
+      { a: 56.0, b: 67.4, calm: [56.0, 57.0], under: [[56.0, 5.8], [57.4, 4.8], [61.0, 4.4], [64.6, 6.6], [66.6, 12.0], [67.4, 20.5]] },
+    ],
+    starts: [
+      [{ x: 11.2, y: 24.0 }, { x: 17.6, y: 19.0 }, { x: 23.4, y: 14.5 }],
+      [{ x: 60.0, y: 22.5 }, { x: 51.4, y: 16.4 }, { x: 46.0, y: 11.5 }],
+    ],
+    forts: [{ back: 5.6, facing: 1 }, { back: 66.4, facing: -1 }],
+    ops: [
+      ...shelf([[13.6, 19.0], [21.0, 19.0]], THIN), // left ledges, top to bottom
+      ...shelf([[13.6, 14.5], [26.0, 14.5]], THIN),
+      ...shelf([[13.6, 9.0], [30.0, 9.0]], 3.0, [22.0]),
+      ...shelf([[48.0, 16.4], [56.4, 16.4]], THIN), // right ledges
+      ...shelf([[43.0, 11.5], [56.4, 11.5]], 3.0, [49.0]),
+      ...crag(8.0, 5.4, 1.1), ...crag(61.0, 5.2, 1.1),
+    ],
+    streams: [{ x: 12.8, y: 24.0, dir: 1 }, { x: 58.6, y: 22.5, dir: -1 }],
+    spots: [
+      // left: pillar → ledge → ledge → bottom ledge, and the bottom ledge back up to the pillar
+      { kind: 'pad', team: 0, range: [12.0, 12.6], dir: 1, to: { x: 18.4, y: 19.0 }, apex: 25.5, ...on(24.0) },
+      { kind: 'pad', team: 0, range: [19.2, 19.8], dir: 1, to: { x: 24.0, y: 14.5 }, apex: 20.5, ...on(19.0) },
+      { kind: 'pad', team: 0, range: [24.4, 25.0], dir: 1, to: { x: 28.2, y: 9.0 }, apex: 17.2, ...on(14.5) },
+      { kind: 'pad', team: 0, range: [28.6, 29.2], dir: -1, to: { x: 11.0, y: 24.0 }, apex: 28.0, ...on(9.0) },
+      {
+        kind: 'burrow', team: 0, range: [14.6, 20.4], sign: 22.4, ...below(14.5),
+        label: { name: '벼랑 굴', desc: '위 선반이 지붕이 되어 높이 쏜 공격을 막아 줘요. 낮게 쏜 건 들어와요' },
+      },
+      // right: pillar → ledge → bottom ledge, and back up
+      { kind: 'pad', team: 1, range: [57.6, 58.2], dir: -1, to: { x: 51.0, y: 16.4 }, apex: 25.0, ...on(22.5) },
+      { kind: 'pad', team: 1, range: [49.0, 49.6], dir: -1, to: { x: 45.4, y: 11.5 }, apex: 19.0, ...on(16.4) },
+      { kind: 'pad', team: 1, range: [43.8, 44.4], dir: 1, to: { x: 61.0, y: 22.5 }, apex: 27.0, ...on(11.5) },
+      {
+        kind: 'burrow', team: 1, range: [49.4, 55.6], sign: 47.4, ...below(11.5),
+        label: { name: '선반 굴', desc: '위 선반이 지붕이 되어 높이 쏜 공격을 막아 줘요. 낮게 쏜 건 들어와요' },
+      },
+    ],
+    features: {},
   }),
 
   // 은행나무 참호 (autumn) — shoot from behind your hill. Each home sits behind its own ridge with an
@@ -487,6 +601,65 @@ export const MAPS = {
       { x0: 46.6, x1: 53.4, y0: 12.4, y1: 15.2, color: 'rgba(92,120,156,0.9)' }, // inside the igloo
     ],
     paints: [{ kind: 'snow', x: 50.0, y: 12.4, rx: 3.5, ry: 4.6, above: 12.45 }, { kind: 'snow', x: 24.6, y: 15.75, rx: 3.1, ry: 0.7 }],
+  }),
+
+  // 얼음 누각 (winter) — the ice pavilion. A three-storey open pavilion of thin ice floats in the
+  // middle between the two home islands: a top deck (the lookout everybody wants), a wide middle
+  // floor open at both ends, and a small bottom floor under its middle. The higher you stand, the
+  // more floors there are under you to catch a fall; under each open end of the middle floor hangs
+  // a thick block of ice, and the bottom floor's ends hop sideways onto them. A spring on the top
+  // deck runs off both ends, down every floor and away. Left home: 1 m higher; the pavilion
+  // itself is the same from both sides. Each side starts at home, on its end of the middle floor
+  // or on its ice block.
+  pavilion: () => ({
+    top: [[2.0, 11.6], [2.8, 13.2], [20.4, 13.2], [21.0, 11.8], [51.0, 10.8], [51.6, 12.2], [69.2, 12.2], [70.0, 10.6]],
+    flat: [[2.8, 20.4], [51.6, 69.2]],
+    islands: [
+      { a: 2.0, b: 21.0, under: [[2.0, 11.8], [3.6, 8.6], [8, 7.0], [14, 6.6], [18, 7.6], [21.0, 10.4]] },
+      { a: 51.0, b: 70.0, under: [[51.0, 10.8], [53, 9.4], [58, 8.0], [64, 8.0], [68, 9.6], [70.0, 10.8]] },
+    ],
+    starts: [
+      [{ x: 12.0, y: 13.2 }, { x: 28.2, y: 17.0 }, { x: 27.6, y: 12.5 }],
+      [{ x: 61.0, y: 12.2 }, { x: 44.0, y: 17.0 }, { x: 44.6, y: 12.5 }],
+    ],
+    forts: [{ back: 5.4, facing: 1 }, { back: 67.6, facing: -1 }],
+    ops: [
+      ...shelf([[30.0, 22.0], [42.0, 22.0]], THIN), // the pavilion: top deck,
+      ...shelf([[26.0, 17.0], [46.0, 17.0]], THIN), // the wide middle floor,
+      ...shelf([[33.0, 12.0], [39.0, 12.0]], THIN), // the small bottom floor,
+      ...shelf([[24.6, 12.5], [30.4, 12.5]], 2.6, [27.6]), // and the ice blocks under the open ends
+      ...shelf([[41.6, 12.5], [47.4, 12.5]], 2.6, [44.4]),
+      ...crag(9.0, 6.6, 1.0), ...crag(16.0, 6.8, 0.8), ...crag(57.0, 7.6, 1.0), ...crag(64.0, 7.6, 0.8),
+    ],
+    streams: [{ x: 35.6, y: 22.0, dir: -1 }, { x: 36.6, y: 22.0, dir: 1 }],
+    spots: [
+      // from home onto your end of the middle floor, and from there up onto the deck
+      { kind: 'pad', team: 0, range: [17.8, 18.4], dir: 1, to: { x: 28.0, y: 17.0 }, apex: 21.0, ...on(13.2) },
+      { kind: 'pad', team: 1, range: [53.6, 54.2], dir: -1, to: { x: 44.0, y: 17.0 }, apex: 21.2, ...on(12.2) },
+      { kind: 'pad', team: 0, range: [27.0, 27.6], dir: -1, to: { x: 33.0, y: 22.0 }, apex: 27.0, ...on(17.0) },
+      { kind: 'pad', team: 1, range: [44.4, 45.0], dir: 1, to: { x: 39.0, y: 22.0 }, apex: 27.0, ...on(17.0) },
+      // the deck's ends drop you home
+      { kind: 'pad', team: -1, range: [30.8, 31.4], dir: -1, to: { x: 16.0, y: 13.2 }, apex: 24.0, ...on(22.0) },
+      { kind: 'pad', team: -1, range: [40.6, 41.2], dir: 1, to: { x: 56.0, y: 12.2 }, apex: 24.0, ...on(22.0) },
+      // the bottom floor hops sideways onto the ice blocks, and the ice blocks go home
+      { kind: 'pad', team: -1, range: [33.6, 34.2], dir: -1, to: { x: 28.0, y: 12.5 }, apex: 14.2, ...on(12.0) },
+      { kind: 'pad', team: -1, range: [37.8, 38.4], dir: 1, to: { x: 44.4, y: 12.5 }, apex: 14.2, ...on(12.0) },
+      { kind: 'pad', team: 0, range: [25.0, 25.6], dir: -1, to: { x: 16.0, y: 13.2 }, apex: 16.4, ...on(12.5) },
+      { kind: 'pad', team: 1, range: [46.4, 47.0], dir: 1, to: { x: 56.0, y: 12.2 }, apex: 16.0, ...on(12.5) },
+      {
+        kind: 'high', team: -1, range: [32.0, 40.0], sign: null, signs: [31.6, 40.4], ...on(22.0),
+        label: { name: '누각 꼭대기', desc: '조준선이 두 배로 길어져요. 아래층이 둘이라 깨져도 받쳐 줘요' },
+      },
+      {
+        kind: 'burrow', team: -1, range: [30.6, 41.4], sign: null, ...below(17.0),
+        label: { name: '누각 2층', desc: '꼭대기 층이 지붕이 되어 높이 쏜 공격을 막아 줘요. 낮게 쏜 건 들어와요' },
+      },
+      {
+        kind: 'burrow', team: -1, range: [33.4, 38.6], sign: null, ...below(12.0),
+        label: { name: '누각 1층', desc: '위층이 지붕이에요. 여기가 깨지면 구름이니 조심해요' },
+      },
+    ],
+    features: {},
   }),
 
   // 오로라 호수 (winter night) — thin ice. A frozen lake fills the middle, ice barely 1.3 m thick:

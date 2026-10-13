@@ -109,7 +109,7 @@ export class Game {
     this.world = new planck.World({ gravity: V(0, -GRAV) });
     // which home each player gets: the stage's say, else the draw (the seed, so two phones agree)
     this.flip = this.opts.flip ?? ((this.seed >>> 3) & 1) === 1;
-    const land = buildLandscape(this.theme.layout, this.seed, this.flip);
+    const land = buildLandscape(this.theme.layout, this.seed, this.flip, this.opts.starts);
     this.land = land;
     this.terrain = new Terrain({ style: this.theme.ground, seed: this.seed, heights: land.heights, under: land.under, ops: land.ops, backs: land.backs, paints: land.paints });
     this.terrain.attach(this.world, planck);
@@ -119,7 +119,7 @@ export class Game {
     // captains
     this.players = [0, 1].map((i) => {
       const x = land.bases[i];
-      const y = this.terrain.surfaceY(x) + CART_R + 0.05;
+      const y = this.terrain.surfaceY(x, land.baseY[i] == null ? undefined : land.baseY[i] + 1) + CART_R + 0.05;
       const p = {
         id: i,
         team: i,

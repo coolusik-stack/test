@@ -8,9 +8,10 @@ import walk from './walk.mjs';
 import shots from './shots.mjs';
 import lockstep from './lockstep.mjs';
 import rooted from './rooted.mjs';
+import floors from './floors.mjs';
 import online from './online.mjs';
 import relay from './relay.mjs';
 import cpu from './cpu.mjs';
 import perf from './perf.mjs';
 
-export const SUITES = [boot, ui, tutorial, campaign, shop, walk, shots, lockstep, rooted, online, relay, cpu, perf];
+export const SUITES = [boot, ui, tutorial, campaign, shop, walk, shots, lockstep, rooted, floors, online, relay, cpu, perf];

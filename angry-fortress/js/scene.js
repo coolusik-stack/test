@@ -75,6 +75,8 @@ export class Scene {
     add(sp[sp.length - 1].b - 0.7, 1);
     if (sp.length === 3) add(r() < 0.5 ? sp[1].a + 0.9 : sp[1].b - 0.9, r() < 0.5 ? -1 : 1);
     for (const f of this.falls) if (f.dir === 1 ? f.x < WORLD.W / 2 : f.x > WORLD.W / 2) f.dir = -f.dir;
+    // a map built in floors has springs whose water runs along each floor and falls to the next
+    this.streams = (land.streams || []).map((st) => ({ ...st, ph: r() * TAU, path: null, ver: -1 }));
     this.reeds = this.pads = null;
   }
 
@@ -395,8 +397,125 @@ export class Scene {
     ctx.globalAlpha = 1;
   }
 
+  // Where a spring's water goes: along the floor it rises on (downhill or in its `dir`), over the
+  // edge, down onto whatever floor is below, along that one, and so on until the clouds. Worked out
+  // again whenever the ground changes, so a blasted hole sends the water through it.
+  _streamPath(st, terrain) {
+    const legs = [];
+    let x = st.x, dir = st.dir, y = terrain.surfaceY(x, st.y + 0.6);
+    if (y < WORLD.SEA + 0.5 || Math.abs(y - st.y) > 1.2) return legs; // the spring is gone
+    for (let leg = 0; leg < 8; leg++) {
+      const run = [[x, y]];
+      let fell = false;
+      for (let k = 0; k < 400; k++) {
+        const nx = x + dir * 0.2;
+        if (nx < 0.5 || nx > WORLD.W - 0.5) break;
+        if (terrain.solid(nx, y + 0.35)) { run.push([x, y]); fell = null; break; } // runs into a wall: a pool
+        const ny = terrain.surfaceY(nx, y + 0.35);
+        if (ny < WORLD.SEA + 0.3 || y - ny > 0.6) { fell = true; break; } // the edge
+        x = nx; y = ny;
+        run.push([x, y]);
+      }
+      legs.push({ kind: 'run', pts: run });
+      if (!fell) break;
+      // over the edge: down to the next floor, or the clouds
+      const fx = x + dir * 0.25;
+      const land = terrain.surfaceY(fx + dir * 0.6, y - 0.3);
+      const bottom = land > WORLD.SEA + 0.3 ? land : WORLD.SEA + 0.3;
+      legs.push({ kind: 'fall', x: fx, dir, y0: y - 0.1, y1: bottom, sea: !(land > WORLD.SEA + 0.3) });
+      if (!(land > WORLD.SEA + 0.3)) break;
+      x = fx + dir * 0.9; y = terrain.surfaceY(x, bottom + 0.4);
+      if (y < WORLD.SEA + 0.3) break;
+    }
+    return legs;
+  }
+
+  _drawStreams(ctx, view, time, terrain) {
+    const a = this.t.abyss;
+    for (const st of this.streams) {
+      if (st.ver !== terrain.version) { st.path = this._streamPath(st, terrain); st.ver = terrain.version; }
+      const legs = st.path;
+      if (!legs.length) continue;
+      // the spring: a little pool where the water wells up
+      const [sx, sy] = legs[0].pts[0];
+      const deep = this.t.night ? '#3f7fd0' : '#3a9be8', clear = this.t.night ? '#7fb4f0' : '#7ccaff';
+      ctx.globalAlpha = 0.9;
+      ctx.fillStyle = deep;
+      ctx.beginPath();
+      ctx.ellipse(sx, -sy - 0.02, 0.55, 0.13, 0, 0, TAU);
+      ctx.fill();
+      for (const L of legs) {
+        if (L.kind === 'run') {
+          if (L.pts.length < 2) continue;
+          // a creek lying on the grass, with a slow glint running along it
+          ctx.lineCap = 'round';
+          ctx.lineJoin = 'round';
+          ctx.globalAlpha = 0.9;
+          ctx.strokeStyle = deep;
+          ctx.lineWidth = 0.26;
+          ctx.beginPath();
+          for (const [x, y] of L.pts) ctx.lineTo(x, -y - 0.06);
+          ctx.stroke();
+          ctx.strokeStyle = clear;
+          ctx.lineWidth = 0.13;
+          ctx.stroke();
+          ctx.globalAlpha = 0.7;
+          ctx.strokeStyle = '#ffffff';
+          ctx.lineWidth = 0.05;
+          ctx.setLineDash([0.35, 1.1]);
+          ctx.lineDashOffset = -(time * 1.6 + st.ph);
+          ctx.beginPath();
+          for (const [x, y] of L.pts) ctx.lineTo(x, -y - 0.07);
+          ctx.stroke();
+          ctx.setLineDash([]);
+        } else {
+          // a ribbon of water off the edge, widening as it falls
+          const h = L.y0 - L.y1;
+          const xAt = (y, side) => L.x + L.dir * 0.7 * Math.sqrt(clamp((L.y0 - y) / 1.2, 0, 1)) + side * (0.18 + 0.22 * clamp((L.y0 - y) / 6, 0, 1));
+          ctx.beginPath();
+          for (let y = L.y0; y > L.y1; y -= 0.3) ctx.lineTo(xAt(y, -1), -y);
+          ctx.lineTo(xAt(L.y1, -1), -L.y1);
+          ctx.lineTo(xAt(L.y1, 1), -L.y1);
+          for (let y = L.y1; y <= L.y0 + 0.01; y += 0.3) ctx.lineTo(xAt(y, 1), -y);
+          ctx.closePath();
+          const fade = L.sea ? ctx.createLinearGradient(0, -L.y0, 0, -L.y1) : null;
+          if (fade) { fade.addColorStop(0, clear); fade.addColorStop(1, 'rgba(255,255,255,0.25)'); }
+          ctx.globalAlpha = 0.72;
+          ctx.fillStyle = fade || clear;
+          ctx.fill();
+          ctx.globalAlpha = 0.5;
+          ctx.strokeStyle = deep;
+          ctx.lineWidth = 0.05;
+          ctx.stroke();
+          ctx.globalAlpha = 0.55;
+          ctx.strokeStyle = '#ffffff';
+          ctx.lineWidth = 0.045;
+          ctx.setLineDash([0.45, 0.8]);
+          for (const side of [-0.5, 0.4]) {
+            ctx.lineDashOffset = -(time * 3 + st.ph + side * 2);
+            ctx.beginPath();
+            for (let y = L.y0; y >= L.y1; y -= 0.3) ctx.lineTo(xAt(y, side), -y);
+            ctx.stroke();
+          }
+          ctx.setLineDash([]);
+          // splash where it lands (mist over the clouds)
+          ctx.fillStyle = L.sea ? a.cloud : '#ffffff';
+          for (let k = 0; k < 3; k++) {
+            const ph = (time * 0.7 + k / 3 + st.ph) % 1;
+            ctx.globalAlpha = (L.sea ? 0.3 : 0.22) * (1 - ph) * clamp(h / 2, 0.4, 1);
+            ctx.beginPath();
+            ctx.arc(xAt(L.y1, 0) + (k - 1) * 0.3, -(L.y1 + ph * 0.5), 0.18 + ph * 0.35, 0, TAU);
+            ctx.fill();
+          }
+        }
+      }
+      ctx.globalAlpha = 1;
+    }
+  }
+
   // Water spilling off the island cliffs into the clouds (gone once its spring is blown away).
   drawFalls(ctx, view, time, terrain) {
+    if (this.streams && this.streams.length) this._drawStreams(ctx, view, time, terrain);
     if (!this.falls) return;
     const a = this.t.abyss;
     for (const f of this.falls) {

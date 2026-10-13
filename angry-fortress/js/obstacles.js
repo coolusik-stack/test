@@ -30,7 +30,7 @@ export class Forest {
     const g = this.g, r = this.r;
     const land = g.land;
     for (const p of g.players) {
-      const x = p.body.getPosition().x - p.facing * 2.9;
+      const x = land.homes[p.id]; // on the home floor, wherever the cart starts
       this.homes.push({ x, y: g.terrain.surfaceY(x), team: p.team, facing: p.facing, seed: r.int(1, 9999) });
     }
     this.taken = [];
