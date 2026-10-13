@@ -31,6 +31,13 @@ A one-page brand intro that follows **ONEKI Brand Book v4.1** (24 spreads, 起�
   - Pretendard for Korean sans.
   - Noto Serif KR for Korean body.
   - Londrina Solid 900 for hand caps.
+- **Packaging colour (decided 2026-10-13):** the stick stays muted champagne metallic gold: near-matte, ensō only, no lettering, never yellow gold, so it doesn't read as a 홍삼 or 한약 stick. Blue is the *release*, not the vessel. Cobalt goes on:
+  - a thin line at the notch
+  - the inside face of the foil, seen when torn open
+  - the 10-pack box (cobalt outside, gold sticks inside)
+  - the caffeine figure, the largest type on the pack
+
+  Any blue-vs-gold question should be settled by testing thumbnail response in the organic hook tests, not by taste.
 - **Ritual:** "톡" / "기 트자". The stick is what snaps, and the 기 is what opens. **Never write "기를 꺾다".** Timing: "들어가기 30분 전, 톡".
 - **Banned wording (general food, 일반식품):**
   - 폭발시킨다, 고카페인 (as a claim), 풀파워, 공부/성적
