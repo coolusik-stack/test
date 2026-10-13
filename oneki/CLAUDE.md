@@ -12,6 +12,7 @@ A one-page brand intro that follows **ONEKI Brand Book v4.1** (24 spreads, 起�
   - The peak switches the page into `.is-snapped` (cobalt, gauge locked at 1,900°C).
 - **`img/`:** self-hosted, optimized assets.
   - Generated with Higgsfield: `stick.webp` and `hand.webp` (alpha cutouts), `haze.webp`, `flame-amber.jpg`, and `snap/d|m/*.webp` (a 62-frame sequence from the snap clip; `m` is the portrait crop).
+  - Origins illustrations: `ill-tower`, `ill-cups`, `ill-watch` and `ill-tok` come from brand book spreads 06-07. `ill-kitchen`, `ill-flame`, `ill-faces`, `ill-people`, `ill-pocket`, `ill-ingredients` and `ill-moon` are new, generated in the same line style with the brand-book illustrations as references. They sit on the paper ground with `mix-blend-mode: multiply`, so their containers need `background: var(--paper)`.
   - From the brand book: everything else.
 - **`fonts/`:** self-hosted. Korean fonts are subset to the page's glyphs, so **run `tools/subset-fonts.sh` after changing Korean copy**.
 - **Verification:** the scroll-craft harness (`shoot.mjs`), run at desktop, 390px and reduced-motion.

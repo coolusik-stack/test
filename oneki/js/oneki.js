@@ -97,6 +97,20 @@
   addEventListener('resize', fitPanel);
   if (document.fonts) document.fonts.ready.then(fitPanel);
 
+  /* ---------- origins: the illustration column follows the answer being read ---------- */
+  var media = Array.prototype.slice.call(document.querySelectorAll('.og-media__img'));
+  var groups = Array.prototype.slice.call(document.querySelectorAll('.og'));
+  function showIll(key) { media.forEach(function (m) { m.classList.toggle('is-on', m.getAttribute('data-ill') === key); }); }
+  if (media.length) {
+    showIll(groups[0].getAttribute('data-ill'));
+    if ('IntersectionObserver' in window) {
+      var gio = new IntersectionObserver(function (es) {
+        es.forEach(function (e) { if (e.isIntersecting) showIll(e.target.getAttribute('data-ill')); });
+      }, { rootMargin: '-45% 0px -45% 0px' });
+      groups.forEach(function (g) { gio.observe(g); });
+    }
+  }
+
   /* ---------- chapter ticks follow the reader ---------- */
   var ticks = Array.prototype.slice.call(document.querySelectorAll('.gauge__ticks a'));
   var chapters = ticks.map(function (a) { return document.getElementById(a.getAttribute('data-ch')); });

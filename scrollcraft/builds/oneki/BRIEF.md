@@ -87,3 +87,13 @@ I scrolled the built page cold and wrote one word per act, then compared it with
 | 8 | Calm, carried | calm | None. The last screen holds the ensō, "Refill, never borrow." and the colophon |
 
 **Deviation from the brand book, on purpose.** The intertitles are reordered to Pause 起 / Breathe in 承 / Snap 轉 / Breathe out 結, so the snap is the turn (轉) and the exhale is the resolution (結). The brand book had Breathe out before Snap. The feeling curve needs release before belonging.
+
+## Revision 2026-10-13: Origins with the full brand-book interview
+
+The user asked for appropriate illustrations to fill in the content of brand book pages 6 and 7.
+
+- **Copy:** act 2 now carries all 17 founder Q&As from spreads 06 (Origins 1) and 07 (Origins 2), in 12 groups.
+- **Illustrations:** a sticky column on desktop crossfades as each group is read; on phones each illustration sits inline above its answers.
+  - Four come from the brand book.
+  - Seven are newly generated in the brand book's line style.
+- **Length:** the act grows to about 7.8vh, so the page now runs about 21vh. That is over the 14vh pacing reference, accepted because the user asked for the content. The act is natural flow, not a pin, so it reads as an editorial spread rather than held scroll.
