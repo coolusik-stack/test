@@ -1,0 +1,101 @@
+
+<!-- 24 BACK COVER -->
+<section class="sp" style="background:var(--black);color:#fff">
+ <div class="dots" style="left:50px;top:462px;width:780px;height:648px;opacity:.55"></div>
+ <img src="img/enso.png" style="left:388px;top:360px;width:140px;height:140px">
+ <div style="left:0;top:540px;width:918px;text-align:center;font:800 15px var(--sans);letter-spacing:.32em">ONEKI</div>
+ <div style="left:0;top:572px;width:918px;text-align:center;font:italic 400 15px var(--serif);opacity:.7">One Ki · 元氣 · Seoul, 2026</div>
+ <div style="left:0;top:1060px;width:918px;text-align:center;font:500 9px/1.6 var(--kr);opacity:.45">ONEKI Brand Book, Issue 1 — Internal edition. 인물·장면 이미지는 브랜드 방향을 보여주기 위한 일러스트레이션이며 실제 게스트가 아닙니다.</div>
+ <div style="left:1040px;top:462px;width:786px;height:648px" class="dots"></div>
+ <div class="rast" style="left:1150px;top:250px;width:560px;font:800 58px/1.04 var(--sans);letter-spacing:-.02em;background:linear-gradient(95deg,#F3E7C4 0%,#DCC690 28%,#BFD9C7 58%,#B3C0F0 82%,#D6C5EE 100%);-webkit-background-clip:text;background-clip:text;color:transparent">Refill,<br>never borrow.</div>
+</section>
+
+<script>
+(function(){
+const $=s=>document.querySelector(s);
+const el=(p,html)=>{p.insertAdjacentHTML('beforeend',html)};
+
+/* 10 — circles */
+const C=[[607,118],[73,451],[340,451],[607,451],[73,785],[340,785],[1030,118],[1296,118],[1030,451],[1296,451],[1563,451],[1563,785]];
+const Q=[
+['“발표 직전엔 숨 세 번. 그리고 무대로.”','지윤, 프로덕트 디자이너'],
+['“붕대를 감는 동안은 아무 말도 안 한다. 톡, 그리고 고요.”','태오, 아마추어 복서'],
+['“시험장 들어가기 전, 딱 한 번 눈을 감는다.”','서연, 로스쿨 준비생'],
+['“큰 미팅 전 1분, 휴대폰을 뒤집는다.”','민재, 전략 컨설턴트'],
+['“무대 오르기 전엔 손은 따뜻하게, 마음은 차갑게.”','하은, 재즈 피아니스트'],
+['“피칭 직전엔 할 말을 세 문장으로 줄인다.”','도윤, 창업가'],
+['“출발선에선 느리게 숨 쉬고, 결승선에서 크게 웃는다.”','유나, 마라토너'],
+['“랭크전 전엔 물 한 잔, 스트레칭, 그리고 톡.”','준호, 게임 크리에이터'],
+['“첫 출근 날 아침, 거울 앞에서 한 번 웃는다.”','소희, 신입 애널리스트'],
+['“셔터를 누르기 전, 숨을 멈춘다.”','재현, 포토그래퍼'],
+['“나이트 근무 전, 물 한 잔이 먼저.”','나래, 간호사'],
+['“첫 데이트 전엔 동네 한 바퀴.”','건우, 세일즈 리드']];
+const ci=$('#circles');
+C.forEach(([x,y],i)=>{
+ el(ci,`<img class="pic" src="img/c${String(i+1).padStart(2,'0')}.jpg" style="left:${x}px;top:${y}px;width:200px;height:200px;border-radius:50%;object-position:50% 28%">`);
+ el(ci,`<div style="left:${x-20}px;top:${y+214}px;width:240px;text-align:center"><div style="font:600 12.4px/1.5 var(--kr);letter-spacing:-.01em">${Q[i][0]}</div><div style="margin-top:5px;font:italic 400 12px var(--serif);opacity:.75">— ${Q[i][1]}</div></div>`);
+});
+el(ci,`<div class="rh l">The Moment</div><div class="rh r">The Moment</div><div style="left:1030px;top:800px;width:480px;font:600 50px/1.04 var(--serif);letter-spacing:-.02em">Your ritual is your <span class="gold">quiet rebellion.</span></div><div class="lead" style="left:1030px;top:925px;width:430px;font-size:14px">거창할 필요 없다. 큰 순간 직전의 작은 습관 하나가 결과의 온도를 바꾼다.</div>`);
+
+/* 15 — callouts */
+const T=[[980,148,1250,96,'Wired, not ready'],[843,389,560,300,'Borrowed energy'],[1134,351,1340,286,'Cup no. 3'],[968,555,560,560,'Loosened, not relaxed'],[1152,944,1400,896,'The crash'],[1074,1092,720,1044,'The debt, paid tonight']];
+let svg='';
+T.forEach(([tx,ty,lx,ly,t])=>{
+ const w=t.length*10.2+34, cx=lx<tx?lx+w:lx, cy=ly+19;
+ svg+=`<line x1="${cx}" y1="${cy}" x2="${tx}" y2="${ty}" stroke="#1C1B1D" stroke-width="4" stroke-linecap="round" opacity=".35"/><line x1="${cx}" y1="${cy}" x2="${tx}" y2="${ty}" stroke="#fff" stroke-width="1.8" stroke-linecap="round"/><circle cx="${tx}" cy="${ty}" r="7" fill="#B39A5C" stroke="#fff" stroke-width="2"/>`;
+ el($('#orig'),`<div style="left:${lx}px;top:${ly}px;width:${w}px;height:38px;border-radius:19px;background:#fff;color:#1C1B1D;font:800 14px/38px var(--sans);letter-spacing:.06em;text-transform:uppercase;text-align:center;box-shadow:0 2px 14px rgba(0,0,0,.18)">${t}</div>`);
+});
+$('#callouts').innerHTML=svg;
+
+/* 40 — posters */
+const P=[
+ {x:213,bg:'#2743B0',fg:'#fff',t:'Own the<br>moment<br>before',s:'2036 · BHAG 01'},
+ {x:600,bg:'#B39A5C',fg:'#1C1B1D',t:'Blue<br>is a<br>category',s:'2036 · BHAG 02'},
+ {x:984,bg:'#231F20',fg:'#B39A5C',t:'One stick,<br>every<br>pocket',s:'2036 · BHAG 03'},
+ {x:1368,bg:'#F4ACA4',fg:'#1C1B1D',t:'Quiet<br>East,<br>loud<br>world',s:'2036 · BHAG 04'}];
+const PC=['중요한 순간 직전이면 누구나 ONEKI를 떠올린다. 떨릴 때도, 기 빠질 때도. ‘기 트자’가 일상어가 된다.','‘블루 에너지’가 진열대의 한 칸이 된다. 레드 옆에, 레드만큼. 그리고 우리가 그 이름의 첫 줄에 선다.','주머니마다 한 포. 매년 1억 번의 톡.','서울에서 시작한 조용한 에너지가 도쿄, 싱가포르, LA의 무대 뒤를 바꾼다.'];
+const FR=window.FRAMES||[[215,128,281,380],[591,128,281,380],[964,128,281,380],[1338,128,283,380]];
+P.forEach((p,i)=>{
+ const [fx,fy,fw,fh]=FR[i];
+ el($('#posters'),`<div style="left:${fx}px;top:${fy}px;width:${fw}px;height:${fh}px;background:${p.bg};color:${p.fg};overflow:hidden;box-shadow:inset 0 0 0 1px rgba(0,0,0,.12)"><div class="handcaps" style="position:absolute;left:0;top:50%;width:100%;transform:translateY(-54%);font-size:${i==1?56:48}px;line-height:1">${p.t}</div><div style="position:absolute;left:0;bottom:18px;width:100%;text-align:center;font:700 9px var(--sans);letter-spacing:.18em;opacity:.85">${p.s}</div><img src="img/${p.fg=='#fff'?'enso_white':'enso'}.png" style="position:absolute;left:50%;margin-left:-17px;top:18px;width:34px;height:34px;${p.fg=='#1C1B1D'?'filter:brightness(0)':''}"></div>`);
+ el($('#posters'),`<div style="left:${fx+fw/2-159}px;top:${fy+fh+26}px;width:318px;padding:12px 16px;background:rgba(255,255,255,.94);font:500 12.5px/1.6 var(--kr);color:#1C1B1D"><b style="font:800 11px var(--sans);letter-spacing:.14em;display:block;margin-bottom:4px">BHAG 0${i+1}</b>${PC[i]}</div>`);
+});
+
+
+/* 12b — red vs blue + map */
+(function(){
+ const R=[['방식','흥분시켜 끌어올린다','가라앉혀 모은다'],['에너지','당겨쓴다 — 크래시로 갚는다','채워서 쓴다'],['몸의 신호','심장이 빨라진다','머리가 차가워진다'],['형태','캔 한 가득','농축 스틱 한 모금'],['순간','파티, 밤샘','직전의 순간 — The Moment Before']];
+ let h=`<div style="display:grid;grid-template-columns:110px 1fr 1fr;border-top:2px solid #1C1B1D">`;
+ h+=`<div></div><div style="padding:8px 10px;font:800 12px var(--sans);letter-spacing:.1em;color:#8a8a8e;text-transform:uppercase">Red Energy</div><div style="padding:8px 10px;font:800 12px var(--sans);letter-spacing:.1em;color:#fff;background:#2743B0;text-transform:uppercase">Blue Energy · ONEKI</div>`;
+ R.forEach(r=>{h+=`<div style="padding:6px 0;border-top:1px solid #d6d6d8;font:700 12px/1.45 var(--kr)">${r[0]}</div><div style="padding:6px 10px;border-top:1px solid #d6d6d8;font:500 12.5px/1.45 var(--kr);color:#6d6d72">${r[1]}</div><div style="padding:6px 10px;border-top:1px solid #c9d2f2;font:700 12.5px/1.45 var(--kr);color:#2743B0;background:#EEF1FB">${r[2]}</div>`});
+ h+='</div>';
+ document.getElementById('rb').innerHTML=h;
+ const W=745,H=440,cx=372,cy=220;
+ const dot=(x,y,t,a)=>`<circle cx="${x}" cy="${y}" r="8" fill="#A7A7AD"/><text x="${a=='l'?x-14:x+14}" y="${y+5}" text-anchor="${a=='l'?'end':'start'}" font-family="Pretendard" font-weight="600" font-size="14" fill="#6d6d72">${t}</text>`;
+ let g=`<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" style="position:absolute;left:0;top:0">`;
+ g+=`<rect x="0" y="0" width="${W}" height="${H}" fill="#F4F4F5"/>`;
+ g+=`<rect x="${cx}" y="${cy}" width="${W-cx}" height="${H-cy}" fill="#2743B0"/>`;
+ g+=`<circle cx="470" cy="${cy+112}" r="86" fill="#fff" opacity=".07"/><circle cx="470" cy="${cy+112}" r="68" fill="#fff" opacity=".12"/>`;
+ g+=`<circle cx="470" cy="${cy+112}" r="44" fill="#fff"/><text x="470" y="${cy+118}" text-anchor="middle" font-family="Hanken Grotesk" font-weight="800" font-size="17" letter-spacing="1" fill="#2743B0">ONEKI</text>`;
+ g+=`<text x="580" y="${cy+84}" font-family="Hanken Grotesk" font-weight="800" font-size="19" letter-spacing="1.5" fill="#fff">BLUE ENERGY</text>`;
+ g+=`<text x="580" y="${cy+112}" font-family="Pretendard" font-weight="700" font-size="15" fill="#fff">차분 × 농축</text>`;
+ g+=`<text x="580" y="${cy+136}" font-family="Pretendard" font-weight="500" font-size="14" fill="#fff" opacity=".85">아무도 없던 자리,</text>`;
+ g+=`<text x="580" y="${cy+158}" font-family="Pretendard" font-weight="500" font-size="14" fill="#fff" opacity=".85">우리가 먼저 선다.</text>`;
+ g+=dot(92,62,'레드불','r')+dot(170,112,'몬스터','r')+dot(80,158,'핫식스','r');
+ g+=dot(118,300,'에너지샷','r')+dot(214,366,'러닝 에너지젤','r');
+ g+=dot(560,74,'릴랙스 음료','r')+dot(470,146,'테아닌 음료','r');
+ g+=`<line x1="14" y1="${cy}" x2="${W-14}" y2="${cy}" stroke="#1C1B1D" stroke-width="1.6"/><line x1="${cx}" y1="14" x2="${cx}" y2="${H-14}" stroke="#1C1B1D" stroke-width="1.6"/>`;
+ g+=`<path d="M14 ${cy} l10 -6 v12 z M${W-14} ${cy} l-10 -6 v12 z M${cx} 14 l-6 10 h12 z" fill="#1C1B1D"/><path d="M${cx} ${H-14} l-6 -10 h12 z" fill="#1C1B1D"/>`;
+ g+=`<text x="16" y="${cy-12}" font-family="Hanken Grotesk" font-weight="800" font-size="12" letter-spacing="1.8" fill="#1C1B1D">EXCITE 흥분</text>`;
+ g+=`<text x="${W-16}" y="${cy-12}" text-anchor="end" font-family="Hanken Grotesk" font-weight="800" font-size="12" letter-spacing="1.8" fill="#2743B0">CALM 차분</text>`;
+ g+=`<text x="${cx-12}" y="30" text-anchor="end" font-family="Hanken Grotesk" font-weight="800" font-size="12" letter-spacing="1.8" fill="#1C1B1D">DRINK 음료</text>`;
+ g+=`<text x="${cx-12}" y="${H-20}" text-anchor="end" font-family="Hanken Grotesk" font-weight="800" font-size="12" letter-spacing="1.8" fill="#1C1B1D">CONCENTRATE 농축</text>`;
+ g+='</svg>';
+ document.getElementById('map').innerHTML=g;
+})();
+
+/* running heads & folios on image spreads */
+document.querySelectorAll('.sp').forEach((s,i)=>{s.dataset.n=i+1;s.querySelectorAll('.fol.l').forEach(f=>f.textContent=2*i);s.querySelectorAll('.fol.r').forEach(f=>f.textContent=2*i+1);});
+})();
+</script>
+</body></html>

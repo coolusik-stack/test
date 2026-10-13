@@ -4,3 +4,14 @@ node_modules/
 scrollcraft/builds/*/lab/
 scrollcraft/builds/*/raw/
 scrollcraft/builds/*/out/
+scrollcraft/builds/*/brandbook/raw/
+scrollcraft/builds/*/brandbook/fx/
+scrollcraft/builds/*/brandbook/orig/
+scrollcraft/builds/*/brandbook/qa/
+scrollcraft/builds/*/brandbook/b/img/
+scrollcraft/builds/*/brandbook/b/fonts/
+scrollcraft/builds/*/brandbook/b/gen/
+scrollcraft/builds/*/brandbook/b/nsk.css
+scrollcraft/builds/*/brandbook/b/index.html
+scrollcraft/builds/*/brandbook/*.pdf
+scrollcraft/builds/*/brandbook/*.jpg
