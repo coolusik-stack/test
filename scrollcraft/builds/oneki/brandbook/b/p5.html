@@ -64,7 +64,7 @@ P.forEach((p,i)=>{
 
 /* 12b — red vs blue + map */
 (function(){
- const R=[['방식','흥분시켜 끌어올린다','가라앉혀 모은다'],['에너지','당겨쓴다 — 크래시로 갚는다','채워서 쓴다'],['몸의 신호','심장이 빨라진다','머리가 차가워진다'],['형태','캔 한 가득','농축 스틱 한 모금'],['순간','파티, 밤샘','직전의 순간 — The Moment Before']];
+ const R=[['태도','요란하게 깨운다','조용히 불을 켠다'],['에너지','당겨쓴다','채워서 쓴다'],['무드','크고 시끄럽게','작고 고요하게'],['형태','캔 한 가득','농축 스틱 한 모금'],['순간','파티, 밤샘','직전의 순간 — The Moment Before']];
  let h=`<div style="display:grid;grid-template-columns:110px 1fr 1fr;border-top:2px solid #1C1B1D">`;
  h+=`<div></div><div style="padding:8px 10px;font:800 12px var(--sans);letter-spacing:.1em;color:#8a8a8e;text-transform:uppercase">Red Energy</div><div style="padding:8px 10px;font:800 12px var(--sans);letter-spacing:.1em;color:#fff;background:#2743B0;text-transform:uppercase">Blue Energy · ONEKI</div>`;
  R.forEach(r=>{h+=`<div style="padding:6px 0;border-top:1px solid #d6d6d8;font:700 12px/1.45 var(--kr)">${r[0]}</div><div style="padding:6px 10px;border-top:1px solid #d6d6d8;font:500 12.5px/1.45 var(--kr);color:#6d6d72">${r[1]}</div><div style="padding:6px 10px;border-top:1px solid #c9d2f2;font:700 12.5px/1.45 var(--kr);color:#2743B0;background:#EEF1FB">${r[2]}</div>`});
