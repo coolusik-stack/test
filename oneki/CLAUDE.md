@@ -43,6 +43,9 @@ A one-page brand intro that follows **ONEKI Brand Book v4.1** (24 spreads, 起�
   - 폭발시킨다, 고카페인 (as a claim), 풀파워, 공부/성적
   - 긴장 완화, 불안 해소, 피로회복, 숙취해소, 집중력 향상
   - Any efficacy claim.
+  - Body-state wording that reads as an effect: 가라앉힌다, (빠진 기를) 채운다, 심장/머리가 어떻게 된다. Say it as a ritual or a mood instead ("숨 한 번, 그리고 톡", "조용히 불을 켠다").
+  - Unverifiable superlatives such as 최초, 유일, 1위.
+  - Competitor brand names on anything public. Use category labels instead (에너지 캔, 에너지 샷).
   - The names 청심환/청심원/맥문동탕/생맥산. 靑心 may be used only as a worldview metaphor.
 - **Trademark:** the ONEKI mark has not been cleared by a 변리사.
   - Keep `noindex` on the page.
