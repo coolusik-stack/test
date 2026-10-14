@@ -17,3 +17,9 @@ reg[...,1][m]=np.clip(reg[...,1][m]*0.95,0,255)
 hsv[y0:y1,x0:x1]=reg.astype('uint8')
 Image.fromarray(hsv,'HSV').convert('RGB').save(P,quality=88,optimize=True,progressive=True)
 print('retouch ok', int(m.sum()), 'px')
+
+# v4.5: spread 03 (Why We Made This) uses the ink ensō plate w01 instead of the glitter i01.
+w=Image.open('/home/user/test/scrollcraft/builds/oneki/brandbook/raw/w01.png').convert('RGB'); W0,H0=w.size; k=min(1,2400/max(W0,H0))
+if k<1: w=w.resize((round(W0*k),round(H0*k)),Image.LANCZOS)
+w.save('/home/user/test/scrollcraft/builds/oneki/brandbook/b/img/w01.jpg',quality=88,optimize=True,progressive=True)
+print('w01 ok')

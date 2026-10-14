@@ -14,6 +14,8 @@ This is the source of the 24-spread brand book PDF. It was recovered from the or
   - The competitor map on spread 11 is marked internal-only.
   - The chapters now follow the site: 轉 = Snap (What We Build: spreads 15-18), 結 = Breathe out (The Moment: spreads 19-22).
 
+- **v4.5** (2026-10-14): spread 03 (Why We Made This) replaces the gold glitter plate (i01) with a dry-brushed champagne-gold ink ensō on dark handmade paper (`w01`, written to `b/img/w01.jpg` by `retouch.py`). It is a photograph of a brushstroke, not the logo, so the logo itself is unchanged.
+
 ## Rebuild
 1. Download every entry in `images.txt` (`key:filename`) from the CDN into `raw/<key>.png`. The CDN is `https://d8j0ntlcm91z4.cloudfront.net/user_3EF7RM3YH2M24lHzmiXGHKRiX4A/`. Level the `n_*` files to white and save them as `b/img/n_*.jpg`.
 2. Install the fonts (`@fontsource/*`, `pretendard`) and `playwright-core` into `fx/`, then copy the fonts into `b/fonts`.
