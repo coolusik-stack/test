@@ -24,6 +24,12 @@ This is the source of the 24-spread brand book PDF. It was recovered from the or
     - **23 Identity:** the mark (clear space, minimum size, grounds, don'ts), colour with recommended ratio and no red, type, and imagery rules.
   - The new images are listed in `images.txt` and processed by `muse.py`.
 
+- **v4.7** (2026-10-15): spreads 06-07 go from 17 founder Q&As to 10.
+  - Seven are dropped because they now repeat spread 11 (why blue, red vs blue) or spread 16 (inside, can vs stick, how to take it, the biggest type on the pack), or because they leaned toward an effect claim ("그래서 무엇을 원했나?").
+  - The origin answer loses its heart-rate line.
+  - Spread 07's right page is retitled "Two rules" (taste, when not to take it).
+  - The website keeps the full interview.
+
 ## Rebuild
 1. Download every entry in `images.txt` (`key:filename`) from the CDN into `raw/<key>.png`. The CDN is `https://d8j0ntlcm91z4.cloudfront.net/user_3EF7RM3YH2M24lHzmiXGHKRiX4A/`. Level the `n_*` files to white and save them as `b/img/n_*.jpg`.
 2. Install the fonts (`@fontsource/*`, `pretendard`) and `playwright-core` into `fx/`, then copy the fonts into `b/fonts`.
