@@ -1,10 +1,14 @@
 # ONEKI brand site (`oneki/`)
 
-A one-page brand intro that follows **ONEKI Brand Book v4.1** (24 spreads, 起承轉結). It is static HTML/CSS/JS with no build step. It lives apart from the repo's other site, so nothing here should touch files outside `oneki/`.
+A one-page brand intro that follows **ONEKI Brand Book v5.0 Final** (24 spreads, 起承轉結). It is static HTML/CSS/JS with no build step. It lives apart from the repo's other site, so nothing here should touch files outside `oneki/`.
 
 ## Files
 - **Rebuild:** built with the scroll-craft skill. The brief, plan and feel check are in `../scrollcraft/builds/oneki/` (BRIEF.md, PLAN.md). The structure is the **Breath cycle**: nine acts, about 14 viewport-heights, holds and releases alternating, and a single peak (the snap).
 - **`index.html`:** all copy and the act markup, using `data-sc-*` attributes that the engine reads.
+  - It follows **Brand Book v5.0 Final**: the hero and opening scene carry the borrowed-energy line from spread 03.
+  - Origins holds the same 10 Q&As as spreads 06-07.
+  - **The Stick** (spread 16) follows the snap peak.
+  - The Vision sits in the Snap chapter (轉), ahead of Breathe out (結).
 - **`engine/`:** the scroll-craft engine (MIT). **Never edit it.** Bespoke behaviour goes in `js/oneki.js`.
 - **`css/oneki.css`:** brand tokens, the hero layer positions (a 16:10 scene box on desktop and a separate portrait composition on phones), and per-act layout.
 - **`js/oneki.js`:** builds the scene callouts, the 12 rituals and the 4 BHAG posters before the engine mounts. It also runs the signature move:
@@ -13,6 +17,7 @@ A one-page brand intro that follows **ONEKI Brand Book v4.1** (24 spreads, 起�
 - **`img/`:** self-hosted, optimized assets.
   - Generated with Higgsfield: `stick.webp` and `hand.webp` (alpha cutouts), `haze.webp`, `flame-amber.jpg`, and `snap/d|m/*.webp` (a 62-frame sequence from the snap clip; `m` is the portrait crop).
   - Origins illustrations: `ill-tower`, `ill-cups`, `ill-watch` and `ill-tok` come from brand book spreads 06-07. `ill-kitchen`, `ill-flame`, `ill-faces`, `ill-people`, `ill-pocket`, `ill-ingredients` and `ill-moon` are new, generated in the same line style with the brand-book illustrations as references. They sit on the paper ground with `mix-blend-mode: multiply`, so their containers need `background: var(--paper)`.
+  - The Stick: `stick-hero.webp` (gold outside, cobalt notch line and inner foil), `step-1..3.webp` (꺾고·짜고·들어간다) and `pack-box.webp`, all from brand book v4.6. Line art sits on paper with `multiply`, so each container has a paper background and `isolation:isolate`.
   - From the brand book: everything else.
 - **`fonts/`:** self-hosted. Korean fonts are subset to the page's glyphs, so **run `tools/subset-fonts.sh` after changing Korean copy**.
 - **Verification:** the scroll-craft harness (`shoot.mjs`), run at desktop, 390px and reduced-motion.

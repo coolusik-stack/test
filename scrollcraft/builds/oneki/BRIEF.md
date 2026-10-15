@@ -97,3 +97,11 @@ The user asked for appropriate illustrations to fill in the content of brand boo
   - Four come from the brand book.
   - Seven are newly generated in the brand book's line style.
 - **Length:** the act grows to about 7.8vh, so the page now runs about 21vh. That is over the 14vh pacing reference, accepted because the user asked for the content. The act is natural flow, not a pin, so it reads as an editorial spread rather than held scroll.
+
+## Revision 2026-10-15: aligned with Brand Book v5.0 Final
+
+- **Opening:** the hero subtitle, meta and opening scene say "에너지를 미래에서 빌려 쓰지 않는다", the core insight from spread 03.
+- **Origins:** now holds the book's 10 Q&As. The why-blue, can-vs-stick, inside, how-to and biggest-type answers are dropped, along with their three illustrations.
+- **The Stick:** a new flow act right after the peak. It shows what just opened: the product, the 꺾고·짜고·들어간다 ritual and the pack principles. This is conviction held after the release.
+- **Order:** the Vision moves ahead of Breathe out, so 轉 (Snap) holds the snap, the stick and the vision, and 結 (Breathe out) holds the manifesto, the rituals and the exhale, as in the book.
+- **Harness:** desktop, 390px and reduced-motion all show no dead scroll, no console errors and no failed requests. The page runs about 21vh, and the only contrast note is the known large-type "Pause." at 3.89:1.
