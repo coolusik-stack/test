@@ -4,7 +4,7 @@
 from PIL import Image
 import numpy as np
 R='/home/user/test/scrollcraft/builds/oneki/brandbook/raw'; O='/home/user/test/scrollcraft/builds/oneki/brandbook/b/img'
-DAY=['m_run','m_desk','m_minute','m_tok']; NIGHT=['m_alley','m_lamp','m_board','m_moon']
+DAY=['m_run','m_desk','m_minute','m_tok','s_squeeze','s_enter','s_box']; NIGHT=['m_alley','m_lamp','m_board','m_moon']
 CREAM=np.array([237,232,223.])
 def load(k):
     a=np.asarray(Image.open(f'{R}/{k}.png').convert('RGB')).astype(float)
@@ -23,3 +23,6 @@ for k in NIGHT:
     rgba=np.dstack([np.clip(fg,0,255),al[...,0]*255]).astype('uint8')
     im=Image.fromarray(rgba,'RGBA'); im.thumbnail((700,700),Image.LANCZOS); im.save(f'{O}/{k}.png',optimize=True)
 print('muse ok')
+# v4.6 The Stick hero plate (photo, full left page)
+h=Image.open(f'{R}/s_hero.png').convert('RGB'); h.thumbnail((2400,2400),Image.LANCZOS); h.save(f'{O}/s_hero.jpg',quality=88,optimize=True,progressive=True)
+print('stick ok')

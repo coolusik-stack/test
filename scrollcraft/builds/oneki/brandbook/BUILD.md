@@ -16,6 +16,14 @@ This is the source of the 24-spread brand book PDF. It was recovered from the or
 
 - **v4.5** (2026-10-14): spread 03 (Why We Made This) replaces the gold glitter plate (i01) with a dry-brushed champagne-gold ink ensō on dark handmade paper (`w01`, written to `b/img/w01.jpg` by `retouch.py`). It is a photograph of a brushstroke, not the logo, so the logo itself is unchanged.
 
+- **v4.6** (2026-10-15): still 24 spreads, restructured.
+  - The vision statement now runs as wall lettering above the BHAG posters (spread 18), replacing its own spread.
+  - The closing line now sits on the back cover under "Refill, never borrow." (spread 24), replacing its own spread.
+  - The two freed spreads are new:
+    - **16 The Stick:** a hero plate (`s_hero`, gold outside, cobalt notch line and inner foil), the 꺾고·짜고·들어간다 ritual (`m_tok`, `s_squeeze`, `s_enter`), the pack principles with the 10-pack (`s_box`), and a note that the pack is fixed only after the trademark review.
+    - **23 Identity:** the mark (clear space, minimum size, grounds, don'ts), colour with recommended ratio and no red, type, and imagery rules.
+  - The new images are listed in `images.txt` and processed by `muse.py`.
+
 ## Rebuild
 1. Download every entry in `images.txt` (`key:filename`) from the CDN into `raw/<key>.png`. The CDN is `https://d8j0ntlcm91z4.cloudfront.net/user_3EF7RM3YH2M24lHzmiXGHKRiX4A/`. Level the `n_*` files to white and save them as `b/img/n_*.jpg`.
 2. Install the fonts (`@fontsource/*`, `pretendard`) and `playwright-core` into `fx/`, then copy the fonts into `b/fonts`.
