@@ -15,3 +15,6 @@ scrollcraft/builds/*/brandbook/b/nsk.css
 scrollcraft/builds/*/brandbook/b/index.html
 scrollcraft/builds/*/brandbook/*.pdf
 scrollcraft/builds/*/brandbook/*.jpg
+
+# Internal-only material lives in the private ki-docs repo, never here (this repo is served publicly)
+scrollcraft/builds/*/brandbook/b/internal*.html

@@ -5,7 +5,7 @@ const fs=require('fs');const {chromium}=require('/home/user/test/scrollcraft/bui
  const FR=fs.existsSync('/home/user/test/scrollcraft/builds/oneki/brandbook/b/frames.json')?fs.readFileSync('/home/user/test/scrollcraft/builds/oneki/brandbook/b/frames.json','utf8'):'null';
  await ctx.addInitScript(`window.FRAMES=${FR};`);
  const pg=await ctx.newPage();
- await pg.goto('file:///home/user/test/scrollcraft/builds/oneki/brandbook/b/index.html',{waitUntil:'load'});
+ await pg.goto('file:///home/user/test/scrollcraft/builds/oneki/brandbook/b/'+(process.env.IN||'index.html'),{waitUntil:'load'});
  await pg.evaluate(()=>document.fonts.ready); await pg.waitForTimeout(1500);
  fs.mkdirSync('/home/user/test/scrollcraft/builds/oneki/brandbook/b/gen',{recursive:true});
  const n=await pg.evaluate(()=>{const r=[...document.querySelectorAll('.rast')];r.forEach((e,i)=>e.dataset.ri=i);return r.length});
