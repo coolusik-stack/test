@@ -18,3 +18,4 @@ scrollcraft/builds/*/brandbook/*.jpg
 
 # Internal-only material lives in the private ki-docs repo, never here (this repo is served publicly)
 scrollcraft/builds/*/brandbook/b/internal*.html
+scrollcraft/builds/*/brandbook/b_light/

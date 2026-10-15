@@ -32,6 +32,12 @@ This is the source of the 24-spread brand book PDF. It was recovered from the or
 
 - **v4.8** (2026-10-15): spread 03 now states the core insight. The headline is "에너지를 미래에서 빌려 쓰지 않는다." It is followed by the loan metaphor ("오늘 밤, 이자까지 붙어 돌아온다"), "이미 내 안에 있는 기(氣)를 깨운다. 톡." and "먼저 차분하게. 그다음, 끝까지." It is written as metaphor and attitude, with no claim about what the product does to the body. The site's hero subtitle, meta description and opening scene carry the same line.
 
+- **v5.0 Final** (2026-10-15): the last copy pass.
+  - The mission now reads "bold, fearless" instead of "focused", which could read as a concentration claim.
+  - The opening scene's "빨라진 심장" becomes "들뜬 손끝", on the site as well.
+  - The colophon marks the edition as final and as partner-only until the trademark review.
+  - A light edition (`ONEKI_BrandBook_v5.0_light.pdf`, about 11 MB) is rendered from `b_light/`, which holds 1500px copies of the images, with `IN=../b_light/index.html`.
+
 ## Rebuild
 1. Download every entry in `images.txt` (`key:filename`) from the CDN into `raw/<key>.png`. The CDN is `https://d8j0ntlcm91z4.cloudfront.net/user_3EF7RM3YH2M24lHzmiXGHKRiX4A/`. Level the `n_*` files to white and save them as `b/img/n_*.jpg`.
 2. Install the fonts (`@fontsource/*`, `pretendard`) and `playwright-core` into `fx/`, then copy the fonts into `b/fonts`.
