@@ -1,7 +1,7 @@
 // Maps built in floors: every side can start on any of its floors (the seed draws them, and both
-// starts land on solid ground), the water on each floor finds its way down to the clouds, and a
-// floor with another floor under it is thin: a nut landing next to a cart breaks it and drops the
-// cart one floor (hurt, not knocked out).
+// starts land on solid ground), the water on each floor falls at least two floors (to the clouds,
+// or into a pool at the bottom of a well), and a floor with another floor under it is thin: a nut
+// landing next to a cart breaks it and drops the cart one floor (hurt, not knocked out).
 import { MAPS } from './maps.mjs';
 
 export default {
@@ -66,7 +66,7 @@ export default {
       }, theme);
       for (const s of r.starts) t.check(s.ok, `${theme}: side ${s.side} start ${s.k} not on its floor (cart at ${s.y.toFixed(1)}, floor ${s.want})`);
       t.check(r.drawn >= 4, `${theme}: the draw only ever gave ${r.drawn} start pairs`);
-      for (const w of r.water) t.check(w.sea && w.falls >= 2, `${theme}: the spring at x ${w.x} does not cascade to the clouds (${w.falls} falls)`);
+      for (const w of r.water) t.check(w.falls >= 2, `${theme}: the spring at x ${w.x} does not cascade down the floors (${w.falls} falls)`);
       t.check(r.drop, `${theme}: no start stands on a thin floor over another floor`);
       if (r.drop) {
         const d = r.drop;

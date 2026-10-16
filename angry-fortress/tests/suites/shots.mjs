@@ -1,5 +1,5 @@
-// From its start, a CPU that does not move can still hit the other start on every map, from either
-// home (nothing of your own, a rock or a tree, blocks the lanes out of the start).
+// From its start, a CPU that does not move can still hit the other start with an acorn on every map,
+// from either home (nothing of your own, a rock or a tree, blocks the lanes out of the start).
 import { MAPS } from './maps.mjs';
 
 export default {
@@ -19,6 +19,9 @@ export default {
           const cv = document.createElement('canvas'); cv.width = 844; cv.height = 390;
           const g = new Game(cv, { mode: 'cpu', difficulty: 'hard', theme, wind: 'off', timer: 0, guide: false, seed: 300 + k, flip: k % 2 === 1, starts: [0, 0] }, () => {}, { w: 844, h: 390, dpr: 1 });
           g.players[0].isAI = true;
+          // acorns only: this is about whether the lane is open, not which nut the CPU fancies (a
+          // walnut drilled in next to the target is a fine move that the ground soaks up)
+          for (const k of Object.keys(g.players[0].ammo)) if (k !== 'acorn') g.players[0].ammo[k] = 0;
           const q = g.players[1];
           let i = 0;
           for (; i < 600 && !(g.state === 'ai-think' && g.turn === 0); i++) g.update(1 / 60);

@@ -29,6 +29,8 @@ export class Terrain {
     this.heights = opts.heights; // function x -> surface height (for generation)
     this.backs = opts.backs || []; // tunnels open at both ends: drawn dark inside while their roof stands
     this.paints = opts.paints || []; // ground of another stuff: an igloo's snow bricks, a rainbow of rock
+    // a mushroom cap is red, not grassy: no grass or plants inside a 'cap' paint
+    this.bare = this.paints.filter((p) => p.kind === 'cap' || p.kind === 'stalk');
     this.opLog = []; // every carve since generation, [x, y, r] in centimetres (quantised so peers agree)
     this._generate(opts);
     this.f0 = this.f.slice();
@@ -376,6 +378,7 @@ export class Terrain {
       return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
     };
     const SLOT = 0.3;
+    const bare = (x, y) => this.bare.some((b) => ((x - b.x) / b.rx) ** 2 + ((y - b.y) / b.ry) ** 2 < 1);
     const isScar = (x, y) => {
       const i = Math.round(x / cell), j = Math.round(y / cell);
       return scar[j * stride + i] === 1;
@@ -447,7 +450,7 @@ export class Terrain {
         const len = Math.hypot(dx, dy) || 1;
         const nyUp = -dx / len; // outward (right-hand) normal y component
         const mx = (x0 + x1) / 2, my = (y0 + y1) / 2;
-        if (nyUp < -0.45 && !isScar(mx, my)) {
+        if (nyUp < -0.45 && !isScar(mx, my) && !bare(mx, my)) {
           rim.moveTo(x0, -y0);
           rim.lineTo(x1, -y1);
           // roots and vines dangling from the underside of the island
@@ -494,7 +497,7 @@ export class Terrain {
             }
           }
         }
-        const ok = nyUp > 0.42 && !isScar(mx, my) && my > WORLD.SEA0 - 0.2;
+        const ok = nyUp > 0.42 && !isScar(mx, my) && my > WORLD.SEA0 - 0.2 && !bare(mx, my);
         if (!ok) { drawing = false; continue; }
         if (!drawing) { grass.moveTo(x0, -y0); drawing = true; }
         grass.lineTo(x1, -y1);
@@ -547,7 +550,8 @@ export class Terrain {
 
   // Part of the ground painted as something else (already clipped to what's left of the ground):
   // 'snow' packed snow bricks inside an ellipse (only above `above`, if given), 'rainbow' bands
-  // following an elliptical arch.
+  // following an elliptical arch, 'cap' a red, spotted mushroom cap and 'stalk' its cream stalk (no
+  // grass or moss on either).
   _paint(ctx, p) {
     ctx.save();
     if (p.kind === 'snow') {
@@ -572,6 +576,42 @@ export class Terrain {
       }
       ctx.strokeStyle = 'rgba(140,170,205,0.6)';
       ctx.lineWidth = 0.05;
+      ctx.stroke();
+    } else if (p.kind === 'cap') {
+      // a mushroom cap: red, darker underneath, with white spots
+      ctx.beginPath();
+      ctx.ellipse(p.x, -p.y, p.rx, p.ry, 0, 0, Math.PI * 2);
+      ctx.clip();
+      const g = ctx.createLinearGradient(0, -(p.y + p.ry), 0, -(p.y - p.ry));
+      g.addColorStop(0, '#ff6b5e');
+      g.addColorStop(0.55, '#e0473f');
+      g.addColorStop(1, '#a8302c');
+      ctx.fillStyle = g;
+      ctx.fillRect(p.x - p.rx, -(p.y + p.ry), p.rx * 2, p.ry * 2);
+      ctx.fillStyle = '#fff6ea';
+      for (let k = 0, x = p.x - p.rx + 0.7; x < p.x + p.rx - 0.4; k++, x += 1.3 + ((k * 7) % 5) * 0.12) {
+        const y = p.y + ((k * 3) % 4 - 1.5) * 0.18, r = 0.17 + ((k * 5) % 3) * 0.06;
+        ctx.beginPath();
+        ctx.ellipse(x, -y, r * 1.3, r, 0, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.fillStyle = 'rgba(255,255,255,0.35)';
+      ctx.fillRect(p.x - p.rx, -(p.y + p.ry), p.rx * 2, 0.18);
+    } else if (p.kind === 'stalk') {
+      // a mushroom's stalk: cream, rounded, with a few soft vertical lines
+      ctx.beginPath();
+      ctx.ellipse(p.x, -p.y, p.rx, p.ry, 0, 0, Math.PI * 2);
+      ctx.clip();
+      const g = ctx.createLinearGradient(p.x - p.rx, 0, p.x + p.rx, 0);
+      g.addColorStop(0, '#d9c8a4');
+      g.addColorStop(0.45, '#f6ecd4');
+      g.addColorStop(1, '#cbb68e');
+      ctx.fillStyle = g;
+      ctx.fillRect(p.x - p.rx, -(p.y + p.ry), p.rx * 2, p.ry * 2);
+      ctx.strokeStyle = 'rgba(150,120,80,0.25)';
+      ctx.lineWidth = 0.05;
+      ctx.beginPath();
+      for (const dx of [-0.25, 0.05, 0.3]) { ctx.moveTo(p.x + dx, -(p.y - p.ry)); ctx.lineTo(p.x + dx, -(p.y + p.ry)); }
       ctx.stroke();
     } else if (p.kind === 'rainbow') {
       const cols = ['#ff8a8a', '#ffbf6a', '#ffe680', '#9de08c', '#86c4ff', '#b79cf2'];

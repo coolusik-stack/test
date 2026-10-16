@@ -38,7 +38,7 @@ for (const theme of maps) {
   console.log('✓', theme);
 }
 if (!pick.length) {
-  // three across, in menu order (a season per row when there are twelve)
+  // three across, in menu order
   const shots = maps.map((m) => 'data:image/png;base64,' + readFileSync(join(out, `${m}.png`)).toString('base64'));
   const sheet = await page.evaluate(async ({ shots, names }) => {
     const w = 640, h = 300, cols = 3, rows = Math.ceil(shots.length / cols);

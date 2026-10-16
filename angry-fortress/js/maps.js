@@ -5,11 +5,11 @@
 // different heights on different ground, and each side pays for what it has in another currency
 // (height costs ground under you or cover; cover costs reach; nuts cost a drive). Which player gets
 // which home is down to the draw (terrain.js flips the map), and every map keeps one idea:
-//   도토리 숲 a hill · 벚꽃 분지 a bowl · 다랑이 논 terraces · 두더지 굴 산 a tunnel · 해바라기 비탈 a tilted island ·
-//   반딧불 징검다리 stepping stones · 무지개 하늘다리 a rock arch in the sky · 층층 구름섬 shelves ·
-//   단풍 협곡 a bridge · 단풍 벼랑 선반 cliff ledges ·
+//   도토리 숲 a hill · 벚꽃 분지 a bowl · 다랑이 논 terraces · 왕버섯 숲 giant mushrooms · 두더지 굴 산 a tunnel · 해바라기 비탈 a tilted island ·
+//   반딧불 징검다리 stepping stones · 무지개 하늘다리 a rock arch in the sky · 층층 구름섬 shelves · 삼층 다리 three decks ·
+//   단풍 협곡 a bridge · 단풍 벼랑 선반 cliff ledges · 낙엽 우물 a well ·
 //   은행나무 참호 trenches · 소나무 절벽 a cliff · 살얼음 두 섬 two islands · 이글루 눈처마 an
-//   overhang and an igloo · 얼음 누각 an ice pavilion · 오로라 호수 thin lake ice
+//   overhang and an igloo · 얼음 누각 an ice pavilion · 빙하 틈새 a crevasse · 오로라 호수 thin lake ice
 // Nothing stands in the exact middle just for show, and no map stacks more than one or two kinds
 // of spot.
 //
@@ -197,6 +197,70 @@ export const MAPS = {
       {
         kind: 'burrow', team: 1, range: [51.6, 55.6], sign: 50.4, ...below(18.2),
         label: { name: '논둑 밑', desc: '위 논이 지붕이 되어 높이 쏜 공격을 막아 줘요. 낮게 쏜 건 들어와요' },
+      },
+    ],
+    features: {},
+  }),
+
+  // 왕버섯 숲 (spring) — the giant mushrooms. Between the two homes grows a grove of giant mushrooms,
+  // low ones near each home and taller ones toward the middle, and over the gap in the middle the
+  // king mushroom, the highest perch on the map with nothing under it but its own stalk and the
+  // clouds. The caps are thin: a nut beside you drops you to the cap or the ground below. Dew
+  // springs on the tall caps run down the smaller caps and off the island. The two sides grow the
+  // same heights (when one side stood 1 m higher it won two games in three); each starts at home,
+  // on its low cap or on its tall cap.
+  shrooms: () => ({
+    top: [[2.0, 10.4], [2.8, 12.0], [30.2, 12.0], [31.0, 10.4], [41.0, 10.4], [41.8, 12.0], [69.2, 12.0], [70.0, 10.4]],
+    flat: [[2.8, 30.2], [41.8, 69.2]],
+    islands: [
+      { a: 2.0, b: 31.0, under: [[2.0, 10.6], [3.6, 8.2], [9, 6.6], [16, 6.0], [24, 6.4], [29, 7.6], [31.0, 9.8]] },
+      { a: 41.0, b: 70.0, under: [[41.0, 10.3], [43, 8.6], [48, 7.0], [56, 6.6], [63, 7.0], [68.4, 8.4], [70.0, 10.3]] },
+    ],
+    starts: [
+      [{ x: 11.0, y: 12.0 }, { x: 23.0, y: 14.1 }, { x: 28.6, y: 20.0 }],
+      [{ x: 61.0, y: 12.0 }, { x: 49.0, y: 14.1 }, { x: 43.4, y: 20.0 }],
+    ],
+    forts: [{ back: 4.4, facing: 1 }, { back: 67.6, facing: -1 }],
+    ops: [
+      ...shelf([[21.0, 14.1], [26.0, 14.1]], THIN), // left: a low cap you can roll off toward home,
+      ...shelf([[26.5, 20.0], [32.0, 20.0]], THIN), // and a tall one beside it
+      ...shelf([[46.0, 14.1], [51.0, 14.1]], THIN), // right: the same, mirrored
+      ...shelf([[40.0, 20.0], [45.5, 20.0]], THIN),
+      ...shelf([[32.0, 22.5], [40.0, 22.5]], THIN), // the king mushroom,
+      ...Array.from({ length: 40 }, (_, k) => ({ type: 'add', x: 36.0, y: 9.5 + k * 0.3, rx: 0.55, ry: 0.55 })), // its stalk
+      { type: 'add', x: 36.0, y: 8.8, rx: 1.6, ry: 1.1 }, // and the root it grows from
+      ...crag(9.0, 6.4, 1.0), ...crag(22.0, 6.4, 0.9), ...crag(50.0, 6.8, 0.9), ...crag(62.0, 7.0, 1.0),
+    ],
+    // the smaller mushrooms' stalks, drawn behind (carts drive past them)
+    backs: [
+      { x0: 22.9, x1: 24.1, y0: 12.0, y1: 12.9, color: 'rgba(244,232,206,0.95)' },
+      { x0: 28.6, x1: 29.8, y0: 12.0, y1: 18.8, color: 'rgba(244,232,206,0.95)' },
+      { x0: 47.9, x1: 49.1, y0: 12.0, y1: 12.9, color: 'rgba(244,232,206,0.95)' },
+      { x0: 42.2, x1: 43.4, y0: 12.0, y1: 18.8, color: 'rgba(244,232,206,0.95)' },
+    ],
+    paints: [
+      { kind: 'cap', x: 23.5, y: 13.45, rx: 3.4, ry: 1.25 }, { kind: 'cap', x: 29.25, y: 19.35, rx: 3.6, ry: 1.25 },
+      { kind: 'cap', x: 48.5, y: 13.45, rx: 3.4, ry: 1.25 }, { kind: 'cap', x: 42.75, y: 19.35, rx: 3.6, ry: 1.25 },
+      { kind: 'cap', x: 36.0, y: 21.85, rx: 4.9, ry: 1.25 }, { kind: 'stalk', x: 36.0, y: 15.0, rx: 0.9, ry: 6.1 },
+    ],
+    streams: [{ x: 27.4, y: 20.0, dir: -1 }, { x: 44.6, y: 20.0, dir: 1 }],
+    spots: [
+      // ground → low cap → tall cap → the king, driving toward the middle; the king's ends drop you
+      // home; rolling off a low cap the other way takes you home too
+      { kind: 'pad', team: 0, range: [17.0, 17.6], dir: 1, to: { x: 22.0, y: 14.1 }, apex: 17.5, ...on(12.0) },
+      { kind: 'pad', team: 1, range: [54.4, 55.0], dir: -1, to: { x: 50.0, y: 14.1 }, apex: 17.5, ...on(12.0) },
+      { kind: 'pad', team: 0, range: [24.2, 24.8], dir: 1, to: { x: 28.6, y: 20.0 }, apex: 24.5, ...on(14.1) },
+      { kind: 'pad', team: 1, range: [47.2, 47.8], dir: -1, to: { x: 43.4, y: 20.0 }, apex: 24.5, ...on(14.1) },
+      { kind: 'pad', team: 0, range: [29.6, 30.2], dir: 1, to: { x: 34.0, y: 22.5 }, apex: 25.8, ...on(20.0) },
+      { kind: 'pad', team: 1, range: [41.8, 42.4], dir: -1, to: { x: 38.0, y: 22.5 }, apex: 25.8, ...on(20.0) },
+      // the nook between a low cap and the island's edge: hop back up onto the cap
+      { kind: 'pad', team: 0, range: [29.0, 29.6], dir: -1, to: { x: 23.0, y: 14.1 }, apex: 17.1, ...on(12.0) },
+      { kind: 'pad', team: 1, range: [42.4, 43.0], dir: 1, to: { x: 49.0, y: 14.1 }, apex: 17.1, ...on(12.0) },
+      { kind: 'pad', team: -1, range: [32.8, 33.4], dir: -1, to: { x: 16.0, y: 12.0 }, apex: 24.0, ...on(22.5) },
+      { kind: 'pad', team: -1, range: [38.6, 39.2], dir: 1, to: { x: 56.0, y: 12.0 }, apex: 24.0, ...on(22.5) },
+      {
+        kind: 'high', team: -1, range: [33.0, 39.0], sign: null, signs: [33.4, 38.6], ...on(22.5),
+        label: { name: '왕버섯 꼭대기', desc: '조준선이 두 배로 길어져요. 갓 밑은 구름이라 깨지면 끝이에요' },
       },
     ],
     features: {},
@@ -401,6 +465,60 @@ export const MAPS = {
     features: { trees: [tree(46.0, 'oak', { h: 4.6, canopyR: 1.9 })] },
   }),
 
+  // 삼층 다리 (summer) — the three-deck bridge. Between two rock towers (the homes on top) run three
+  // long decks, one above the other: two top halves with a gap in the middle, a middle deck and a
+  // thick bottom deck. Carts on the same deck look straight down a corridor at each other; lobs
+  // reach the decks below only through the gap and the ends. The top and middle decks are thin, so
+  // a nut beside a cart drops it a deck. A spring on each top half runs to the gap, down the decks
+  // and off the bottom deck's far end. Left home: the tower 1 m higher. Each side starts on its
+  // tower, its top half or the middle deck under it.
+  decks: () => ({
+    top: [[4.4, 22.9], [5.2, 24.5], [13.2, 24.5], [13.4, 24.1], [58.6, 23.1], [58.8, 23.5], [66.8, 23.5], [67.6, 21.9]],
+    flat: [[5.2, 13.2], [58.8, 66.8]],
+    islands: [
+      { a: 4.4, b: 13.4, calm: [12.4, 13.4], under: [[4.4, 22.5], [5.0, 14.0], [6.2, 7.0], [8.6, 4.4], [11.6, 4.4], [13.0, 5.6], [13.4, 6.4]] },
+      { a: 58.6, b: 67.6, calm: [58.6, 59.6], under: [[58.6, 6.4], [59.0, 5.6], [61.6, 4.4], [64.6, 4.6], [66.8, 10.0], [67.6, 21.5]] },
+    ],
+    starts: [
+      [{ x: 10.4, y: 24.5 }, { x: 24.0, y: 19.5 }, { x: 25.0, y: 14.5 }],
+      [{ x: 61.6, y: 23.5 }, { x: 48.0, y: 19.5 }, { x: 47.0, y: 14.5 }],
+    ],
+    forts: [{ back: 4.8, facing: 1 }, { back: 67.2, facing: -1 }],
+    ops: [
+      ...shelf([[17.0, 19.5], [31.0, 19.5]], THIN), // top deck, left half
+      ...shelf([[41.0, 19.5], [55.0, 19.5]], THIN), // top deck, right half
+      ...shelf([[19.0, 14.5], [53.0, 14.5]], THIN), // middle deck
+      ...shelf([[14.8, 9.5], [57.2, 9.5]], 2.4, [24.0, 36.0, 48.0]), // bottom deck
+      ...crag(9.0, 5.2, 1.0), ...crag(63.0, 5.2, 1.0),
+    ],
+    streams: [{ x: 18.0, y: 19.5, dir: 1 }, { x: 54.0, y: 19.5, dir: -1 }],
+    spots: [
+      // towers onto the top halves; the halves down through the gap; the middle deck's ends down;
+      // the bottom deck's ends back up the towers
+      { kind: 'pad', team: 0, range: [12.0, 12.6], dir: 1, to: { x: 20.5, y: 19.5 }, apex: 26.0, ...on(24.5) },
+      { kind: 'pad', team: 1, range: [59.4, 60.0], dir: -1, to: { x: 51.5, y: 19.5 }, apex: 25.5, ...on(23.5) },
+      { kind: 'pad', team: 0, range: [28.6, 29.2], dir: 1, to: { x: 34.0, y: 14.5 }, apex: 22.5, ...on(19.5) },
+      { kind: 'pad', team: 1, range: [42.8, 43.4], dir: -1, to: { x: 38.0, y: 14.5 }, apex: 22.5, ...on(19.5) },
+      { kind: 'pad', team: -1, range: [19.6, 20.2], dir: -1, to: { x: 16.6, y: 9.5 }, apex: 15.8, ...on(14.5) },
+      { kind: 'pad', team: -1, range: [51.8, 52.4], dir: 1, to: { x: 55.4, y: 9.5 }, apex: 15.8, ...on(14.5) },
+      { kind: 'pad', team: 0, range: [15.6, 16.2], dir: -1, to: { x: 12.2, y: 24.5 }, apex: 29.0, ...on(9.5) },
+      { kind: 'pad', team: 1, range: [55.8, 56.4], dir: 1, to: { x: 60.0, y: 23.5 }, apex: 28.0, ...on(9.5) },
+      {
+        kind: 'burrow', team: -1, range: [19.6, 30.4], sign: null, ...below(14.5),
+        label: { name: '다리 2층', desc: '위 다리가 지붕이 되어 높이 쏜 공격을 막아 줘요. 같은 층에서 곧장 쏜 건 들어와요' },
+      },
+      {
+        kind: 'burrow', team: -1, range: [41.6, 52.4], sign: null, ...below(14.5),
+        label: { name: '다리 2층', desc: '위 다리가 지붕이 되어 높이 쏜 공격을 막아 줘요. 같은 층에서 곧장 쏜 건 들어와요' },
+      },
+      {
+        kind: 'burrow', team: -1, range: [19.6, 52.4], sign: null, ...below(9.5),
+        label: { name: '다리 1층', desc: '가운데 다리가 지붕이에요. 같은 층에서 곧장 쏜 건 들어와요' },
+      },
+    ],
+    features: {},
+  }),
+
   // 단풍 협곡 (autumn) — cross, or cut? Two landmasses over a bottomless canyon, joined by one thin
   // earth bridge that slopes down from left to right. Stand on it and it cracks; a hit nearby drops
   // it, and then nobody crosses again. Left home: the high rim (1.6 m up) with a lookout at the
@@ -478,6 +596,60 @@ export const MAPS = {
       },
     ],
     features: {},
+  }),
+
+  // 낙엽 우물 (autumn) — the leaf well. A deep well sunk into one wide island, the homes on its two
+  // rims, thin ledges clinging to the well's walls one under another and a nut tree at the bottom.
+  // Everything slopes inward and down: a broken ledge drops you deeper (it hurts, nothing more),
+  // and the bottom is where the prize is, in full view of both rims. A spring on each rim spills
+  // down that side's ledges and pools at the bottom. Left home: the lower rim with two ledges, the
+  // lower one roofed by the upper and the well floor roofed by both. Right home: 1 m higher, two
+  // ledges. Each side starts on its rim or one of its ledges.
+  well: () => ({
+    top: [[2.0, 18.4], [2.8, 20.0], [19.8, 20.0], [20.6, 7.0], [51.0, 7.0], [51.8, 21.0], [69.2, 21.0], [70.0, 19.4]],
+    flat: [[2.8, 19.8], [20.6, 51.0], [51.8, 69.2]],
+    islands: [
+      { a: 2.0, b: 70.0, under: [[2.0, 18.6], [3.6, 14.0], [8, 9.0], [14, 6.0], [20, 4.0], [28, 2.6], [36, 2.4], [44, 2.6], [52, 4.0], [58, 6.0], [64, 9.0], [68.4, 14.0], [70.0, 19.0]] },
+    ],
+    starts: [
+      [{ x: 12.0, y: 20.0 }, { x: 23.0, y: 15.5 }, { x: 23.0, y: 11.0 }],
+      [{ x: 61.0, y: 21.0 }, { x: 49.5, y: 17.0 }, { x: 48.0, y: 12.5 }],
+    ],
+    forts: [{ back: 5.4, facing: 1 }, { back: 67.6, facing: -1 }],
+    ops: [
+      ...shelf([[20.2, 15.5], [25.0, 15.5]], THIN), // left ledges, each shorter than the one below
+      ...shelf([[20.2, 11.0], [29.0, 11.0]], THIN),
+      ...shelf([[47.0, 17.0], [51.4, 17.0]], THIN), // right ledges
+      ...shelf([[43.0, 12.5], [51.4, 12.5]], THIN),
+      ...crag(14.0, 4.8, 1.0), ...crag(36.0, 3.0, 1.2), ...crag(58.0, 4.8, 1.0),
+    ],
+    streams: [{ x: 18.4, y: 20.0, dir: 1 }, { x: 53.2, y: 21.0, dir: -1 }],
+    spots: [
+      // rims down onto the top ledges, ledge to ledge, down to the floor, and the floor back up to the
+      // rims (those climb past the ledge tips, so they sit out in the middle of the floor)
+      { kind: 'pad', team: 0, range: [17.2, 17.8], dir: 1, to: { x: 22.6, y: 15.5 }, apex: 22.5, ...on(20.0) },
+      { kind: 'pad', team: 1, range: [54.2, 54.8], dir: -1, to: { x: 49.0, y: 17.0 }, apex: 23.5, ...on(21.0) },
+      { kind: 'pad', team: 0, range: [23.4, 24.0], dir: 1, to: { x: 26.6, y: 11.0 }, apex: 19.5, ...on(15.5) },
+      { kind: 'pad', team: 0, range: [27.4, 28.0], dir: 1, to: { x: 32.6, y: 7.0 }, apex: 12.4, ...on(11.0) },
+      { kind: 'pad', team: 1, range: [47.6, 48.2], dir: -1, to: { x: 45.0, y: 12.5 }, apex: 20.5, ...on(17.0) },
+      { kind: 'pad', team: 1, range: [43.6, 44.2], dir: -1, to: { x: 38.6, y: 7.0 }, apex: 14.6, ...on(12.5) },
+      { kind: 'pad', team: 0, range: [31.6, 32.2], dir: 1, to: { x: 17.0, y: 20.0 }, apex: 26.0, ...on(7.0) }, // fires driving out of the nook
+      { kind: 'pad', team: 1, range: [39.8, 40.4], dir: 1, to: { x: 56.0, y: 21.0 }, apex: 27.0, ...on(7.0) },
+      { kind: 'tree', team: -1, range: [34.8, 37.2], sign: null, ...on(7.0), label: { name: '우물 바닥 명당', desc: '내 차례가 시작될 때마다 특수 견과 +1. 맨 바닥이라 양쪽 가장자리에서 다 보여요' } },
+      {
+        kind: 'burrow', team: 0, range: [20.8, 24.4], sign: null, ...below(11.0),
+        label: { name: '우물 굴', desc: '위 선반이 지붕이 되어 높이 쏜 공격을 막아 줘요. 낮게 쏜 건 들어와요' },
+      },
+      {
+        kind: 'burrow', team: 0, range: [21.2, 28.4], sign: null, ...below(7.0),
+        label: { name: '우물 밑 굴', desc: '선반 둘이 지붕이에요. 우물 바닥에서 곧장 쏜 건 들어와요' },
+      },
+      {
+        kind: 'burrow', team: 1, range: [47.6, 50.8], sign: null, ...below(12.5),
+        label: { name: '우물 굴', desc: '위 선반이 지붕이 되어 높이 쏜 공격을 막아 줘요. 낮게 쏜 건 들어와요' },
+      },
+    ],
+    features: { trees: [tree(36.0, 'ginkgo', { h: 4.6, canopyR: 1.9 })] },
   }),
 
   // 은행나무 참호 (autumn) — shoot from behind your hill. Each home sits behind its own ridge with an
@@ -657,6 +829,55 @@ export const MAPS = {
       {
         kind: 'burrow', team: -1, range: [33.4, 38.6], sign: null, ...below(12.0),
         label: { name: '누각 1층', desc: '위층이 지붕이에요. 여기가 깨지면 구름이니 조심해요' },
+      },
+    ],
+    features: {},
+  }),
+
+  // 빙하 틈새 (winter) — the crevasse. Two glacier plateaus with a bottomless crack between them,
+  // the homes on top, and two thin ice bridges across the crack: an upper one broken in the middle
+  // and a lower one right across, roofed by the upper halves. Down in the crack you are out of
+  // reach of most lobs, but there is nothing under the lower bridge: break it and it is the clouds.
+  // A spring on each plateau pours into the crack, off the upper bridge and pools on the lower one.
+  // Left home: 1 m lower. Each side starts on its plateau or its half of the upper bridge.
+  crevasse: () => ({
+    top: [[2.0, 18.4], [2.8, 20.0], [25.8, 20.0], [26.0, 19.6], [46.0, 20.6], [46.2, 21.0], [69.2, 21.0], [70.0, 19.4]],
+    flat: [[2.8, 25.8], [46.2, 69.2]],
+    islands: [
+      { a: 2.0, b: 26.0, calm: [25.0, 26.0], under: [[2.0, 18.6], [3.6, 14.0], [8, 9.0], [14, 6.0], [20, 4.6], [24, 4.4], [26.0, 5.0]] },
+      { a: 46.0, b: 70.0, calm: [46.0, 47.0], under: [[46.0, 5.0], [48, 4.4], [52, 4.6], [58, 6.0], [64, 9.0], [68.4, 14.0], [70.0, 19.4]] },
+    ],
+    starts: [
+      [{ x: 12.0, y: 20.0 }, { x: 30.0, y: 16.0 }],
+      [{ x: 61.0, y: 21.0 }, { x: 42.0, y: 16.0 }],
+    ],
+    forts: [{ back: 5.4, facing: 1 }, { back: 67.6, facing: -1 }],
+    ops: [
+      ...shelf([[25.8, 16.0], [32.5, 16.0]], THIN), // the upper bridge, broken in the middle
+      ...shelf([[39.5, 16.0], [46.2, 16.0]], THIN),
+      ...shelf([[25.8, 11.5], [46.2, 11.5]], THIN), // the lower bridge, right across
+      ...crag(10.0, 6.0, 1.0), ...crag(18.0, 4.6, 0.9), ...crag(54.0, 4.6, 0.9), ...crag(62.0, 6.4, 1.0),
+    ],
+    streams: [{ x: 22.0, y: 20.0, dir: 1 }, { x: 50.0, y: 21.0, dir: -1 }],
+    spots: [
+      // plateaus down onto the upper bridge, and back up
+      { kind: 'pad', team: 0, range: [23.6, 24.2], dir: 1, to: { x: 30.0, y: 16.0 }, apex: 22.0, ...on(20.0) },
+      { kind: 'pad', team: 1, range: [47.8, 48.4], dir: -1, to: { x: 42.0, y: 16.0 }, apex: 23.0, ...on(21.0) },
+      { kind: 'pad', team: 0, range: [28.6, 29.2], dir: -1, to: { x: 21.5, y: 20.0 }, apex: 25.0, ...on(16.0) },
+      { kind: 'pad', team: 1, range: [42.8, 43.4], dir: 1, to: { x: 50.5, y: 21.0 }, apex: 26.0, ...on(16.0) },
+      // the upper bridge down through its break onto the lower bridge; back up from the lower
+      // bridge, driving toward the middle (so the roofed ends stay a drive away)
+      { kind: 'pad', team: 0, range: [30.8, 31.4], dir: 1, to: { x: 36.0, y: 11.5 }, apex: 19.5, ...on(16.0) },
+      { kind: 'pad', team: 1, range: [40.6, 41.2], dir: -1, to: { x: 36.0, y: 11.5 }, apex: 19.5, ...on(16.0) },
+      { kind: 'pad', team: 0, range: [35.0, 35.6], dir: 1, to: { x: 30.0, y: 16.0 }, apex: 21.0, ...on(11.5) },
+      { kind: 'pad', team: 1, range: [36.6, 37.2], dir: -1, to: { x: 42.0, y: 16.0 }, apex: 21.0, ...on(11.5) },
+      {
+        kind: 'burrow', team: 0, range: [26.6, 31.9], sign: null, ...below(11.5),
+        label: { name: '틈새 굴', desc: '위 다리가 지붕이 되어 높이 쏜 공격을 막아 줘요. 발밑 다리가 깨지면 끝이에요' },
+      },
+      {
+        kind: 'burrow', team: 1, range: [40.1, 45.4], sign: null, ...below(11.5),
+        label: { name: '틈새 굴', desc: '위 다리가 지붕이 되어 높이 쏜 공격을 막아 줘요. 발밑 다리가 깨지면 끝이에요' },
       },
     ],
     features: {},

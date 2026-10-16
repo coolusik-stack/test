@@ -414,8 +414,20 @@ THEMES.cliffs = { ...THEMES.maple, id: 'cliffs', name: '단풍 벼랑 선반', d
 // 얼음 누각 wears the winter day of 살얼음 두 섬.
 THEMES.pavilion = { ...THEMES.snowcliff, id: 'pavilion', name: '얼음 누각', desc: '가운데 떠 있는 3층 얼음 누각. 위층일수록 받쳐 줄 층이 많아요', layout: { fixed: 'pavilion' } };
 
+// 삼층 다리 wears the summer of 해바라기 비탈.
+THEMES.decks = { ...THEMES.sunflower, id: 'decks', name: '삼층 다리', desc: '세 층으로 놓인 긴 다리. 같은 층끼리는 곧장 쏘고, 다른 층은 틈으로 넘겨요', layout: { fixed: 'decks' } };
+
+// 낙엽 우물 wears the autumn of 은행나무 참호.
+THEMES.well = { ...THEMES.ginkgo, id: 'well', name: '낙엽 우물', desc: '가운데 깊은 우물. 벽에 매달린 선반을 따라 바닥의 명당까지', layout: { fixed: 'well' } };
+
+// 빙하 틈새 wears the winter day of 이글루 눈처마.
+THEMES.crevasse = { ...THEMES.igloo, id: 'crevasse', name: '빙하 틈새', desc: '끝없는 얼음 틈 속 다리 두 층. 아래 다리가 깨지면 끝이에요', layout: { fixed: 'crevasse' } };
+
+// 왕버섯 숲 wears the spring of 도토리 숲.
+THEMES.shrooms = { ...THEMES.oak, id: 'shrooms', name: '왕버섯 숲', desc: '키가 다른 버섯 갓 위에서 쏘기. 가운데 왕버섯은 높지만 밑이 구름이에요', layout: { fixed: 'shrooms' } };
+
 // Menu order: through the year, spring to winter.
-export const THEME_ORDER = ['oak', 'blossom', 'paddy', 'mole', 'sunflower', 'night', 'arch', 'tiers', 'maple', 'cliffs', 'ginkgo', 'pine', 'snowcliff', 'igloo', 'pavilion', 'aurora'];
+export const THEME_ORDER = ['oak', 'blossom', 'paddy', 'shrooms', 'mole', 'sunflower', 'night', 'arch', 'tiers', 'decks', 'maple', 'cliffs', 'well', 'ginkgo', 'pine', 'snowcliff', 'igloo', 'pavilion', 'crevasse', 'aurora'];
 export const SEASONS = { spring: '봄', summer: '여름', autumn: '가을', winter: '겨울' };
 
 // Fort blueprints. x is measured from the fort's back edge toward the enemy,

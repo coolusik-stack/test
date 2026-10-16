@@ -18,6 +18,12 @@ const ROUTES = {
       [50, 'pad→middle', null, true, 'once'], [40, 'pad→bottom', null, true, 'once'], [30, 'pad→across', null, true, 'once'], [34, 'pad→back across', null, true, 'once'],
       [38.0, 'back up a little', null], [60, 'pad→home', null, true, 'once']],
   },
+  shrooms: {
+    0: [[18, 'pad→low cap', null, true, 'once'], [25, 'pad→tall cap', null, true, 'once'], [31, 'pad→king', '왕버섯 꼭대기', true, 'once'], [32, 'pad→ground', null, true, 'once'],
+      [18, 'pad→low cap', null, true, 'once'], [11.0, 'roll off the low cap, home', null], ['tp', 30.0, 12.0], [26, 'pad→low cap from the nook', null, true, 'once'], [11.0, 'home', null]],
+    1: [[54, 'pad→low cap', null, true, 'once'], [47, 'pad→tall cap', null, true, 'once'], [41, 'pad→king', '왕버섯 꼭대기', true, 'once'], [40, 'pad→ground', null, true, 'once'],
+      [54, 'pad→low cap', null, true, 'once'], [61.0, 'roll off the low cap, home', null], ['tp', 42.0, 12.0], [46, 'pad→low cap from the nook', null, true, 'once'], [61.0, 'home', null]],
+  },
   mole: {
     0: [[28.4, 'tunnel', '두더지 굴'], [10.6, 'out', null], [2, 'pad→top', '두더지 산 꼭대기', true, 'once'], [20, 'pad→home', null, true, 'once']],
     1: [[53.4, 'tree', '언덕 벚나무'], [30.0, 'down the ramp', '두더지 굴'], [61.0, 'up home', null], [66, 'pad→cloud rock', '구름 바위', true, 'once'], [40, 'pad→mountain top', '두더지 산 꼭대기', true, 'once'], [50, 'pad→terrace', null, true, 'once'], [61.0, 'home', null]],
@@ -41,6 +47,12 @@ const ROUTES = {
     1: [[46.0, 'tree', '선반 위 명당'], [40, 'pad→middle', null, true, 'once'], [50.0, 'under the top shelf', '선반 밑'], [55, 'pad→basement', null, true, 'once'],
       [64, 'pad→middle', null, true, 'once'], [30, 'pad→top', null, true, 'once'], [60.0, 'home', null]],
   },
+  decks: {
+    0: [[13, 'pad→top deck', null, true, 'once'], [30, 'pad→middle deck', null, true, 'once'], [25.0, 'under the top deck', '다리 2층'], [19, 'pad→bottom deck', null, true, 'once'],
+      [30.0, 'along the bottom deck', '다리 1층'], [15, 'pad→tower', null, true, 'once'], [10.4, 'home', null]],
+    1: [[59, 'pad→top deck', null, true, 'once'], [43, 'pad→middle deck', null, true, 'once'], [47.0, 'under the top deck', '다리 2층'], [53, 'pad→bottom deck', null, true, 'once'],
+      [45.0, 'along the bottom deck', '다리 1층'], [57, 'pad→tower', null, true, 'once'], [61.6, 'home', null]],
+  },
   maple: {
     0: [[5, 'pad→sky stone', '단풍 구름섬', true, 'once'], [45, 'pad→right side', null, true, 'once'], [46.0, 'tree', '단풍 명당'], [35.0, 'bridge', '흙다리'], [26.6, 'bluff', '벼랑 전망대'], [10.0, 'home', null]],
     1: [[66, 'pad→sky stone', '단풍 구름섬', true, 'once'], [25, 'pad→left rim', null, true, 'once'], [26.6, 'bluff', '벼랑 전망대'], [35.0, 'bridge', '흙다리'], [46.0, 'tree', '단풍 명당'], [61.6, 'home', null]],
@@ -50,6 +62,12 @@ const ROUTES = {
       [29.0, 'to the end of the ledge', null], [23, 'pad→pillar top', null, true, 'once'], [11.2, 'home', null]],
     1: [[56, 'pad→ledge', null, true, 'once'], [48, 'pad→bottom ledge', null, true, 'once'], [52.0, 'into the nook', '선반 굴'], [43.7, 'to the end of the ledge', null],
       [48, 'pad→pillar top', null, true, 'once'], [60.0, 'home', null]],
+  },
+  well: {
+    0: [[19, 'pad→ledge', null, true, 'once'], [25, 'pad→lower ledge', null, true, 'once'], [22.6, 'into the nook', '우물 굴'], [29, 'pad→well floor', null, true, 'once'],
+      [36.0, 'tree', '우물 바닥 명당'], [25.0, 'under the ledges', '우물 밑 굴'], [33, 'pad→rim', null, true, 'once'], [12.0, 'home', null]],
+    1: [[53, 'pad→ledge', null, true, 'once'], [47, 'pad→lower ledge', null, true, 'once'], [49.5, 'into the nook', '우물 굴'], [42, 'pad→well floor', null, true, 'once'],
+      [36.0, 'tree', '우물 바닥 명당'], [41, 'pad→rim', null, true, 'once'], [61.0, 'home', null]],
   },
   ginkgo: {
     0: [[5, 'pad→bunker roof', '벙커 지붕', true, 'once'], [25, 'pad→ridge', '은행 봉우리', true, 'once'], [35.0, 'into the bunker', '골짜기 벙커'], [9.6, 'home', null]],
@@ -73,6 +91,12 @@ const ROUTES = {
       ['tp', 36.0, 12.0], [32, 'pad→left ice block', null, true, 'once'], [24, 'pad→home from the ice block', null, true, 'once'], [12.0, 'home', null]],
     1: [[50, 'pad→middle floor', null, true, 'once'], [46, 'pad→top deck', '누각 꼭대기', true, 'once'], [42, 'pad→home', null, true, 'once'], [61.0, 'home', null],
       ['tp', 36.0, 12.0], [40, 'pad→right ice block', null, true, 'once'], [48, 'pad→home from the ice block', null, true, 'once'], [61.0, 'home', null]],
+  },
+  crevasse: {
+    0: [[25, 'pad→upper bridge', null, true, 'once'], [32, 'pad→lower bridge', null, true, 'once'], [29.0, 'under the bridge', '틈새 굴'], [36, 'pad→upper bridge', null, true, 'once'],
+      [27, 'pad→plateau', null, true, 'once'], [12.0, 'home', null]],
+    1: [[47, 'pad→upper bridge', null, true, 'once'], [40, 'pad→lower bridge', null, true, 'once'], [43.0, 'under the bridge', '틈새 굴'], [36, 'pad→upper bridge', null, true, 'once'],
+      [45, 'pad→plateau', null, true, 'once'], [61.0, 'home', null]],
   },
   aurora: {
     0: [[17.4, 'tree', '눈꽃 명당'], [29.0, 'under the ice eave', '얼음 처마 밑'], [33.0, 'on the ice', null], [8.4, 'home', null]],
