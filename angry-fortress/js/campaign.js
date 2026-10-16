@@ -1,5 +1,5 @@
-// 깡단 원정: twelve CPU stages through the year, three in each season, every stage on its own map,
-// played in order. Each stage has three stars: win, win with half your health or more, and the
+// 깡단 원정: twenty CPU stages through the year, five in each season (the middle two on its 층층
+// maps), every stage on its own map, played in order. Each stage has three stars: win, win with half your health or more, and the
 // stage's own challenge. Stars open the 깡단 옷장 (looks.js). Progress lives on the phone.
 import { storage } from './util.js';
 import { THEMES, SEASONS } from './levels.js';
@@ -13,28 +13,40 @@ const GOALS = {
   shots6: { text: '6번 안에 쏴서 이기기', test: (r, me) => me.shots <= 6 },
   shots8: { text: '8번 안에 쏴서 이기기', test: (r, me) => me.shots <= 8 },
   hits4: { text: '4번 이상 명중시키고 이기기', test: (r, me) => me.hits >= 4 },
+  drop: { text: '상대를 한 층 아래로 떨어뜨리고 이기기', test: (r, me, foe) => (foe.drops || 0) > 0 },
 };
 
 // foe: the CPU captain's name; look: what it wears (the season bosses dress up)
 export const STAGES = [
   { id: 'spring-1', season: 'spring', theme: 'oak', foe: '솔숲단 막내 솔솔', difficulty: 'easy', wind: 'off', goal: 'shots8', look: { hat: 'acorn' } },
   { id: 'spring-2', season: 'spring', theme: 'blossom', foe: '꽃잎 줍는 솔방', difficulty: 'easy', wind: 'normal', goal: 'acorn', look: { hat: 'leaf' } },
+  { id: 'spring-paddy', season: 'spring', theme: 'paddy', foe: '다랑이 논 물꼬지기', difficulty: 'normal', wind: 'off', goal: 'drop', look: { hat: 'straw' } },
+  { id: 'spring-shrooms', season: 'spring', theme: 'shrooms', foe: '왕버섯 숲 버섯돌이', difficulty: 'normal', wind: 'normal', goal: 'hits4', look: { hat: 'mushroom', cart: 'red' } },
   { id: 'spring-3', season: 'spring', theme: 'mole', foe: '두더지 굴 수문장 솔이', difficulty: 'normal', wind: 'normal', goal: 'fall', look: { hat: 'leaf', cart: 'red' } },
   { id: 'summer-1', season: 'summer', theme: 'sunflower', foe: '해바라기 비탈 뜀박이', difficulty: 'normal', wind: 'off', goal: 'shots8', look: { hat: 'straw' } },
   { id: 'summer-2', season: 'summer', theme: 'night', foe: '반딧불 징검다리 길잡이', difficulty: 'normal', wind: 'normal', goal: 'hp80', look: { hat: 'mushroom', cart: 'sky' } },
+  { id: 'summer-tiers', season: 'summer', theme: 'tiers', foe: '층층 구름섬 섬지기', difficulty: 'normal', wind: 'normal', goal: 'drop', look: { hat: 'leaf', cart: 'sky' } },
+  { id: 'summer-decks', season: 'summer', theme: 'decks', foe: '삼층 다리 다리지기', difficulty: 'normal', wind: 'off', goal: 'shots8', look: { hat: 'straw', cart: 'red' } },
   { id: 'summer-3', season: 'summer', theme: 'arch', foe: '하늘다리 대장 무지개솔', difficulty: 'normal', wind: 'strong', goal: 'fall', look: { hat: 'straw', cart: 'red', trail: 'leaf' } },
   { id: 'autumn-1', season: 'autumn', theme: 'maple', foe: '흙다리 지킴이', difficulty: 'normal', wind: 'normal', goal: 'acorn', look: { hat: 'acorn', cart: 'red' } },
   { id: 'autumn-2', season: 'autumn', theme: 'ginkgo', foe: '은행 참호 명사수', difficulty: 'hard', wind: 'off', goal: 'hits4', look: { hat: 'mushroom', cart: 'leaf' } },
+  { id: 'autumn-cliffs', season: 'autumn', theme: 'cliffs', foe: '벼랑 선반 바위타기', difficulty: 'hard', wind: 'normal', goal: 'drop', look: { hat: 'acorn', cart: 'leaf' } },
+  { id: 'autumn-well', season: 'autumn', theme: 'well', foe: '낙엽 우물 두레박', difficulty: 'hard', wind: 'off', goal: 'acorn', look: { hat: 'pinecone', trail: 'leaf' } },
   { id: 'autumn-3', season: 'autumn', theme: 'pine', foe: '소나무 절벽 대장 솔바람', difficulty: 'hard', wind: 'normal', goal: 'fall', look: { hat: 'pinecone', cart: 'leaf', trail: 'leaf' } },
   { id: 'winter-1', season: 'winter', theme: 'snowcliff', foe: '살얼음 썰매꾼', difficulty: 'hard', wind: 'normal', goal: 'shots8', look: { hat: 'pinecone', cart: 'sky' } },
   { id: 'winter-2', season: 'winter', theme: 'igloo', foe: '이글루 파수꾼', difficulty: 'hard', wind: 'normal', goal: 'hp80', look: { hat: 'mushroom', cart: 'sky', trail: 'star' } },
+  { id: 'winter-pavilion', season: 'winter', theme: 'pavilion', foe: '얼음 누각 문지기', difficulty: 'hard', wind: 'normal', goal: 'drop', look: { hat: 'mushroom', cart: 'sky' } },
+  { id: 'winter-crevasse', season: 'winter', theme: 'crevasse', foe: '빙하 틈새 얼음꾼', difficulty: 'hard', wind: 'strong', goal: 'fall', look: { hat: 'pinecone', cart: 'sky', trail: 'star' } },
   { id: 'winter-3', season: 'winter', theme: 'aurora', foe: '솔숲단 큰대장 솔왕', difficulty: 'hard', wind: 'strong', goal: 'fall', look: { hat: 'crown', cart: 'gold', trail: 'star' }, boss: true },
 ];
 export const MAX_STARS = STAGES.length * 3;
 export const SEASON_ORDER = ['spring', 'summer', 'autumn', 'winter'];
 
-// The first campaign had three stages on each of four maps; its stars carry over stage for stage.
+// The first campaign had three stages on each of four maps; its stars carry over stage for stage
+// onto the twelve stages that came next (which keep their ids, so their own stars stay too; the
+// 층층 stages came later still and start empty).
 const OLD_IDS = ['oak-1', 'oak-2', 'oak-3', 'maple-1', 'maple-2', 'maple-3', 'pine-1', 'pine-2', 'pine-3', 'night-1', 'night-2', 'night-3'];
+const TWELVE = ['spring-1', 'spring-2', 'spring-3', 'summer-1', 'summer-2', 'summer-3', 'autumn-1', 'autumn-2', 'autumn-3', 'winter-1', 'winter-2', 'winter-3'];
 
 export function stage(id) {
   return STAGES.find((s) => s.id === id) || null;
@@ -49,7 +61,8 @@ export function stageName(s) {
   return `${SEASONS[s.season]} ${stageNumber(s)} · ${THEMES[s.theme].name}`;
 }
 
-export const stageNumber = (s) => Number(s.id.split('-')[1]);
+// where a stage stands in its season (1 to 5), whatever its id says
+export const stageNumber = (s) => STAGES.filter((q) => q.season === s.season).indexOf(s) + 1;
 
 // The three goals of a stage, in star order.
 export function goals(s) {
@@ -61,9 +74,10 @@ export function progress() {
   const stars = {};
   if (p && p.stars && typeof p.stars === 'object') {
     const old = !STAGES.some((s) => s.id in p.stars) && OLD_IDS.some((id) => id in p.stars);
-    STAGES.forEach((s, i) => {
-      const v = p.stars[old ? OLD_IDS[i] : s.id];
-      if (Array.isArray(v)) stars[s.id] = [0, 1, 2].map((k) => !!v[k]);
+    STAGES.forEach((s) => {
+      const k = TWELVE.indexOf(s.id);
+      const v = p.stars[old ? (k >= 0 ? OLD_IDS[k] : null) : s.id];
+      if (Array.isArray(v)) stars[s.id] = [0, 1, 2].map((j) => !!v[j]);
     });
     if (old) storage.set('af.campaign', { stars });
   }
@@ -79,9 +93,10 @@ export function totalStars(prog = progress()) {
   return STAGES.reduce((n, s) => n + starCount(prog, s.id), 0);
 }
 
-// A stage is open once the one before it has been won.
+// A stage is open once the one before it has been won (or once it has been won itself: stages
+// added later in front of it don't lock it again).
 export function isOpen(prog, i) {
-  return i === 0 || starCount(prog, STAGES[i - 1].id) > 0;
+  return i === 0 || starCount(prog, STAGES[i - 1].id) > 0 || starCount(prog, STAGES[i].id) > 0;
 }
 
 // The battle options for a stage (main.js adds the player's own look).

@@ -841,7 +841,7 @@ svg { width: 1em; height: 1em; fill: currentColor; flex: none; }
 }
 .camp-panel { max-width: 640px; display: flex; flex-direction: column; gap: 8px; }
 .camp-grid { display: flex; flex-direction: column; gap: 6px; }
-.camp-row { display: grid; grid-template-columns: 3.2em repeat(3, minmax(0, 1fr)); align-items: center; gap: 8px; }
+.camp-row { display: grid; grid-template-columns: 3.2em repeat(5, minmax(0, 1fr)); align-items: center; gap: 8px; }
 .camp-map { font-family: var(--display); font-size: 22px; color: var(--ink); line-height: 1.15; text-align: center; }
 .camp-row[data-season="spring"] .camp-map { color: #e0588f; }
 .camp-row[data-season="summer"] .camp-map { color: #3f9a2c; }

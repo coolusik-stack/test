@@ -149,7 +149,7 @@ export class Game {
         moveSoundT: 0,
         mood: 'normal',
         moodT: 0,
-        stats: { shots: 0, hits: 0, dmg: 0, blocks: 0, specials: 0 },
+        stats: { shots: 0, hits: 0, dmg: 0, blocks: 0, specials: 0, drops: 0 },
         look: cleanLook(this.opts.looks && this.opts.looks[i]), // 깡단 옷장 (drawn only)
       };
       this._captainBody(p, x, y);
@@ -1372,7 +1372,10 @@ export class Game {
       for (const job of jobs) job();
     }
     if (this.pendingFalls.length) {
-      for (const f of this.pendingFalls) this._hurt(f.p, f.dmg, f.attacker);
+      for (const f of this.pendingFalls) {
+        this._hurt(f.p, f.dmg, f.attacker);
+        if (f.attacker) f.p.stats.drops++; // knocked down a floor (or off a ledge) by the other side's shot
+      }
       this.pendingFalls.length = 0;
     }
     if (this.dentQueue.length) {
