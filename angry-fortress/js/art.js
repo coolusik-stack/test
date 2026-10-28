@@ -316,6 +316,82 @@ function fill2(ctx, path, c, d, gx, gy, cx, cy, off, k) {
 }
 
 // ---------------------------------------------------------------------
+//  Face kit (captains and nuts), after the way Angry Birds builds a face that reads from across
+//  the screen: two big white eyes nearly touching, pupils that look where the action is, heavy
+//  brows sitting on top of the eyes (they cover the eye tops, which is where the attitude comes
+//  from), and soft rounded volume (a lit spot toward the light, a gloss, a darker far side).
+// ---------------------------------------------------------------------
+// soft volume: a radial gradient toward the light (gx, gy), cached per key (unit space)
+function volFill(ctx, key, c, d, gx, gy, cx, cy, R) {
+  return cgrad(ctx, 'vol:' + key, () => {
+    const lx = cx + gx * R * 0.42, ly = cy + gy * R * 0.42;
+    const g = ctx.createRadialGradient(lx, ly, R * 0.05, cx + gx * R * 0.2, cy + gy * R * 0.2, R * 1.12);
+    g.addColorStop(0, mix(c, '#ffffff', 0.32));
+    g.addColorStop(0.42, c);
+    g.addColorStop(0.8, mix(c, d, 0.75));
+    g.addColorStop(1, d);
+    return g;
+  });
+}
+// gloss: a soft white streak on the lit shoulder
+function gloss(ctx, gx, gy, cx, cy, R, a) {
+  const ang = Math.atan2(gy, gx);
+  ctx.save();
+  ctx.translate(cx + gx * R * 0.56, cy + gy * R * 0.56); ctx.rotate(ang + PI / 2);
+  ctx.beginPath(); ctx.ellipse(0, 0, R * 0.3, R * 0.11, 0, 0, TAU);
+  ctx.fillStyle = 'rgba(255,255,255,' + a + ')'; ctx.fill();
+  ctx.restore();
+}
+// Big white eyes. E = [[cx, cy, rx, ry], ...]; (lx, ly) where they look (-1..1); pr = pupil radius
+// over rx; open = 1 - blink squash; lid = how far an upper lid comes down (0..1) in lidCol.
+function bigEyes(ctx, E, lx, ly, pr, open, lid, lidCol, ink, lw) {
+  ctx.beginPath();
+  for (const e of E) { ctx.moveTo(e[0] + e[2], e[1]); ctx.ellipse(e[0], e[1], e[2], e[3] * open, 0, 0, TAU); }
+  ctx.fillStyle = '#ffffff'; ctx.fill();
+  ctx.save(); ctx.clip();
+  ctx.beginPath();
+  for (const e of E) {
+    const r = e[2] * pr, px = e[0] + lx * (e[2] - r) * 0.8, py = e[1] + ly * (e[3] * open - r) * 0.7;
+    ctx.moveTo(px + r, py); ctx.arc(px, py, r, 0, TAU);
+  }
+  ctx.fillStyle = ink; ctx.fill();
+  ctx.beginPath();
+  for (const e of E) {
+    const r = e[2] * pr, px = e[0] + lx * (e[2] - r) * 0.8 - r * 0.36, py = e[1] + ly * (e[3] * open - r) * 0.7 - r * 0.38, h = r * 0.34;
+    ctx.moveTo(px + h, py); ctx.arc(px, py, h, 0, TAU);
+  }
+  ctx.fillStyle = '#ffffff'; ctx.fill();
+  if (lid > 0.01) {
+    ctx.beginPath();
+    for (const e of E) { const top = e[1] - e[3] * open; ctx.rect(e[0] - e[2] - 0.1, top - 0.1, e[2] * 2 + 0.2, 0.1 + e[3] * open * 2 * lid); }
+    ctx.fillStyle = lidCol; ctx.fill();
+    ctx.beginPath();
+    for (const e of E) { const y = e[1] - e[3] * open + e[3] * open * 2 * lid; ctx.moveTo(e[0] - e[2], y); ctx.lineTo(e[0] + e[2], y); }
+    ctx.strokeStyle = ink; ctx.lineWidth = lw * 1.2; ctx.stroke();
+  }
+  ctx.restore();
+  ctx.beginPath();
+  for (const e of E) { ctx.moveTo(e[0] + e[2], e[1]); ctx.ellipse(e[0], e[1], e[2], e[3] * open, 0, 0, TAU); }
+  ctx.strokeStyle = ink; ctx.lineWidth = lw; ctx.stroke();
+}
+// A heavy brow: a wedge from its thick inner end (x0, y0, w0) to its thin outer end (x1, y1, w1),
+// bowed by bend (along the wedge's normal, up = negative). Added to the current path.
+function browPath(ctx, x0, y0, w0, x1, y1, w1, bend) {
+  const dx = x1 - x0, dy = y1 - y0, L = Math.hypot(dx, dy) || 1, nx = dy / L, ny = -dx / L;
+  const s = ny < 0 ? 1 : -1; // normal pointing up
+  const ux = nx * s, uy = ny * s, mx = (x0 + x1) / 2 + ux * bend, my = (y0 + y1) / 2 + uy * bend;
+  ctx.moveTo(x0 + ux * w0 / 2, y0 + uy * w0 / 2);
+  ctx.quadraticCurveTo(mx + ux * (w0 + w1) / 4, my + uy * (w0 + w1) / 4, x1 + ux * w1 / 2, y1 + uy * w1 / 2);
+  ctx.lineTo(x1 - ux * w1 / 2, y1 - uy * w1 / 2);
+  ctx.quadraticCurveTo(mx - ux * (w0 + w1) / 4, my - uy * (w0 + w1) / 4, x0 - ux * w0 / 2, y0 - uy * w0 / 2);
+  ctx.closePath();
+}
+function fillBrows(ctx, col, lw) {
+  ctx.fillStyle = col; ctx.fill();
+  ctx.strokeStyle = col; ctx.lineWidth = lw; ctx.lineJoin = 'round'; ctx.stroke();
+}
+
+// ---------------------------------------------------------------------
 //  Nut ammo (unit space: collision radius = 1, facing +x)
 // ---------------------------------------------------------------------
 const NUT_INK = '#24160e';
@@ -329,74 +405,105 @@ function pinenutTipPath(p) {
 }
 function walnutOutlinePath(p) {
   walnutPath(p);
-  p.moveTo(-0.08, -0.94); p.bezierCurveTo(-0.3, -0.42, -0.3, 0.42, -0.08, 0.94);
+  p.moveTo(-0.34, -0.89); p.bezierCurveTo(-0.58, -0.4, -0.58, 0.4, -0.34, 0.89);
 }
-// eyes [x0, y0, x1, y1], er = eye dot radius, mouth [x, y], cy = shape centre y, stars = dizzy star height
+// Each nut is a character whose face says what it does (unit space, collision radius 1):
+//   E      the two eyes [cx, cy, rx, ry], near one first
+//   brow   [tilt (fierce > 0), inner width, outer width, bend]; uni joins them into one brow
+//   pr     pupil size over the eye; lid how heavy the upper lids hang
+//   moods  the mouth at rest and in flight; M where it sits; cy/R the body's centre and size
 const NUT = {
-  acorn:   { c: '#cf8644', d: '#a5622c', o: '#4a2408', acc: '#8e6036', path: acornBodyPath, eyes: [0.04, 0.22, 0.46, 0.2], er: 0.14, mouth: [0.3, 0.56], cy: 0.25, stars: -1.4 },
-  pinenut: { c: '#f4e0b4', d: '#d6b378', o: '#6a4a22', acc: '#b27a40', path: pinenutPath, eyes: [0.1, -0.1, 0.48, -0.12], er: 0.13, mouth: [0.6, 0.24], cy: 0, stars: -1.0 },
-  peanut:  { c: '#e0b476', d: '#bb894a', o: '#5a3814', path: peanutPath, eyes: [0.22, -0.1, 0.6, -0.12], er: 0.13, mouth: [0.5, 0.28], cy: 0, stars: -1.0 },
-  burr:    { c: '#8ec64e', d: '#5f9c30', o: '#2a4a10', acc: '#43721a', path: burrBallPath, eyes: [0.0, -0.02, 0.4, -0.04], er: 0.14, mouth: [0.22, 0.32], cy: 0, stars: -1.5 },
-  walnut:  { c: '#ae7e50', d: '#855830', o: '#3a200c', path: walnutPath, olPath: walnutOutlinePath, eyes: [0.14, -0.02, 0.56, -0.04], er: 0.15, mouth: [0.38, 0.4], cy: 0, stars: -1.3, grumpy: true },
-  kernel:  { c: '#f6cdaa', d: '#dba27c', o: '#6a3a1e', path: kernelPath, eyes: [0.04, -0.08, 0.52, -0.1], er: 0.17, mouth: [0.3, 0.32], cy: 0, stars: -1.2, cute: true },
+  // the hero: heavy straight brows under its cap, set jaw, and a battle cry in flight
+  acorn:   { c: '#cf8644', d: '#93531f', o: '#4a2408', acc: '#8e6036', path: acornBodyPath, E: [[-0.09, 0.24, 0.29, 0.33], [0.46, 0.22, 0.26, 0.31]],
+             brow: [1.2, 0.22, 0.11, -0.01], pr: 0.44, lid: 0, idle: 'frown', fly: 'yell', M: [0.2, 0.74], cy: 0.25, R: 0.95, stars: -1.4 },
+  // the speedster: cocky arched brows and a smirk; grins through its dash
+  pinenut: { c: '#f4e0b4', d: '#c9a46a', o: '#6a4a22', acc: '#b27a40', path: pinenutPath, E: [[0.04, -0.06, 0.27, 0.31], [0.56, -0.08, 0.24, 0.29]],
+             brow: [0.7, 0.18, 0.08, 0.08], pr: 0.42, lid: 0.18, idle: 'smirk', fly: 'grin', M: [0.68, 0.4], cy: 0, R: 1.1, stars: -1.0 },
+  // the cheerful one (it splits into three): raised brows, big smile, "wheee" in flight
+  peanut:  { c: '#e0b476', d: '#a87a40', o: '#5a3814', path: peanutPath, E: [[0.14, -0.1, 0.25, 0.29], [0.6, -0.12, 0.23, 0.28]],
+             brow: [-0.6, 0.15, 0.08, 0.06], pr: 0.5, lid: 0, idle: 'smile', fly: 'whee', M: [0.42, 0.38], cy: 0, R: 1.05, stars: -1.0 },
+  // the short fuse: grumpy brows and gritted teeth, redder and angrier as it fizzes
+  burr:    { c: '#8ec64e', d: '#55902a', o: '#2a4a10', acc: '#43721a', path: burrBallPath, E: [[-0.12, -0.06, 0.27, 0.31], [0.38, -0.08, 0.25, 0.3]],
+             brow: [1.0, 0.22, 0.12, -0.03], pr: 0.4, lid: 0.12, idle: 'grit', fly: 'yell', M: [0.14, 0.43], cy: 0, R: 0.82, stars: -1.5 },
+  // the heavyweight: one huge unibrow, small deep-set eyes, a scowl
+  walnut:  { c: '#ae7e50', d: '#74481f', o: '#3a200c', path: walnutPath, olPath: walnutOutlinePath, E: [[0.1, 0.0, 0.24, 0.26], [0.56, -0.02, 0.22, 0.25]],
+             brow: [0.9, 0.26, 0.16, -0.02], uni: true, pr: 0.36, lid: 0.3, idle: 'frown', fly: 'grit', M: [0.32, 0.52], cy: 0, R: 1.0, stars: -1.3 },
+  // the little split-off kernels: all eyes, no brows
+  kernel:  { c: '#f6cdaa', d: '#d3966e', o: '#6a3a1e', path: kernelPath, E: [[-0.04, -0.06, 0.3, 0.34], [0.52, -0.08, 0.27, 0.32]],
+             brow: null, pr: 0.52, lid: 0, idle: 'smile', fly: 'o', M: [0.28, 0.38], cy: 0, R: 1.0, stars: -1.2 },
 };
 
-function nutFace(ctx, N, st, blink, lx, ly, lw, time, pound) {
-  const E = N.eyes, er = N.er;
-  let tilt = N.grumpy ? 0.6 : 1, eye = 'dot';
-  if (st === 'fly') tilt = 1.7;
-  else if (st === 'hurt') { eye = 'x'; tilt = -1.2; }
-  else if (st === 'dizzy') { eye = 'spiral'; tilt = 0.3; }
-  if (pound) tilt = 2.1;
-  if (eye === 'dot' && blink > 0.55) eye = 'line';
-  const lid = (N.grumpy && st !== 'fly') || pound;
-  const ox = lx * 0.07, oy = ly * 0.06;
-  // eye fills (+ open mouth in the same ink)
-  ctx.beginPath();
-  if (eye === 'dot') {
-    const bk = 1 - clamp(blink, 0, 1) * 0.8;
-    for (let i = 0; i < 2; i++) {
-      const ex = E[i * 2] + ox, ey = E[i * 2 + 1] + oy, r = er * (i ? 0.9 : 1) * (st === 'fly' ? 0.9 : 1);
-      if (lid) { ctx.moveTo(ex + r, ey - r * 0.2); ctx.arc(ex, ey - r * 0.2, r, 0, PI); ctx.closePath(); }
-      else { ctx.moveTo(ex + r, ey); ctx.ellipse(ex, ey, r, r * bk, 0, 0, TAU); }
-    }
-  }
-  const M = N.mouth;
-  if (st === 'fly' && !pound) { ctx.moveTo(M[0] + 0.09, M[1] + 0.02); ctx.ellipse(M[0], M[1] + 0.02, 0.09, 0.1, 0, 0, TAU); }
-  ctx.fillStyle = NUT_INK; ctx.fill();
-  if (eye === 'dot' && blink < 0.55) {
+function nutMouth(ctx, kind, M, ink, lw, time) {
+  const x = M[0], y = M[1];
+  if (kind === 'yell' || kind === 'whee' || kind === 'o') {
     ctx.beginPath();
-    for (let i = 0; i < 2; i++) {
-      const ex = E[i * 2] + ox, ey = E[i * 2 + 1] + oy, r = er * 0.36;
-      const hx = ex - er * 0.35, hy = lid ? ey : ey - er * 0.38;
-      ctx.moveTo(hx + r, hy); ctx.arc(hx, hy, r, 0, TAU);
-    }
-    ctx.fillStyle = '#ffffff'; ctx.fill();
+    if (kind === 'yell') { const w = 1 + 0.06 * Math.sin(time * 40); ctx.moveTo(x - 0.2 * w, y - 0.06); ctx.quadraticCurveTo(x, y - 0.12, x + 0.2 * w, y - 0.07); ctx.quadraticCurveTo(x + 0.17, y + 0.22, x, y + 0.22); ctx.quadraticCurveTo(x - 0.18, y + 0.22, x - 0.2 * w, y - 0.06); ctx.closePath(); }
+    else if (kind === 'whee') { ctx.moveTo(x - 0.2, y - 0.05); ctx.quadraticCurveTo(x, y + 0.0, x + 0.2, y - 0.06); ctx.quadraticCurveTo(x + 0.14, y + 0.24, x, y + 0.24); ctx.quadraticCurveTo(x - 0.15, y + 0.23, x - 0.2, y - 0.05); ctx.closePath(); }
+    else { ctx.moveTo(x + 0.1, y + 0.02); ctx.ellipse(x, y + 0.02, 0.1, 0.12, 0, 0, TAU); }
+    ctx.fillStyle = '#5a1414'; ctx.fill();
+    ctx.save(); ctx.clip();
+    ctx.beginPath(); ctx.ellipse(x, y + 0.2, 0.13, 0.09, 0, 0, TAU); ctx.fillStyle = '#ff7a92'; ctx.fill();
+    if (kind === 'yell') { ctx.beginPath(); ctx.rect(x - 0.22, y - 0.14, 0.44, 0.1); ctx.fillStyle = '#ffffff'; ctx.fill(); }
+    ctx.restore();
+    ctx.strokeStyle = ink; ctx.lineWidth = lw * 0.8; ctx.stroke();
+    return;
   }
-  // strokes: brows, closed/x/spiral eyes, line mouths — one path
+  if (kind === 'grit' || kind === 'grin') {
+    ctx.beginPath();
+    if (kind === 'grit') roundRectPath(ctx, x - 0.18, y - 0.07, 0.36, 0.15, 0.06);
+    else { ctx.moveTo(x - 0.2, y - 0.06); ctx.quadraticCurveTo(x, y - 0.02, x + 0.2, y - 0.1); ctx.quadraticCurveTo(x + 0.14, y + 0.16, x - 0.02, y + 0.15); ctx.quadraticCurveTo(x - 0.17, y + 0.12, x - 0.2, y - 0.06); ctx.closePath(); }
+    ctx.fillStyle = '#ffffff'; ctx.fill(); ctx.strokeStyle = ink; ctx.lineWidth = lw * 0.8; ctx.stroke();
+    ctx.beginPath();
+    if (kind === 'grit') { ctx.moveTo(x - 0.17, y + 0.005); ctx.lineTo(x + 0.17, y + 0.005); ctx.moveTo(x - 0.06, y - 0.06); ctx.lineTo(x - 0.06, y + 0.07); ctx.moveTo(x + 0.06, y - 0.06); ctx.lineTo(x + 0.06, y + 0.07); }
+    else { ctx.moveTo(x - 0.17, y + 0.02); ctx.quadraticCurveTo(x, y + 0.06, x + 0.17, y - 0.02); }
+    ctx.lineWidth = lw * 0.5; ctx.stroke();
+    return;
+  }
   ctx.beginPath();
-  if (!(N.cute && st === 'idle')) {
-    for (let i = 0; i < 2; i++) {
-      const ex = E[i * 2], ey = E[i * 2 + 1], d = i ? -1 : 1, yb = ey - er - 0.13;
-      ctx.moveTo(ex - d * 0.16, yb - 0.08 * tilt); ctx.lineTo(ex + d * 0.12, yb + 0.08 * tilt);
-    }
+  if (kind === 'frown') { ctx.moveTo(x - 0.15, y + 0.04); ctx.quadraticCurveTo(x, y - 0.07, x + 0.15, y + 0.03); }
+  else if (kind === 'smirk') { ctx.moveTo(x - 0.15, y); ctx.quadraticCurveTo(x + 0.02, y + 0.1, x + 0.17, y - 0.07); }
+  else if (kind === 'smile') { ctx.moveTo(x - 0.16, y - 0.03); ctx.quadraticCurveTo(x, y + 0.15, x + 0.16, y - 0.03); }
+  else if (kind === 'zig') { ctx.moveTo(x - 0.16, y); ctx.lineTo(x - 0.08, y - 0.06); ctx.lineTo(x, y + 0.02); ctx.lineTo(x + 0.08, y - 0.06); ctx.lineTo(x + 0.16, y); }
+  ctx.strokeStyle = ink; ctx.lineWidth = lw; ctx.stroke();
+}
+
+function nutFace(ctx, N, st, blink, lx, ly, lw, time, pound, fz) {
+  const E = N.E, ink = NUT_INK;
+  let eye = 'open', mouth = N[st === 'fly' ? 'fly' : 'idle'] || 'frown';
+  let tilt = N.brow ? N.brow[0] : 0, lid = N.lid, pr = N.pr;
+  if (st === 'fly') tilt += N.brow && N.brow[0] < 0 ? -0.3 : 0.5;
+  else if (st === 'hurt') { eye = 'x'; mouth = 'zig'; tilt = -1.0; }
+  else if (st === 'dizzy') { eye = 'spiral'; mouth = 'o'; tilt = 0.2; }
+  if (pound) { tilt = 1.8; lid = 0.45; mouth = 'grit'; }
+  if (fz > 0) { tilt += fz * 0.8; pr *= 1 - fz * 0.35; mouth = fz > 0.5 ? 'yell' : 'grit'; }
+  if (eye === 'open' && blink > 0.55) eye = 'closed';
+  if (eye === 'open') bigEyes(ctx, E, lx, ly, pr, 1 - clamp(blink, 0, 1) * 0.8, lid, N.d, ink, lw * 0.6);
+  const lift = eye === 'x' || eye === 'spiral' ? 0.1 : 0; // brows clear of the line eyes
+  // brows sit on the eye tops
+  if (N.brow) {
+    const B = N.brow, e0 = E[0], e1 = E[1], t0 = e0[1] - e0[3] + 0.03 - lift, t1 = e1[1] - e1[3] + 0.03 - lift;
+    const mid = (e0[0] + e0[2] + e1[0] - e1[2]) / 2;
+    const in0 = N.uni ? mid : e0[0] + e0[2] * 0.95, in1 = N.uni ? mid : e1[0] - e1[2] * 0.95;
+    ctx.beginPath();
+    browPath(ctx, in0, t0 + 0.09 * tilt, B[1], e0[0] - e0[2] * 1.1, t0 - 0.08 * tilt, B[2], B[3]);
+    browPath(ctx, in1, t1 + 0.09 * tilt - (N.uni ? t1 - t0 : 0), B[1], e1[0] + e1[2] * 1.1, t1 - 0.07 * tilt, B[2] * 0.9, B[3]);
+    fillBrows(ctx, ink, lw * 0.3);
   }
+  // line eyes
+  ctx.beginPath();
   for (let i = 0; i < 2; i++) {
-    const ex = E[i * 2], ey = E[i * 2 + 1], d = i ? -1 : 1;
-    if (eye === 'line') { ctx.moveTo(ex - er, ey + 0.02); ctx.quadraticCurveTo(ex, ey + er * 0.8, ex + er, ey + 0.02); }
+    const e = E[i], ex = e[0], ey = e[1], d = i ? -1 : 1, er = e[2] * 0.75;
+    if (eye === 'closed') { ctx.moveTo(ex - er, ey + 0.02); ctx.quadraticCurveTo(ex, ey + er * 0.8, ex + er, ey + 0.02); }
     else if (eye === 'x') { ctx.moveTo(ex - d * er, ey - er); ctx.lineTo(ex + d * er * 0.9, ey); ctx.lineTo(ex - d * er, ey + er); }
     else if (eye === 'spiral') {
       for (let j = 0; j <= 9; j++) {
-        const t = j / 9, a = time * 7 * d + t * TAU * 1.15, rr = 0.03 + t * er * 1.45;
+        const t = j / 9, a = time * 7 * d + t * TAU * 1.15, rr = 0.03 + t * er * 1.25;
         if (j) ctx.lineTo(ex + Math.cos(a) * rr, ey + Math.sin(a) * rr); else ctx.moveTo(ex + Math.cos(a) * rr, ey + Math.sin(a) * rr);
       }
     }
   }
-  if (pound) { ctx.moveTo(M[0] - 0.12, M[1]); ctx.lineTo(M[0] + 0.12, M[1] - 0.02); }
-  else if (st === 'hurt') { ctx.moveTo(M[0] - 0.13, M[1]); ctx.lineTo(M[0] - 0.04, M[1] - 0.05); ctx.lineTo(M[0] + 0.04, M[1] + 0.02); ctx.lineTo(M[0] + 0.13, M[1] - 0.03); }
-  else if (st === 'dizzy') { ctx.moveTo(M[0] + 0.07, M[1]); ctx.arc(M[0], M[1], 0.07, 0, TAU); }
-  else if (st === 'idle' && (N.cute || N === NUT.peanut)) { ctx.moveTo(M[0] - 0.1, M[1] - 0.02); ctx.quadraticCurveTo(M[0], M[1] + 0.08, M[0] + 0.1, M[1] - 0.02); }
-  ctx.strokeStyle = NUT_INK; ctx.lineWidth = lw * 1.15; ctx.stroke();
+  ctx.strokeStyle = ink; ctx.lineWidth = lw * 1.15; ctx.stroke();
+  nutMouth(ctx, mouth, N.M, ink, lw * 1.1, time);
   if (st === 'dizzy') {
     ctx.beginPath();
     for (let i = 0; i < 3; i++) {
@@ -405,6 +512,38 @@ function nutFace(ctx, N, st, blink, lx, ly, lw, time, pound) {
     }
     ctx.fillStyle = '#ffd83a'; ctx.fill();
   }
+}
+
+// surface details that make each shell read as its nut (unit space, drawn over the body fill)
+function nutDetail(ctx, key, N, lw) {
+  if (key === 'walnut') {
+    ctx.beginPath();
+    ctx.moveTo(-0.72, -0.46); ctx.quadraticCurveTo(-0.6, -0.28, -0.74, -0.08);
+    ctx.moveTo(-0.76, 0.22); ctx.quadraticCurveTo(-0.62, 0.42, -0.7, 0.58);
+    ctx.moveTo(0.7, 0.56); ctx.quadraticCurveTo(0.5, 0.74, 0.26, 0.8);
+    ctx.moveTo(0.12, -0.84); ctx.quadraticCurveTo(0.36, -0.74, 0.62, -0.7);
+    ctx.strokeStyle = N.d; ctx.lineWidth = lw * 0.8; ctx.stroke();
+  } else if (key === 'peanut') {
+    ctx.beginPath();
+    for (const [x, y] of [[-0.72, -0.12], [-0.5, 0.3], [-0.3, -0.24], [-0.74, 0.24], [0.62, 0.36], [0.1, 0.42]]) { ctx.moveTo(x + 0.045, y); ctx.arc(x, y, 0.045, 0, TAU); }
+    ctx.fillStyle = N.d; ctx.fill();
+  } else if (key === 'pinenut') {
+    ctx.beginPath(); ctx.moveTo(-0.8, 0.3); ctx.quadraticCurveTo(-0.2, 0.62, 0.6, 0.46);
+    ctx.strokeStyle = 'rgba(160,120,60,0.5)'; ctx.lineWidth = lw * 0.6; ctx.stroke();
+  }
+}
+// the acorn's cap: volume plus its scaly weave
+function acornCap(ctx, N, gx, gy, lw, qk) {
+  const cap = P2('nut:acorncap', acornCapPath);
+  ctx.fillStyle = volFill(ctx, 'acap' + qk, N.acc, '#5a3818', gx, gy, 0, -0.62, 0.95); ctx.fill(cap);
+  ctx.save(); ctx.clip(cap);
+  ctx.beginPath();
+  for (const [y, off] of [[-0.42, 0], [-0.64, 0.13], [-0.86, 0]]) {
+    for (let x = -1.1 + off; x < 1.1; x += 0.26) { ctx.moveTo(x - 0.13, y - 0.08); ctx.quadraticCurveTo(x, y + 0.07, x + 0.13, y - 0.08); }
+  }
+  ctx.strokeStyle = 'rgba(60,32,10,0.55)'; ctx.lineWidth = lw * 0.55; ctx.stroke();
+  ctx.restore();
+  ctx.strokeStyle = N.o; ctx.lineWidth = lw; ctx.stroke(cap);
 }
 
 function burrSpikes(ctx, N, fz, time, lw) {
@@ -477,15 +616,16 @@ export function drawNut(ctx, type, x, y, r, angle, s) {
     ctx.beginPath(); ctx.moveTo(0.02, -0.82); ctx.quadraticCurveTo(0.04, -1.12, 0.24, -1.24);
     ctx.strokeStyle = N.o; ctx.lineWidth = 0.17; ctx.stroke();
   }
-  fill2(ctx, body, c, d, gx, gy, 0, N.cy, 0.1, 0.9);
+  // soft volume toward the light (quantised to 16 directions so the gradients cache)
+  const qa = Math.round(Math.atan2(gy, gx) / (TAU / 16)), qgx = Math.cos(qa * TAU / 16), qgy = Math.sin(qa * TAU / 16);
+  ctx.fillStyle = volFill(ctx, 'nut' + key + c + qa, c, d, qgx, qgy, 0, N.cy, N.R); ctx.fill(body);
   if (key === 'pinenut') { ctx.fillStyle = N.acc; ctx.fill(P2('nut:pinetip', pinenutTipPath)); }
+  nutDetail(ctx, key, N, lw);
+  ctx.save(); ctx.clip(body); gloss(ctx, qgx, qgy, 0, N.cy, N.R, 0.4); ctx.restore();
   ctx.strokeStyle = N.o; ctx.lineWidth = lw;
   ctx.stroke(N.olPath ? P2('nut:ol:' + key, N.olPath) : body);
-  if (key === 'acorn') {
-    const cap = P2('nut:acorncap', acornCapPath);
-    ctx.fillStyle = N.acc; ctx.fill(cap); ctx.stroke(cap);
-  }
-  nutFace(ctx, N, st, +s.blink || 0, lx, ly, lw, time, pound);
+  if (key === 'acorn') acornCap(ctx, N, qgx, qgy, lw, qa);
+  nutFace(ctx, N, st, +s.blink || 0, lx, ly, lw, time, pound, fz);
   ctx.restore();
 }
 
@@ -511,10 +651,12 @@ const CAPT = [
   { // 참나무단 — red squirrel 토리
     fur: '#f07c3c', furD: '#cc5a22', cream: '#ffeedd', ear: '#ffb09c', line: '#4a1c08', ink: '#2a1208',
     tail: '#ee7a3a', tailL: '#ffc08c', nose: '#5a2014', team: '#f0572f', tuft: null,
+    face: { brow: '#5a1e08', tilt: 1, bend: -0.01, lid: 0 },      // the hero: straight, fierce brows
   },
   { // 솔숲단 — grey squirrel 솔이 (long ear tufts)
     fur: '#968e88', furD: '#736b66', cream: '#f7f3ef', ear: '#f0b4aa', line: '#2a2320', ink: '#1c1410',
     tail: '#8c847e', tailL: '#cbc3bd', nose: '#2e2420', team: '#2f9be8', tuft: '#3a302c',
+    face: { brow: '#2a201c', tilt: 0.8, bend: 0.05, lid: 0.2 },   // the rival: arched brows, half-lidded
   },
 ];
 const TUB = { c: '#cd9254', d: '#a86e38', line: '#3e240e', wheel: '#a06e40', hub: '#5a3a1c' };
@@ -598,66 +740,84 @@ function captainFace(s) {
   return o;
 }
 
-// eyes, brows and mouth (head-unit space)
-const EYE_POS = [[0.13, 0.04, 1], [0.6, 0.01, 0.88]];
+// eyes, brows and mouth (head-unit space). Two big white eyes nearly touching (the far one a
+// little smaller: the head is turned three-quarters), heavy brows sitting on them, a glossy nose and
+// the squirrel's buck teeth as the one bright accent under it.
+const EYE_POS = [[0.12, -0.04, 0.215, 0.265], [0.555, -0.06, 0.185, 0.245]];
 function captainFaceFeatures(ctx, P, o, time) {
-  const ink = P.ink, ex0 = o.llx * 0.05, ey0 = o.lly * 0.05;
-  const closed = o.eye === 'open' || o.eye === 'squint' || o.eye === 'wide' ? o.blink > 0.55 : false;
-  // fills: eye ovals + nose (+ open mouths)
-  ctx.beginPath();
-  if (!closed && (o.eye === 'open' || o.eye === 'squint' || o.eye === 'wide')) {
-    const sc = o.eye === 'wide' ? 1.2 : 1, sq = o.eye === 'squint' ? 0.5 : 1, bk = 1 - o.blink * 0.8;
-    for (const e of EYE_POS) {
-      const rx = 0.165 * e[2] * sc, ry = 0.22 * sc * sq * bk, cx = e[0] + ex0, cy = e[1] + ey0 + (o.eye === 'squint' ? 0.05 : 0);
-      ctx.moveTo(cx + rx, cy); ctx.ellipse(cx, cy, rx, ry, 0, 0, TAU);
-    }
+  const ink = P.ink, F = P.face;
+  const lw = 0.06;
+  let eye = o.eye;
+  if ((eye === 'open' || eye === 'squint' || eye === 'wide') && o.blink > 0.55) eye = 'closed';
+  // eyes
+  if (eye === 'open' || eye === 'squint' || eye === 'wide') {
+    const k = eye === 'wide' ? 1.12 : 1;
+    const E = EYE_POS.map((e) => [e[0], e[1] + (eye === 'squint' ? 0.03 : 0), e[2] * k, e[3] * k]);
+    const lid = eye === 'squint' ? Math.max(0.36, F.lid) : eye === 'wide' ? 0 : F.lid;
+    bigEyes(ctx, E, o.llx, o.lly, eye === 'wide' ? 0.3 : 0.46, 1 - o.blink * 0.8, lid, P.furD, ink, lw);
   }
-  ctx.moveTo(1.0, 0.14); ctx.ellipse(0.91, 0.14, 0.09, 0.07, 0.2, 0, TAU);
-  ctx.fillStyle = ink; ctx.fill();
-  // highlights
-  if (!closed && (o.eye === 'open' || o.eye === 'wide')) {
-    const hr = o.eye === 'wide' ? 0.1 : 0.08;
-    ctx.beginPath();
-    for (const e of EYE_POS) { const hx = e[0] + ex0 - 0.05, hy = e[1] + ey0 - 0.08; ctx.moveTo(hx + hr, hy); ctx.arc(hx, hy, hr, 0, TAU); }
-    ctx.fillStyle = '#ffffff'; ctx.fill();
-  }
-  // open mouths
+  // nose (glossy)
+  ctx.beginPath(); ctx.ellipse(0.925, 0.13, 0.115, 0.085, 0.2, 0, TAU); ctx.fillStyle = P.nose; ctx.fill();
+  ctx.strokeStyle = ink; ctx.lineWidth = lw * 0.8; ctx.stroke();
+  ctx.beginPath(); ctx.ellipse(0.9, 0.095, 0.04, 0.025, 0.2, 0, TAU); ctx.fillStyle = 'rgba(255,255,255,0.8)'; ctx.fill();
+  // mouth: open shapes first, then the teeth, then the lines over them
   const m = o.mouth;
+  const teeth = m !== 'tight';
   if (m === 'grin' || m === 'o' || m === 'tongue') {
     ctx.beginPath();
-    if (m === 'grin') { ctx.moveTo(0.66, 0.28); ctx.quadraticCurveTo(0.82, 0.32, 0.98, 0.26); ctx.quadraticCurveTo(0.95, 0.54, 0.8, 0.53); ctx.quadraticCurveTo(0.66, 0.5, 0.66, 0.28); ctx.closePath(); }
-    else if (m === 'o') { ctx.moveTo(0.9, 0.38); ctx.ellipse(0.83, 0.38, 0.07, 0.09, 0, 0, TAU); }
-    else { ctx.moveTo(0.96, 0.34); ctx.ellipse(0.84, 0.36, 0.12, 0.08, 0, 0, TAU); }
-    ctx.fillStyle = '#6a1a1a'; ctx.fill();
-    if (m !== 'o') {
-      ctx.beginPath(); ctx.ellipse(m === 'grin' ? 0.82 : 0.86, m === 'grin' ? 0.46 : 0.46, 0.08, m === 'grin' ? 0.05 : 0.09, 0, 0, TAU);
-      ctx.fillStyle = '#ff7a92'; ctx.fill();
-    }
+    if (m === 'grin') { ctx.moveTo(0.64, 0.28); ctx.quadraticCurveTo(0.82, 0.33, 1.0, 0.25); ctx.quadraticCurveTo(0.97, 0.58, 0.8, 0.57); ctx.quadraticCurveTo(0.64, 0.54, 0.64, 0.28); ctx.closePath(); }
+    else if (m === 'o') { ctx.moveTo(0.93, 0.4); ctx.ellipse(0.83, 0.4, 0.1, 0.12, 0, 0, TAU); }
+    else { ctx.moveTo(0.98, 0.34); ctx.ellipse(0.84, 0.37, 0.14, 0.09, 0, 0, TAU); }
+    ctx.fillStyle = '#5a1414'; ctx.fill();
+    ctx.save(); ctx.clip();
+    ctx.beginPath(); ctx.ellipse(0.82, m === 'o' ? 0.52 : 0.5, 0.12, 0.08, 0, 0, TAU); ctx.fillStyle = '#ff7a92'; ctx.fill();
+    ctx.restore();
   }
-  // strokes: brows, non-oval eyes, line mouths
+  if (teeth) {
+    const ty = m === 'grin' ? 0.29 : m === 'o' ? 0.29 : m === 'tongue' ? 0.3 : 0.315, tx = 0.835, th = m === 'w' || m === 'flat' ? 0.14 : 0.1;
+    ctx.beginPath();
+    ctx.moveTo(tx - 0.085, ty); ctx.lineTo(tx - 0.085, ty + th - 0.03); ctx.quadraticCurveTo(tx - 0.085, ty + th, tx - 0.055, ty + th);
+    ctx.lineTo(tx + 0.055, ty + th); ctx.quadraticCurveTo(tx + 0.085, ty + th, tx + 0.085, ty + th - 0.03); ctx.lineTo(tx + 0.085, ty);
+    ctx.fillStyle = '#ffffff'; ctx.fill(); ctx.strokeStyle = ink; ctx.lineWidth = lw * 0.75; ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(tx, ty + 0.01); ctx.lineTo(tx, ty + th - 0.02); ctx.lineWidth = lw * 0.5; ctx.stroke();
+  }
+  // brows: heavy wedges sitting on the eye tops (tilt > 0 = inner ends down: fierce)
+  const t = o.tilt * F.tilt, yb = -0.3 - o.browUp - (eye === 'wide' ? 0.06 : 0);
   ctx.beginPath();
-  const t = o.tilt, yb = -0.32 - o.browUp;
-  ctx.moveTo(-0.02, yb - 0.06 * t); ctx.lineTo(0.28, yb + 0.06 * t);
-  ctx.moveTo(0.46, yb + 0.06 * t - 0.02); ctx.lineTo(0.72, yb - 0.06 * t - 0.03);
+  browPath(ctx, 0.3, yb + 0.075 * t, 0.17, -0.13, yb - 0.075 * t + 0.02, 0.085, F.bend);
+  browPath(ctx, 0.41, yb + 0.075 * t - 0.01, 0.16, 0.76, yb - 0.065 * t - 0.03, 0.075, F.bend);
+  fillBrows(ctx, F.brow, 0.03);
+  // line work: closed / happy / hurt / dizzy / dead eyes, line mouths
+  ctx.beginPath();
   for (const e of EYE_POS) {
-    const cx = e[0], cy = e[1], d = e === EYE_POS[0] ? 1 : -1;
-    if (closed) { ctx.moveTo(cx - 0.15, cy); ctx.quadraticCurveTo(cx, cy + 0.14, cx + 0.15, cy); }
-    else if (o.eye === 'happy') { ctx.moveTo(cx - 0.15, cy + 0.06); ctx.quadraticCurveTo(cx, cy - 0.16, cx + 0.15, cy + 0.06); }
-    else if (o.eye === 'x') { ctx.moveTo(cx - d * 0.15, cy - 0.15); ctx.lineTo(cx + d * 0.12, cy); ctx.lineTo(cx - d * 0.15, cy + 0.15); }
-    else if (o.eye === 'dead') { ctx.moveTo(cx - 0.13, cy - 0.13); ctx.lineTo(cx + 0.13, cy + 0.13); ctx.moveTo(cx + 0.13, cy - 0.13); ctx.lineTo(cx - 0.13, cy + 0.13); }
-    else if (o.eye === 'spiral') {
+    const cx = e[0], cy = e[1], d = e === EYE_POS[0] ? 1 : -1, r = e[2];
+    if (eye === 'closed') { ctx.moveTo(cx - r, cy); ctx.quadraticCurveTo(cx, cy + 0.14, cx + r, cy); }
+    else if (eye === 'happy') { ctx.moveTo(cx - r * 0.9, cy + 0.07); ctx.quadraticCurveTo(cx, cy - 0.2, cx + r * 0.9, cy + 0.07); }
+    else if (eye === 'x') { ctx.moveTo(cx - d * 0.16, cy - 0.16); ctx.lineTo(cx + d * 0.13, cy); ctx.lineTo(cx - d * 0.16, cy + 0.16); }
+    else if (eye === 'dead') { ctx.moveTo(cx - 0.14, cy - 0.14); ctx.lineTo(cx + 0.14, cy + 0.14); ctx.moveTo(cx + 0.14, cy - 0.14); ctx.lineTo(cx - 0.14, cy + 0.14); }
+    else if (eye === 'spiral') {
       for (let j = 0; j <= 12; j++) {
-        const u = j / 12, a = time * 7 * d + u * TAU * 1.7, rr = 0.015 + u * 0.16;
+        const u = j / 12, a = time * 7 * d + u * TAU * 1.7, rr = 0.015 + u * 0.17;
         if (j) ctx.lineTo(cx + Math.cos(a) * rr, cy + Math.sin(a) * rr); else ctx.moveTo(cx + Math.cos(a) * rr, cy + Math.sin(a) * rr);
       }
     }
   }
-  if (m === 'w') { ctx.moveTo(0.7, 0.3); ctx.quadraticCurveTo(0.76, 0.39, 0.83, 0.3); ctx.quadraticCurveTo(0.9, 0.39, 0.96, 0.3); }
-  else if (m === 'flat') { ctx.moveTo(0.72, 0.34); ctx.lineTo(0.94, 0.31); }
-  else if (m === 'tight') { ctx.moveTo(0.68, 0.34); ctx.lineTo(0.75, 0.29); ctx.lineTo(0.82, 0.35); ctx.lineTo(0.89, 0.29); ctx.lineTo(0.96, 0.34); }
-  else if (m === 'grin') { ctx.moveTo(0.66, 0.28); ctx.quadraticCurveTo(0.82, 0.32, 0.98, 0.26); ctx.quadraticCurveTo(0.95, 0.54, 0.8, 0.53); ctx.quadraticCurveTo(0.66, 0.5, 0.66, 0.28); }
-  else if (m === 'o') { ctx.moveTo(0.9, 0.38); ctx.ellipse(0.83, 0.38, 0.07, 0.09, 0, 0, TAU); }
-  ctx.strokeStyle = ink; ctx.lineWidth = 0.09; ctx.stroke();
+  if (m === 'w') { ctx.moveTo(0.68, 0.3); ctx.quadraticCurveTo(0.755, 0.39, 0.835, 0.31); ctx.quadraticCurveTo(0.915, 0.39, 0.99, 0.29); }
+  else if (m === 'flat') { ctx.moveTo(0.7, 0.33); ctx.quadraticCurveTo(0.84, 0.3, 0.98, 0.29); }
+  else if (m === 'tight') { ctx.moveTo(0.66, 0.34); ctx.lineTo(0.74, 0.28); ctx.lineTo(0.82, 0.35); ctx.lineTo(0.9, 0.28); ctx.lineTo(0.98, 0.33); }
+  else if (m === 'grin') { ctx.moveTo(0.64, 0.28); ctx.quadraticCurveTo(0.82, 0.33, 1.0, 0.25); ctx.quadraticCurveTo(0.97, 0.58, 0.8, 0.57); ctx.quadraticCurveTo(0.64, 0.54, 0.64, 0.28); }
+  else if (m === 'o') { ctx.moveTo(0.93, 0.4); ctx.ellipse(0.83, 0.4, 0.1, 0.12, 0, 0, TAU); }
+  else if (m === 'tongue') { ctx.moveTo(0.98, 0.34); ctx.ellipse(0.84, 0.37, 0.14, 0.09, 0, 0, TAU); }
+  ctx.strokeStyle = ink; ctx.lineWidth = 0.085; ctx.stroke();
+}
+
+// the fur tuft on the back of the cheek: breaks the round head's outline (head units)
+function cheekTuftPath(p) {
+  p.moveTo(-0.99, 0.02);
+  p.quadraticCurveTo(-1.12, 0.2, -1.27, 0.26); p.quadraticCurveTo(-1.12, 0.34, -1.03, 0.4);
+  p.quadraticCurveTo(-1.12, 0.56, -1.2, 0.64); p.quadraticCurveTo(-1.02, 0.66, -0.9, 0.62);
+  p.quadraticCurveTo(-0.92, 0.76, -0.96, 0.86); p.quadraticCurveTo(-0.78, 0.82, -0.66, 0.74);
+  p.closePath();
 }
 
 // Head with ears, hat and face, in head-unit space. hat=false skips the hat (dead: drawn askew by caller)
@@ -666,20 +826,23 @@ function drawCaptainHead(ctx, team, P, o, gx, gy, time, lw) {
   // ears (behind the head)
   if (P.tuft) { const tp = P2('cap:tufts', tuftsPath); ctx.fillStyle = P.tuft; ctx.fill(tp); ctx.strokeStyle = P.line; ctx.lineWidth = lw; ctx.stroke(tp); }
   const ears = P2('cap:ears', earsPath);
-  ctx.fillStyle = P.fur; ctx.fill(ears);
+  ctx.fillStyle = volFill(ctx, 'ear' + P.fur + P.furD + (gx > 0 ? 'r' : 'l'), P.fur, P.furD, gx, gy, -0.1, -0.8, 0.7); ctx.fill(ears);
   ctx.fillStyle = P.ear; ctx.fill(P2('cap:earsIn', earsInPath));
   ctx.strokeStyle = P.line; ctx.lineWidth = lw; ctx.stroke(ears);
-  // head: two-tone + cream muzzle + blush
+  // cheek tuft, then the head over its root
+  const tuft = P2('cap:cheek', cheekTuftPath);
+  ctx.fillStyle = P.furD; ctx.fill(tuft); ctx.stroke(tuft);
+  // head: soft volume + cream muzzle + blush
   const q = Math.round((o.puff || 0) * 6) / 6;
   const head = P2('cap:head' + q, (p) => headPath(p, q));
-  const cres = shadeCrescent('cap:headShade' + q + (gx > 0 ? 'r' : 'l'), head, gx, gy, 0, 0, 0.08, 0.92);
-  if (cres) { ctx.fillStyle = P.fur; ctx.fill(head); ctx.fillStyle = P.furD; ctx.fill(cres, 'evenodd'); }
-  else fill2(ctx, head, P.fur, P.furD, gx, gy, 0, 0, 0.08, 0.92);
-  ctx.fillStyle = P.cream; ctx.fill(P2('cap:muzzle', muzzlePath));
+  ctx.fillStyle = volFill(ctx, 'head' + P.fur + P.furD + (gx > 0 ? 'r' : 'l'), P.fur, P.furD, gx, gy, 0, 0, 1.05);
+  ctx.fill(head);
+  const muz = P2('cap:muzzle', muzzlePath);
+  ctx.fillStyle = volFill(ctx, 'muz' + P.cream + (gx > 0 ? 'r' : 'l'), P.cream, mix(P.cream, P.furD, 0.28), gx, gy, 0.54, 0.36, 0.42);
+  ctx.fill(muz);
   const bs = 1 + 0.6 * q;
   ctx.beginPath();
-  ctx.moveTo(-0.16 + 0.2 * bs, 0.36); ctx.ellipse(-0.16, 0.36, 0.2 * bs, 0.11 * bs, 0, 0, TAU);
-  ctx.moveTo(0.96, 0.24); ctx.ellipse(0.88, 0.24, 0.08, 0.06, 0, 0, TAU);
+  ctx.moveTo(-0.2 + 0.2 * bs, 0.38); ctx.ellipse(-0.2, 0.38, 0.2 * bs, 0.11 * bs, 0, 0, TAU);
   ctx.fillStyle = 'rgba(255,110,140,' + (0.45 + 0.25 * q).toFixed(2) + ')'; ctx.fill();
   ctx.strokeStyle = P.line; ctx.lineWidth = lw; ctx.stroke(head);
   captainFaceFeatures(ctx, P, o, time);
@@ -839,7 +1002,7 @@ function drawCaptainTail(ctx, P, rot) {
   ctx.save();
   ctx.translate(TAIL_S[0][0], TAIL_S[0][1]); ctx.rotate(rot); ctx.translate(-TAIL_S[0][0], -TAIL_S[0][1]);
   const outer = P2('cap:tail', (p) => tailShape(p, 1));
-  ctx.fillStyle = P.tail; ctx.fill(outer);
+  ctx.fillStyle = volFill(ctx, 'tail' + P.tail, P.tail, mix(P.tail, P.line, 0.3), LIGHT_X, LIGHT_Y, -0.9, -0.82, 0.95); ctx.fill(outer);
   ctx.save(); ctx.translate(0.05, -0.04);
   ctx.fillStyle = P.tailL; ctx.fill(P2('cap:tailIn', (p) => tailShape(p, 0.42)));
   ctx.restore();
@@ -882,6 +1045,15 @@ function drawTubCart(ctx, lw, wheelAng, bounce, paint) {
   ctx.save(); ctx.translate(0, bounce);
   ctx.fillStyle = T.c; ctx.fill(P2('cart:tub', (p) => { tubPath(p); rimPath(p); }));
   ctx.fillStyle = T.d; ctx.fill(P2('cart:shade', tubShadePath));
+  // plank seams, a lit rim edge and nail heads
+  ctx.beginPath();
+  for (const x of [-0.24, 0.2]) { ctx.moveTo(x, -0.14); ctx.lineTo(x - 0.02, 0.42); }
+  ctx.strokeStyle = T.line; ctx.globalAlpha = 0.45; ctx.lineWidth = lw * 0.7; ctx.stroke(); ctx.globalAlpha = 1;
+  ctx.beginPath(); ctx.moveTo(-0.74, -0.26); ctx.lineTo(0.7, -0.26);
+  ctx.strokeStyle = 'rgba(255,255,255,0.35)'; ctx.lineWidth = 0.035; ctx.stroke();
+  ctx.beginPath();
+  for (const [x, y] of [[-0.62, -0.08], [0.56, -0.08], [-0.58, 0.12], [0.54, 0.12]]) { ctx.moveTo(x + 0.03, y); ctx.arc(x, y, 0.03, 0, TAU); }
+  ctx.fillStyle = T.line; ctx.fill();
   if (T.dots) {
     ctx.beginPath();
     for (const [x, y] of [[-0.42, -0.06], [0.0, 0.12], [0.4, -0.08], [-0.2, 0.28], [0.26, 0.3]]) { ctx.moveTo(x + 0.05, y); ctx.arc(x, y, 0.05, 0, TAU); }
@@ -900,6 +1072,12 @@ function drawTubCart(ctx, lw, wheelAng, bounce, paint) {
   const c = Math.cos(wheelAng) * WHEEL_R * 0.8, s = Math.sin(wheelAng) * WHEEL_R * 0.8;
   for (const w of WHEELS) { ctx.moveTo(w[0] - c, w[1] - s); ctx.lineTo(w[0] + c, w[1] + s); ctx.moveTo(w[0] + s, w[1] - c); ctx.lineTo(w[0] - s, w[1] + c); }
   ctx.strokeStyle = T.hub; ctx.lineWidth = 0.07; ctx.stroke();
+  ctx.beginPath();
+  for (const w of WHEELS) { ctx.moveTo(w[0] + WHEEL_R * 0.74, w[1]); ctx.arc(w[0], w[1], WHEEL_R * 0.74, 0, TAU); }
+  ctx.strokeStyle = T.hub; ctx.lineWidth = 0.035; ctx.stroke();
+  ctx.beginPath();
+  for (const w of WHEELS) { ctx.moveTo(w[0] + 0.07, w[1]); ctx.arc(w[0], w[1], 0.07, 0, TAU); }
+  ctx.fillStyle = T.hub; ctx.fill(); ctx.strokeStyle = T.line; ctx.lineWidth = lw * 0.6; ctx.stroke();
   ctx.strokeStyle = T.line; ctx.lineWidth = lw; ctx.stroke(wp);
 }
 function drawPaws(ctx, P, lw, pose, time, dx, dy) {
@@ -907,9 +1085,12 @@ function drawPaws(ctx, P, lw, pose, time, dx, dy) {
   let back = [-0.3 + dx, -0.27 + dy], front = [0.18 + dx, -0.27 + dy];
   if (pose === 'wave') back = [-0.72 + dx, -0.7 + dy - Math.abs(Math.sin(time * 9)) * 0.12];
   else if (pose === 'limp') front = [0.24 + dx, -0.2 + dy];
-  for (const q of [back, front]) { ctx.moveTo(q[0] + 0.12, q[1]); ctx.ellipse(q[0], q[1], 0.12, 0.1, 0, 0, TAU); }
+  for (const q of [back, front]) { ctx.moveTo(q[0] + 0.13, q[1]); ctx.ellipse(q[0], q[1], 0.13, 0.105, 0, 0, TAU); }
   ctx.fillStyle = P.fur; ctx.fill();
   ctx.strokeStyle = P.line; ctx.lineWidth = CAP_LW; ctx.stroke();
+  ctx.beginPath();
+  for (const q of [back, front]) for (const dx of [-0.045, 0.045]) { ctx.moveTo(q[0] + dx, q[1] + 0.105); ctx.lineTo(q[0] + dx, q[1] + 0.04); }
+  ctx.lineWidth = CAP_LW * 0.7; ctx.stroke();
 }
 function drawSimpleSweat(ctx, x, y, time) {
   const ph = frac(time * 0.8);
@@ -989,6 +1170,11 @@ export function drawCommander(ctx, x, y, s, drawAmmo) {
   if (dead) { ctx.translate(0, 0.5); ctx.rotate(-0.28); ctx.translate(0, -0.5); }
   ctx.scale(HEAD_K * (1 - breath * 0.5), HEAD_K * (1 + breath));
   const look = s.look || EMPTY;
+  // eyes follow whatever matters (the nut in the air, else the other captain), except when aiming
+  if (s.gaze && s.mood !== 'aim' && isFinite(s.gaze.x) && isFinite(s.gaze.y)) {
+    const gdx = (s.gaze.x - x) * f - HEAD_X, gdy = s.gaze.y - (y + HEAD_Y), gd = Math.hypot(gdx, gdy) || 1;
+    fo.llx = gdx / gd; fo.lly = clamp(gdy / gd, -0.8, 0.8);
+  }
   const ho = { eye: fo.eye, blink: fo.blink, tilt: fo.tilt, browUp: fo.browUp, mouth: fo.mouth, puff: fo.puff, llx: fo.llx, lly: fo.lly, dead, hatId: look.hat };
   const hlw = lw / HEAD_K;
   drawCaptainHead(ctx, team, P, ho, gxLocal, LIGHT_Y, time, hlw);
@@ -4032,7 +4218,7 @@ function drawCrewTail(ctx, P, V, q, lw) {
 }
 function drawCrewBody(ctx, P, V, v, gx, gy) {
   const body = P2('crew:body' + v, V.body);
-  fill2(ctx, body, P.fur, P.furD, gx, gy, 0, V.by, 0.025, 0.9);
+  ctx.fillStyle = volFill(ctx, 'crewb' + v + P.fur + P.furD + (gx > 0 ? 'r' : 'l'), P.fur, P.furD, gx, gy, 0, V.by, Math.max(V.brx, V.bry) * 1.05); ctx.fill(body);
   ctx.fillStyle = P.cream; ctx.fill(P2('crew:belly' + v, V.bellyP));
   ctx.strokeStyle = P.line; ctx.lineWidth = CREW_LW; ctx.stroke(body);
 }
@@ -4121,10 +4307,12 @@ function crewFace(ctx, P, v, q, time) {
     ctx.fillStyle = '#ffffff'; ctx.fill();
   }
   // --- strokes: brows, line eyes, mouth lines
-  ctx.beginPath();
   const tl = q.tilt, yb = -0.4 - q.browUp;
-  ctx.moveTo(-0.04, yb - 0.07 * tl); ctx.lineTo(0.24, yb + 0.07 * tl);
-  ctx.moveTo(0.48, yb + 0.07 * tl - 0.02); ctx.lineTo(0.72, yb - 0.07 * tl - 0.03);
+  ctx.beginPath();
+  browPath(ctx, 0.26, yb + 0.075 * tl, 0.2, -0.08, yb - 0.075 * tl, 0.12, P.face.bend);
+  browPath(ctx, 0.46, yb + 0.075 * tl - 0.02, 0.19, 0.76, yb - 0.07 * tl - 0.03, 0.11, P.face.bend);
+  fillBrows(ctx, ink, 0.04);
+  ctx.beginPath();
   for (let i = 0; i < 2; i++) {
     const e = CREW_EYES[i], cx = e[0], cy = e[1], d = i ? -1 : 1, s = e[2];
     if (eye === 'closed') { ctx.moveTo(cx - 0.17 * s, cy); ctx.quadraticCurveTo(cx, cy + 0.15, cx + 0.17 * s, cy); }
@@ -4195,7 +4383,7 @@ function drawCrewHead(ctx, P, V, v, q, gx, gy, time) {
   }
   const pq = Math.round(clamp(q.puff, 0, 1) * 6) / 6;
   const head = P2('cap:head' + pq, (p) => headPath(p, pq));
-  fill2(ctx, head, P.fur, P.furD, gx, gy, 0, 0, 0.08, 0.92);
+  ctx.fillStyle = volFill(ctx, 'crewh' + P.fur + P.furD + Math.round(gx * 8) + Math.round(gy * 8), P.fur, P.furD, gx, gy, 0, 0, 1.05); ctx.fill(head);
   ctx.fillStyle = P.cream; ctx.fill(P2('cap:muzzle', muzzlePath));
   const bs = (1 + 0.5 * pq) * q.blush;
   ctx.beginPath();

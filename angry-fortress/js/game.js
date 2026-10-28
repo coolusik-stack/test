@@ -2096,8 +2096,12 @@ export class Game {
       pouch = { x: a.rest.x - Math.cos(this.aim.angle) * pull, y: a.rest.y + Math.sin(this.aim.angle) * pull };
     }
     const showAmmo = isCur && !p.dead && (this.state === 'aim' || this.state === 'ai-think' || this.state === 'ai-move' || this.state === 'ai-aim' || this.state === 'intro' || this.state === 'remote');
+    // what the captain watches: the nut in the air, else the other captain (drawing only)
+    let gaze = null;
+    for (const P of this.projectiles) if (!P.dead) { const q = P.body.getPosition(); gaze = { x: q.x, y: -q.y }; break; }
+    if (!gaze) { const o = this.players.find((q) => q !== p); if (o) { const q = o.body.getPosition(); gaze = { x: q.x, y: -q.y - 0.8 }; } }
     Art.drawCommander(ctx, x, y, {
-      team: p.team, facing: p.facing, time: this.time + p.id * 1.7, blink: p.blink > 0 ? 1 : 0,
+      team: p.team, facing: p.facing, time: this.time + p.id * 1.7, blink: p.blink > 0 ? 1 : 0, gaze,
       hurt: p.hurtT, hp: p.hp / HP_MAX, moving: p.moving, wheelAngle: p.wheel, dead: p.dead,
       pouch, aimPower: aiming ? this.aim.power : 0, mood: aiming ? 'aim' : p.mood, look: p.look,
     }, showAmmo ? (c) => {
