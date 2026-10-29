@@ -14,7 +14,7 @@ import Sound from './audio.js';
 
 // Where a sitting crew member's bottom goes on the captain's hat, relative to the captain's draw
 // point (render space, facing +x).
-const HAT = { x: -0.06, y: -1.47 };
+const HAT = { x: -0.06, y: -1.55 };
 const GROUND_BACK = 1.25; // how far behind the cart the runner stays
 const LINES = {
   hit: ['나이스!', '깡깡!', '맞았다!', '우와아!', '봤지?'],
@@ -260,7 +260,7 @@ export class Crew {
     const p = m.p;
     if (!Art.drawCrew || (p.fell && p.dead)) return; // gone with the cart into the clouds
     const pose = m.pose === 'sit' && m.slot !== 'hat' ? 'idle' : m.pose;
-    Art.drawCrew(ctx, m.x + m.ox, m.y + m.oy, { team: p.team, variant: m.variant, facing: p.facing, pose, t: m.t, time: this.g.time + m.variant * 1.3, blink: m.blink > 0 ? 1 : 0 });
+    Art.drawCrew(ctx, m.x + m.ox, m.y + m.oy, { team: p.team, who: p.look && p.look.who, variant: m.variant, facing: p.facing, pose, t: m.t, time: this.g.time + m.variant * 1.3, blink: m.blink > 0 ? 1 : 0 });
   }
 
   // the runner, behind the cart (unless it is hanging off the back of it)

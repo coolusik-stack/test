@@ -4,7 +4,7 @@
 // real picture, and stars from the first campaign carry over.
 export default {
   name: 'campaign',
-  what: '깡단 원정 계절별 단계·별 → 옷장 아이템 열기·입기 → 결과 카드 → 옛 기록 옮기기',
+  what: '깡단 원정 계절별 단계·별 → 옷장 대장 고르기·아이템 열기·입기 → 결과 카드 → 옛 기록 옮기기',
   async run(t) {
     const page = await t.page();
     const game = (fn, arg) => page.evaluate(fn, arg);
@@ -83,6 +83,12 @@ export default {
     t.check((await page.getAttribute('.look[data-look="leaf"]', 'class')).includes(' on'), 'the leaf hat was not put on');
     await page.click('#closet-tabs button[data-k="cart"]');
     t.check((await page.getAttribute('.look[data-look="red"]', 'class')).includes('locked'), 'the red cart (4 stars) should be locked at 3');
+    // the captain: 토리 leads until you pick; 다트 opens at 5 stars; pick 밤보
+    await page.click('#closet-tabs button[data-k="who"]');
+    t.check((await page.getAttribute('.look[data-look="tori"]', 'class')).includes(' on'), 'with no pick 토리 should lead');
+    t.check((await page.getAttribute('.look[data-look="dart"]', 'class')).includes('locked'), '다트 (5 stars) should be locked at 3');
+    await page.click('.look[data-look="bambo"]');
+    t.check((await page.getAttribute('.look[data-look="bambo"]', 'class')).includes(' on'), '밤보 was not picked');
     await page.click('#closet-tabs button[data-k="hat"]');
     await page.waitForTimeout(300);
     await t.shot(page, 'closet');
@@ -92,8 +98,10 @@ export default {
     await page.click('#camp-grid .stage[data-stage="spring-2"]');
     await page.click('#stage-go');
     await page.waitForFunction(() => { const g = window.__af.game; return g && g.opts.campaign === 'spring-2'; }, null, { timeout: 15000 });
-    const o2 = await game(() => { const g = window.__af.game; return { hat: g.players[0].look.hat, theme: g.opts.theme }; });
+    const o2 = await game(() => { const g = window.__af.game; return { hat: g.players[0].look.hat, who: g.players[0].look.who, foe: g.players[1].look.who, theme: g.opts.theme }; });
     t.check(o2.hat === 'leaf', 'the chosen hat did not show up in the match');
+    t.check(o2.who === 'bambo', `the chosen captain did not show up in the match (${o2.who})`);
+    t.check(o2.foe === 'dart', `stage 2's 솔방 should be 다트, was ${o2.foe}`);
     t.check(o2.theme === 'blossom', `stage 2 should be on 벚꽃 분지, was ${o2.theme}`);
     await page.waitForTimeout(1600);
     await t.shot(page, 'outfit');

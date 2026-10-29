@@ -645,54 +645,45 @@ export function slingAnchors(x, y, facing) {
   };
 }
 
-const HEAD_X = -0.06, HEAD_Y = -0.8, HEAD_K = 0.58;       // head centre and head-unit scale (m)
+const HEAD_X = -0.06, HEAD_Y = -0.9, HEAD_K = 0.58;       // head centre and head-unit scale (m)
 const CAP_LW = 0.05;                                      // uniform captain outline (m)
-const CAPT = [
-  { // 참나무단 — red squirrel 토리
-    fur: '#f07c3c', furD: '#cc5a22', cream: '#ffeedd', ear: '#ffb09c', line: '#4a1c08', ink: '#2a1208',
-    tail: '#ee7a3a', tailL: '#ffc08c', nose: '#5a2014', team: '#f0572f', tuft: null,
-    face: { brow: '#5a1e08', tilt: 1, bend: -0.01, lid: 0 },      // the hero: straight, fierce brows
+// The three squirrels (soft, round and chubby: big cream cheeks, big eyes under heavy brows, two
+// buck teeth, a tuft on top and a huge fluffy tail). Any of them can lead either side; the side
+// shows in the hat band and the UI colour.
+//   mark   'mask' (a dark band round the eyes), 'stripes' (chipmunk lines), 'blaze' (a cream stripe)
+//   crest  the fur tuft on top: [spikes, height]; cheek: blush circles on the cream (or null)
+const SPECIES = {
+  tori: { // 토리: rust-red, dark eye mask, the hero
+    name: '토리', fur: '#d0602c', furD: '#a8441c', cream: '#f7dcae', ear: '#f4c69a', line: '#3a170a', ink: '#2a1206',
+    tail: '#d0602c', tailD: null, tailL: '#f5d6a4', nose: '#3a1a10', paw: null, mark: 'mask', markCol: '#5c2a14',
+    crest: [3, 0.34], cheek: null, face: { brow: '#2a1206', tilt: 1, bend: 0.03, lid: 0 },
   },
-  { // 솔숲단 — grey squirrel 솔이 (long ear tufts)
-    fur: '#968e88', furD: '#736b66', cream: '#f7f3ef', ear: '#f0b4aa', line: '#2a2320', ink: '#1c1410',
-    tail: '#8c847e', tailL: '#cbc3bd', nose: '#2e2420', team: '#2f9be8', tuft: '#3a302c',
-    face: { brow: '#2a201c', tilt: 0.8, bend: 0.05, lid: 0.2 },   // the rival: arched brows, half-lidded
+  dart: { // 다트: golden chipmunk, stripes, spiky crest, quick and cocky
+    name: '다트', fur: '#f0b23a', furD: '#d08a1c', cream: '#f9e6b8', ear: '#eea27a', line: '#4a2a10', ink: '#2e1808',
+    tail: '#f0b23a', tailD: '#5a3416', tailL: '#f8e2b0', nose: '#4a2a14', paw: '#5a3416', mark: 'stripes', markCol: '#5a3416',
+    crest: [4, 0.56], cheek: '#ea8d2c', face: { brow: '#3a200c', tilt: 1.1, bend: 0.05, lid: 0 },
   },
-];
+  bambo: { // 밤보: blue-grey and plump, a cream blaze, smug half-lidded eyes
+    name: '밤보', fur: '#73829a', furD: '#58657c', cream: '#f5e8ce', ear: '#eca383', line: '#262830', ink: '#1c1d24',
+    tail: '#5d6a80', tailD: '#3a3f4c', tailL: '#cdcbc6', nose: '#ec8a72', paw: '#58657c', mark: 'blaze', markCol: '#f5e8ce',
+    crest: [3, 0.22], cheek: null, face: { brow: '#1c1d24', tilt: 0.85, bend: 0.06, lid: 0.24 },
+  },
+};
+export const CAPTAINS = Object.keys(SPECIES);
+const TEAM_COL = ['#f0572f', '#2f9be8'];
+const TEAM_WHO = ['tori', 'bambo'];
+const _capPal = new Map();
+// a squirrel's palette with its side's colour
+function capPal(team, who) {
+  const w = SPECIES[who] ? who : TEAM_WHO[team ? 1 : 0], k = w + (team ? 1 : 0);
+  let P = _capPal.get(k);
+  if (!P) { P = { ...SPECIES[w], who: w, team: TEAM_COL[team ? 1 : 0], tuft: null }; _capPal.set(k, P); }
+  return P;
+}
 const TUB = { c: '#cd9254', d: '#a86e38', line: '#3e240e', wheel: '#a06e40', hub: '#5a3a1c' };
 const SLING = { wood: '#a2703c', line: '#3e240e', band: '#7c2e1c', pouch: '#6e4424' };
 
 // --- head-unit shapes (head radius ~1, facing +x)
-function headPath(p, puff) {
-  const w = 1.03 + 0.16 * puff;
-  p.moveTo(0, -0.98);
-  p.bezierCurveTo(0.62, -0.98, 1.0, -0.58, 1.02, -0.06);
-  p.bezierCurveTo(w, 0.52, 0.64, 0.94, 0.02, 0.94);
-  p.bezierCurveTo(-0.62, 0.94, -w, 0.52, -1.02, -0.06);
-  p.bezierCurveTo(-1.0, -0.58, -0.62, -0.98, 0, -0.98);
-  p.closePath();
-}
-function earShape(p, bx, by, ang, L, W) {
-  const c = Math.cos(ang), s = Math.sin(ang);
-  const X = (u, v) => bx + u * c - v * s, Y = (u, v) => by + u * s + v * c;
-  p.moveTo(X(0, -W / 2), Y(0, -W / 2));
-  p.quadraticCurveTo(X(L * 0.62, -W * 0.56), Y(L * 0.62, -W * 0.56), X(L, 0), Y(L, 0));
-  p.quadraticCurveTo(X(L * 0.62, W * 0.56), Y(L * 0.62, W * 0.56), X(0, W / 2), Y(0, W / 2));
-  p.closePath();
-}
-function tuftShape(p, bx, by, ang, L) {
-  const c = Math.cos(ang), s = Math.sin(ang);
-  const X = (u, v) => bx + u * c - v * s, Y = (u, v) => by + u * s + v * c;
-  p.moveTo(X(L * 0.72, -0.1), Y(L * 0.72, -0.1));
-  p.quadraticCurveTo(X(L * 1.2, -0.22), Y(L * 1.2, -0.22), X(L * 1.62, -0.12), Y(L * 1.62, -0.12));
-  p.quadraticCurveTo(X(L * 1.24, 0.0), Y(L * 1.24, 0.0), X(L * 1.44, 0.16), Y(L * 1.44, 0.16));
-  p.quadraticCurveTo(X(L * 1.02, 0.14), Y(L * 1.02, 0.14), X(L * 0.72, 0.1), Y(L * 0.72, 0.1));
-  p.closePath();
-}
-const EARS = [[-0.6, -0.58, -2.3], [0.36, -0.76, -1.25]];
-function earsPath(p) { for (const e of EARS) earShape(p, e[0], e[1], e[2], 0.52, 0.44); }
-function earsInPath(p) { for (const e of EARS) earShape(p, e[0] + Math.cos(e[2]) * 0.1, e[1] + Math.sin(e[2]) * 0.1, e[2], 0.33, 0.22); }
-function tuftsPath(p) { for (const e of EARS) tuftShape(p, e[0], e[1], e[2], 0.52); }
 function capPath(p) {
   p.moveTo(-0.07, -1.02); p.quadraticCurveTo(-0.06, -1.24, 0.12, -1.36); p.lineTo(0.2, -1.28); p.quadraticCurveTo(0.08, -1.2, 0.09, -1.04); p.closePath();
   p.moveTo(-0.88, -0.56);
@@ -711,7 +702,6 @@ function hatOutlinePath(p) {
   capPath(p);
   p.moveTo(0.8, -0.82); p.quadraticCurveTo(-0.02, -0.64, -0.88, -0.76);
 }
-function muzzlePath(p) { p.moveTo(0.9, 0.36); p.ellipse(0.54, 0.36, 0.36, 0.29, -0.08, 0, TAU); p.closePath(); }
 
 function captainFace(s) {
   const mood = s.mood || 'normal';
@@ -740,10 +730,102 @@ function captainFace(s) {
   return o;
 }
 
-// eyes, brows and mouth (head-unit space). Two big white eyes nearly touching (the far one a
-// little smaller: the head is turned three-quarters), heavy brows sitting on them, a glossy nose and
-// the squirrel's buck teeth as the one bright accent under it.
-const EYE_POS = [[0.12, -0.04, 0.215, 0.265], [0.555, -0.06, 0.185, 0.245]];
+// --- the squirrel head (head units: radius ~1, facing +x, y down), shared by captains and crew.
+// Drawn as one soft blob: every part is stroked first at twice the line width and then filled, so
+// the outline runs round the whole union and the cream cheeks meet the fur with no line between.
+function sqHeadPath(p, puff) {
+  const w = 1.04 + 0.12 * puff;
+  p.moveTo(0, -0.96);
+  p.bezierCurveTo(0.66, -0.96, w, -0.56, w, -0.04);
+  p.bezierCurveTo(w, 0.5, 0.66, 0.9, 0, 0.9);
+  p.bezierCurveTo(-0.66, 0.9, -w, 0.5, -w, -0.04);
+  p.bezierCurveTo(-w, -0.56, -0.66, -0.96, 0, -0.96);
+  p.closePath();
+}
+// cream lower face: two puffy cheeks (they push up against the eyes and bulge past the head) and the
+// chin between them
+function sqCreamPath(p, puff) {
+  const k = 1 + 0.14 * puff;
+  p.moveTo(-0.04, 0.5); p.ellipse(-0.6, 0.5, 0.58 * k, 0.48, 0, 0, TAU);
+  p.moveTo(1.2 * k, 0.48); p.ellipse(0.62, 0.48, 0.58 * k, 0.46, 0, 0, TAU);
+  p.moveTo(0.62, 0.72); p.ellipse(0, 0.72, 0.62, 0.34, 0, 0, TAU);
+}
+function sqCrestPath(p, n, h) {
+  const x0 = -0.36, x1 = 0.3, y0 = -0.84;
+  p.moveTo(x0, y0 + 0.06);
+  for (let i = 0; i < n; i++) {
+    const u0 = i / n, u1 = (i + 1) / n, tx = x0 + (x1 - x0) * (u0 + u1) / 2 - h * 0.35, hh = h * (i === n - 1 ? 0.7 : 1 - 0.12 * Math.abs(i - (n - 1) / 2));
+    const bx = x0 + (x1 - x0) * u1;
+    p.quadraticCurveTo(tx + 0.02, y0 - hh * 0.4, tx, y0 - 0.06 - hh);
+    p.quadraticCurveTo(tx + 0.12, y0 - hh * 0.5, bx, y0 - 0.02);
+  }
+  p.lineTo(x1, y0 + 0.1);
+  p.closePath();
+}
+const SQ_EARS = [[-0.62, -0.62, -2.25], [0.36, -0.8, -1.3]];
+// round ears: a wide base and a soft dome
+function roundEar(p, bx, by, ang, L, W) {
+  const c = Math.cos(ang), s = Math.sin(ang);
+  const X = (u, v) => bx + u * c - v * s, Y = (u, v) => by + u * s + v * c;
+  p.moveTo(X(0, -W / 2), Y(0, -W / 2));
+  p.bezierCurveTo(X(L * 0.75, -W * 0.72), Y(L * 0.75, -W * 0.72), X(L * 1.12, -W * 0.34), Y(L * 1.12, -W * 0.34), X(L * 1.1, 0), Y(L * 1.1, 0));
+  p.bezierCurveTo(X(L * 1.12, W * 0.34), Y(L * 1.12, W * 0.34), X(L * 0.75, W * 0.72), Y(L * 0.75, W * 0.72), X(0, W / 2), Y(0, W / 2));
+  p.closePath();
+}
+function sqEarsPath(p) { for (const e of SQ_EARS) roundEar(p, e[0], e[1], e[2], 0.42, 0.56); }
+function sqEarsInPath(p) { for (const e of SQ_EARS) roundEar(p, e[0] + Math.cos(e[2]) * 0.1, e[1] + Math.sin(e[2]) * 0.1, e[2], 0.26, 0.32); }
+// the species' markings, clipped to the head
+function sqMarks(ctx, P, head) {
+  ctx.save(); ctx.clip(head);
+  ctx.beginPath();
+  if (P.mark === 'mask') {
+    ctx.ellipse(0.12, -0.08, 0.37, 0.37, 0, 0, TAU);
+    ctx.moveTo(0.6 + 0.31, -0.1); ctx.ellipse(0.6, -0.1, 0.31, 0.34, 0, 0, TAU);
+    ctx.moveTo(-1.1, -0.26); ctx.quadraticCurveTo(-0.5, -0.4, -0.1, -0.34); ctx.lineTo(-0.1, 0.18); ctx.quadraticCurveTo(-0.5, 0.12, -1.1, 0.06); ctx.closePath();
+    ctx.fillStyle = P.markCol; ctx.fill();
+  } else if (P.mark === 'stripes') {
+    ctx.moveTo(0.06, -0.44); ctx.quadraticCurveTo(-0.08, -0.8, -0.42, -1.0);
+    ctx.moveTo(0.36, -0.46); ctx.quadraticCurveTo(0.3, -0.8, 0.08, -1.02);
+    ctx.moveTo(-0.34, -0.36); ctx.quadraticCurveTo(-0.6, -0.56, -0.98, -0.62);
+    ctx.strokeStyle = P.markCol; ctx.lineWidth = 0.11; ctx.lineCap = 'round'; ctx.stroke();
+  } else if (P.mark === 'blaze') {
+    ctx.moveTo(0.33, 0.12); ctx.quadraticCurveTo(0.1, -0.5, -0.3, -1.0); ctx.lineTo(0.36, -1.0); ctx.quadraticCurveTo(0.5, -0.5, 0.46, 0.12); ctx.closePath();
+    ctx.fillStyle = P.markCol; ctx.fill();
+  }
+  ctx.restore();
+}
+function drawSquirrelHead(ctx, P, gx, gy, lw, puff) {
+  ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+  const side = gx > 0 ? 'r' : 'l';
+  // ears (behind the head)
+  const ears = P2('sq:ears', sqEarsPath);
+  ctx.strokeStyle = P.line; ctx.lineWidth = lw * 2; ctx.stroke(ears);
+  ctx.fillStyle = P.fur; ctx.fill(ears);
+  ctx.fillStyle = P.ear; ctx.fill(P2('sq:earsIn', sqEarsInPath));
+  const q = Math.round(clamp(puff || 0, 0, 1) * 6) / 6;
+  const head = P2('sq:head' + q, (p) => sqHeadPath(p, q));
+  const cream = P2('sq:cream' + q, (p) => sqCreamPath(p, q));
+  const crest = P2('sq:crest' + P.crest[0] + P.crest[1], (p) => sqCrestPath(p, P.crest[0], P.crest[1]));
+  ctx.lineWidth = lw * 2;
+  ctx.stroke(crest); ctx.stroke(head); ctx.stroke(cream);
+  ctx.fillStyle = P.fur; ctx.fill(crest);
+  ctx.fillStyle = volFill(ctx, 'sqh' + P.fur + P.furD + side, P.fur, P.furD, gx, gy, 0, 0, 1.05); ctx.fill(head);
+  sqMarks(ctx, P, head);
+  ctx.fillStyle = volFill(ctx, 'sqc' + P.cream + side, P.cream, mix(P.cream, P.furD, 0.22), gx, gy, 0.1, 0.5, 1.0); ctx.fill(cream);
+  if (P.cheek) {
+    ctx.save(); ctx.clip(cream);
+    ctx.beginPath();
+    ctx.moveTo(0.78, 0.66); ctx.arc(0.6, 0.66, 0.18, 0, TAU);
+    ctx.moveTo(-0.66, 0.56); ctx.arc(-0.84, 0.56, 0.17, 0, TAU);
+    ctx.fillStyle = P.cheek; ctx.globalAlpha = 0.85; ctx.fill();
+    ctx.restore();
+  }
+}
+
+// eyes, brows, nose and mouth (head units). Two big white eyes (the far one a little smaller: the
+// head is turned three-quarters), heavy brows sitting on them, a small nose, a smirk and two teeth.
+const EYE_POS = [[0.12, -0.08, 0.255, 0.3], [0.6, -0.1, 0.215, 0.28]];
+const MOUTH = [0.88, 0.52];
 function captainFaceFeatures(ctx, P, o, time) {
   const ink = P.ink, F = P.face;
   const lw = 0.06;
@@ -751,44 +833,55 @@ function captainFaceFeatures(ctx, P, o, time) {
   if ((eye === 'open' || eye === 'squint' || eye === 'wide') && o.blink > 0.55) eye = 'closed';
   // eyes
   if (eye === 'open' || eye === 'squint' || eye === 'wide') {
-    const k = eye === 'wide' ? 1.12 : 1;
+    const k = eye === 'wide' ? 1.1 : 1;
     const E = EYE_POS.map((e) => [e[0], e[1] + (eye === 'squint' ? 0.03 : 0), e[2] * k, e[3] * k]);
     const lid = eye === 'squint' ? Math.max(0.36, F.lid) : eye === 'wide' ? 0 : F.lid;
-    bigEyes(ctx, E, o.llx, o.lly, eye === 'wide' ? 0.3 : 0.46, 1 - o.blink * 0.8, lid, P.furD, ink, lw);
+    bigEyes(ctx, E, o.llx, o.lly, eye === 'wide' ? 0.32 : 0.5, 1 - o.blink * 0.8, lid, P.mark === 'mask' ? P.markCol : P.furD, ink, lw);
   }
-  // nose (glossy)
-  ctx.beginPath(); ctx.ellipse(0.925, 0.13, 0.115, 0.085, 0.2, 0, TAU); ctx.fillStyle = P.nose; ctx.fill();
-  ctx.strokeStyle = ink; ctx.lineWidth = lw * 0.8; ctx.stroke();
-  ctx.beginPath(); ctx.ellipse(0.9, 0.095, 0.04, 0.025, 0.2, 0, TAU); ctx.fillStyle = 'rgba(255,255,255,0.8)'; ctx.fill();
+  // nose: a soft rounded triangle
+  ctx.beginPath();
+  ctx.moveTo(0.92, 0.25); ctx.quadraticCurveTo(1.03, 0.19, 1.14, 0.25); ctx.quadraticCurveTo(1.12, 0.37, 1.03, 0.39); ctx.quadraticCurveTo(0.94, 0.37, 0.92, 0.25); ctx.closePath();
+  ctx.fillStyle = P.nose; ctx.fill(); ctx.strokeStyle = ink; ctx.lineWidth = lw * 0.7; ctx.stroke();
+  ctx.beginPath(); ctx.ellipse(1.0, 0.25, 0.035, 0.02, 0, 0, TAU); ctx.fillStyle = 'rgba(255,255,255,0.7)'; ctx.fill();
   // mouth: open shapes first, then the teeth, then the lines over them
-  const m = o.mouth;
-  const teeth = m !== 'tight';
+  const m = o.mouth, mx = MOUTH[0], my = MOUTH[1];
   if (m === 'grin' || m === 'o' || m === 'tongue') {
     ctx.beginPath();
-    if (m === 'grin') { ctx.moveTo(0.64, 0.28); ctx.quadraticCurveTo(0.82, 0.33, 1.0, 0.25); ctx.quadraticCurveTo(0.97, 0.58, 0.8, 0.57); ctx.quadraticCurveTo(0.64, 0.54, 0.64, 0.28); ctx.closePath(); }
-    else if (m === 'o') { ctx.moveTo(0.93, 0.4); ctx.ellipse(0.83, 0.4, 0.1, 0.12, 0, 0, TAU); }
-    else { ctx.moveTo(0.98, 0.34); ctx.ellipse(0.84, 0.37, 0.14, 0.09, 0, 0, TAU); }
+    if (m === 'grin') { ctx.moveTo(mx - 0.26, my - 0.04); ctx.quadraticCurveTo(mx, my + 0.02, mx + 0.2, my - 0.1); ctx.quadraticCurveTo(mx + 0.16, my + 0.34, mx - 0.06, my + 0.33); ctx.quadraticCurveTo(mx - 0.24, my + 0.28, mx - 0.26, my - 0.04); ctx.closePath(); }
+    else if (m === 'o') { ctx.moveTo(mx + 0.1, my + 0.08); ctx.ellipse(mx, my + 0.08, 0.1, 0.12, 0, 0, TAU); }
+    else { ctx.moveTo(mx + 0.14, my + 0.04); ctx.ellipse(mx, my + 0.05, 0.14, 0.09, 0, 0, TAU); }
     ctx.fillStyle = '#5a1414'; ctx.fill();
     ctx.save(); ctx.clip();
-    ctx.beginPath(); ctx.ellipse(0.82, m === 'o' ? 0.52 : 0.5, 0.12, 0.08, 0, 0, TAU); ctx.fillStyle = '#ff7a92'; ctx.fill();
+    ctx.beginPath(); ctx.ellipse(mx - 0.04, my + 0.3, 0.15, 0.1, 0, 0, TAU); ctx.fillStyle = '#f07088'; ctx.fill();
     ctx.restore();
   }
-  if (teeth) {
-    const ty = m === 'grin' ? 0.29 : m === 'o' ? 0.29 : m === 'tongue' ? 0.3 : 0.315, tx = 0.835, th = m === 'w' || m === 'flat' ? 0.14 : 0.1;
+  if (m !== 'tight') {
+    const ty = m === 'grin' ? my - 0.03 : m === 'o' ? my - 0.02 : my + 0.01, th = m === 'grin' || m === 'o' ? 0.09 : 0.12, tx = mx - 0.02;
     ctx.beginPath();
-    ctx.moveTo(tx - 0.085, ty); ctx.lineTo(tx - 0.085, ty + th - 0.03); ctx.quadraticCurveTo(tx - 0.085, ty + th, tx - 0.055, ty + th);
-    ctx.lineTo(tx + 0.055, ty + th); ctx.quadraticCurveTo(tx + 0.085, ty + th, tx + 0.085, ty + th - 0.03); ctx.lineTo(tx + 0.085, ty);
-    ctx.fillStyle = '#ffffff'; ctx.fill(); ctx.strokeStyle = ink; ctx.lineWidth = lw * 0.75; ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(tx, ty + 0.01); ctx.lineTo(tx, ty + th - 0.02); ctx.lineWidth = lw * 0.5; ctx.stroke();
+    for (const dx of [-0.075, 0.005]) roundRectPath(ctx, tx + dx, ty, 0.07, th, 0.025);
+    ctx.fillStyle = '#ffffff'; ctx.fill(); ctx.strokeStyle = ink; ctx.lineWidth = lw * 0.6; ctx.stroke();
   }
   // brows: heavy wedges sitting on the eye tops (tilt > 0 = inner ends down: fierce)
-  const t = o.tilt * F.tilt, yb = -0.3 - o.browUp - (eye === 'wide' ? 0.06 : 0);
+  const t = o.tilt * F.tilt, yb = -0.42 - o.browUp - (eye === 'wide' ? 0.06 : 0);
   ctx.beginPath();
-  browPath(ctx, 0.3, yb + 0.075 * t, 0.17, -0.13, yb - 0.075 * t + 0.02, 0.085, F.bend);
-  browPath(ctx, 0.41, yb + 0.075 * t - 0.01, 0.16, 0.76, yb - 0.065 * t - 0.03, 0.075, F.bend);
+  browPath(ctx, 0.33, yb + 0.08 * t, 0.19, -0.17, yb - 0.08 * t + 0.03, 0.095, F.bend);
+  browPath(ctx, 0.43, yb + 0.08 * t - 0.01, 0.17, 0.82, yb - 0.07 * t - 0.01, 0.085, F.bend);
   fillBrows(ctx, F.brow, 0.03);
   // line work: closed / happy / hurt / dizzy / dead eyes, line mouths
   ctx.beginPath();
+  captainLineEyes(ctx, eye, time);
+  // on a dark eye mask, line eyes get a light underlay so they still read
+  if (P.mark === 'mask' && eye !== 'open' && eye !== 'squint' && eye !== 'wide') { ctx.strokeStyle = mix(P.fur, P.cream, 0.6); ctx.lineWidth = 0.16; ctx.stroke(); ctx.beginPath(); captainLineEyes(ctx, eye, time); }
+  if (m === 'w') { ctx.moveTo(mx - 0.2, my - 0.02); ctx.quadraticCurveTo(mx - 0.02, my + 0.06, mx + 0.18, my - 0.1); }
+  else if (m === 'flat') { ctx.moveTo(mx - 0.18, my + 0.01); ctx.quadraticCurveTo(mx, my - 0.02, mx + 0.16, my - 0.04); }
+  else if (m === 'tight') { ctx.moveTo(mx - 0.2, my + 0.02); ctx.lineTo(mx - 0.11, my - 0.04); ctx.lineTo(mx - 0.02, my + 0.03); ctx.lineTo(mx + 0.07, my - 0.04); ctx.lineTo(mx + 0.16, my + 0.01); }
+  else if (m === 'grin') { ctx.moveTo(mx - 0.26, my - 0.04); ctx.quadraticCurveTo(mx, my + 0.02, mx + 0.2, my - 0.1); ctx.quadraticCurveTo(mx + 0.16, my + 0.34, mx - 0.06, my + 0.33); ctx.quadraticCurveTo(mx - 0.24, my + 0.28, mx - 0.26, my - 0.04); }
+  else if (m === 'o') { ctx.moveTo(mx + 0.1, my + 0.08); ctx.ellipse(mx, my + 0.08, 0.1, 0.12, 0, 0, TAU); }
+  else if (m === 'tongue') { ctx.moveTo(mx + 0.14, my + 0.04); ctx.ellipse(mx, my + 0.05, 0.14, 0.09, 0, 0, TAU); }
+  ctx.strokeStyle = ink; ctx.lineWidth = 0.07; ctx.stroke();
+}
+
+function captainLineEyes(ctx, eye, time) {
   for (const e of EYE_POS) {
     const cx = e[0], cy = e[1], d = e === EYE_POS[0] ? 1 : -1, r = e[2];
     if (eye === 'closed') { ctx.moveTo(cx - r, cy); ctx.quadraticCurveTo(cx, cy + 0.14, cx + r, cy); }
@@ -802,56 +895,20 @@ function captainFaceFeatures(ctx, P, o, time) {
       }
     }
   }
-  if (m === 'w') { ctx.moveTo(0.68, 0.3); ctx.quadraticCurveTo(0.755, 0.39, 0.835, 0.31); ctx.quadraticCurveTo(0.915, 0.39, 0.99, 0.29); }
-  else if (m === 'flat') { ctx.moveTo(0.7, 0.33); ctx.quadraticCurveTo(0.84, 0.3, 0.98, 0.29); }
-  else if (m === 'tight') { ctx.moveTo(0.66, 0.34); ctx.lineTo(0.74, 0.28); ctx.lineTo(0.82, 0.35); ctx.lineTo(0.9, 0.28); ctx.lineTo(0.98, 0.33); }
-  else if (m === 'grin') { ctx.moveTo(0.64, 0.28); ctx.quadraticCurveTo(0.82, 0.33, 1.0, 0.25); ctx.quadraticCurveTo(0.97, 0.58, 0.8, 0.57); ctx.quadraticCurveTo(0.64, 0.54, 0.64, 0.28); }
-  else if (m === 'o') { ctx.moveTo(0.93, 0.4); ctx.ellipse(0.83, 0.4, 0.1, 0.12, 0, 0, TAU); }
-  else if (m === 'tongue') { ctx.moveTo(0.98, 0.34); ctx.ellipse(0.84, 0.37, 0.14, 0.09, 0, 0, TAU); }
-  ctx.strokeStyle = ink; ctx.lineWidth = 0.085; ctx.stroke();
-}
-
-// the fur tuft on the back of the cheek: breaks the round head's outline (head units)
-function cheekTuftPath(p) {
-  p.moveTo(-0.99, 0.02);
-  p.quadraticCurveTo(-1.12, 0.2, -1.27, 0.26); p.quadraticCurveTo(-1.12, 0.34, -1.03, 0.4);
-  p.quadraticCurveTo(-1.12, 0.56, -1.2, 0.64); p.quadraticCurveTo(-1.02, 0.66, -0.9, 0.62);
-  p.quadraticCurveTo(-0.92, 0.76, -0.96, 0.86); p.quadraticCurveTo(-0.78, 0.82, -0.66, 0.74);
-  p.closePath();
 }
 
 // Head with ears, hat and face, in head-unit space. hat=false skips the hat (dead: drawn askew by caller)
 function drawCaptainHead(ctx, team, P, o, gx, gy, time, lw) {
-  ctx.lineJoin = 'round'; ctx.lineCap = 'round';
-  // ears (behind the head)
-  if (P.tuft) { const tp = P2('cap:tufts', tuftsPath); ctx.fillStyle = P.tuft; ctx.fill(tp); ctx.strokeStyle = P.line; ctx.lineWidth = lw; ctx.stroke(tp); }
-  const ears = P2('cap:ears', earsPath);
-  ctx.fillStyle = volFill(ctx, 'ear' + P.fur + P.furD + (gx > 0 ? 'r' : 'l'), P.fur, P.furD, gx, gy, -0.1, -0.8, 0.7); ctx.fill(ears);
-  ctx.fillStyle = P.ear; ctx.fill(P2('cap:earsIn', earsInPath));
-  ctx.strokeStyle = P.line; ctx.lineWidth = lw; ctx.stroke(ears);
-  // cheek tuft, then the head over its root
-  const tuft = P2('cap:cheek', cheekTuftPath);
-  ctx.fillStyle = P.furD; ctx.fill(tuft); ctx.stroke(tuft);
-  // head: soft volume + cream muzzle + blush
-  const q = Math.round((o.puff || 0) * 6) / 6;
-  const head = P2('cap:head' + q, (p) => headPath(p, q));
-  ctx.fillStyle = volFill(ctx, 'head' + P.fur + P.furD + (gx > 0 ? 'r' : 'l'), P.fur, P.furD, gx, gy, 0, 0, 1.05);
-  ctx.fill(head);
-  const muz = P2('cap:muzzle', muzzlePath);
-  ctx.fillStyle = volFill(ctx, 'muz' + P.cream + (gx > 0 ? 'r' : 'l'), P.cream, mix(P.cream, P.furD, 0.28), gx, gy, 0.54, 0.36, 0.42);
-  ctx.fill(muz);
-  const bs = 1 + 0.6 * q;
-  ctx.beginPath();
-  ctx.moveTo(-0.2 + 0.2 * bs, 0.38); ctx.ellipse(-0.2, 0.38, 0.2 * bs, 0.11 * bs, 0, 0, TAU);
-  ctx.fillStyle = 'rgba(255,110,140,' + (0.45 + 0.25 * q).toFixed(2) + ')'; ctx.fill();
-  ctx.strokeStyle = P.line; ctx.lineWidth = lw; ctx.stroke(head);
+  drawSquirrelHead(ctx, P, gx, gy, lw, o.puff || 0);
   captainFaceFeatures(ctx, P, o, time);
   // hat: acorn cap with a team-coloured band, or whatever the 깡단 옷장 put on
   if (o.hat !== false) drawCaptainHat(ctx, P, lw, o.dead, o.hatId);
 }
+const HAT_K = 0.88;
 function drawCaptainHat(ctx, P, lw, askew, id) {
   ctx.save();
   if (askew) { ctx.translate(-0.22, -0.06); ctx.rotate(-0.38); }
+  ctx.translate(0, -0.12); ctx.scale(HAT_K, HAT_K); lw /= HAT_K;
   const hat = HATS[id];
   if (hat) hat(ctx, P, lw);
   else {
@@ -974,7 +1031,7 @@ function cubicPt(p0, p1, p2, p3, t) {
   const u = 1 - t, a = u * u * u, b = 3 * u * u * t, c = 3 * u * t * t, d = t * t * t;
   return [a * p0[0] + b * p1[0] + c * p2[0] + d * p3[0], a * p0[1] + b * p1[1] + c * p2[1] + d * p3[1]];
 }
-function tailShape(p, wmul) {
+function tailShape(p, wmul, jag = 0) {
   const S = TAIL_S, N = 12, pts = [];
   for (let i = 0; i <= N; i++) {
     const u = i / N, seg = u < 0.5 ? 0 : 1, t = seg ? (u - 0.5) * 2 : u * 2;
@@ -984,7 +1041,7 @@ function tailShape(p, wmul) {
   for (let i = 0; i <= N; i++) {
     const a = pts[Math.max(0, i - 1)], b = pts[Math.min(N, i + 1)];
     let tx = b[0] - a[0], ty = b[1] - a[1]; const d = Math.hypot(tx, ty) || 1; tx /= d; ty /= d;
-    const w = tailW(i / N) * wmul / 2;
+    const w = tailW(i / N) * wmul / 2 * (i % 2 && i < N - 1 ? 1 + jag : 1);
     L.push([pts[i][0] - ty * w, pts[i][1] + tx * w]); R.push([pts[i][0] + ty * w, pts[i][1] - tx * w]);
   }
   p.moveTo(L[0][0], L[0][1]);
@@ -998,15 +1055,22 @@ function tailShape(p, wmul) {
   p.lineTo(R[0][0], R[0][1]);
   p.closePath();
 }
+// the big fluffy tail: scalloped edge, an optional dark outer band, the light stripe inside
+const TAIL_K = 1.18; // bigger than the old one: the tail is half the silhouette
 function drawCaptainTail(ctx, P, rot) {
   ctx.save();
-  ctx.translate(TAIL_S[0][0], TAIL_S[0][1]); ctx.rotate(rot); ctx.translate(-TAIL_S[0][0], -TAIL_S[0][1]);
-  const outer = P2('cap:tail', (p) => tailShape(p, 1));
-  ctx.fillStyle = volFill(ctx, 'tail' + P.tail, P.tail, mix(P.tail, P.line, 0.3), LIGHT_X, LIGHT_Y, -0.9, -0.82, 0.95); ctx.fill(outer);
-  ctx.save(); ctx.translate(0.05, -0.04);
-  ctx.fillStyle = P.tailL; ctx.fill(P2('cap:tailIn', (p) => tailShape(p, 0.42)));
+  ctx.translate(TAIL_S[0][0], TAIL_S[0][1]); ctx.rotate(rot); ctx.scale(TAIL_K, TAIL_K); ctx.translate(-TAIL_S[0][0], -TAIL_S[0][1]);
+  const outer = P2('cap:tailF', (p) => tailShape(p, 1.15, 0.14));
+  ctx.strokeStyle = P.line; ctx.lineWidth = CAP_LW * 2 / TAIL_K; ctx.lineJoin = 'round'; ctx.stroke(outer);
+  ctx.fillStyle = volFill(ctx, 'tail' + (P.tailD || P.tail), P.tailD || P.tail, mix(P.tailD || P.tail, P.line, 0.3), LIGHT_X, LIGHT_Y, -0.9, -0.82, 0.95); ctx.fill(outer);
+  if (P.tailD) {
+    ctx.save(); ctx.translate(0.06, 0.02);
+    ctx.fillStyle = volFill(ctx, 'tailm' + P.tail, P.tail, mix(P.tail, P.line, 0.25), LIGHT_X, LIGHT_Y, -0.9, -0.82, 0.95); ctx.fill(P2('cap:tailM', (p) => tailShape(p, 0.8, 0.1)));
+    ctx.restore();
+  }
+  ctx.save(); ctx.translate(0.08, -0.02);
+  ctx.fillStyle = P.tailL; ctx.fill(P2('cap:tailIn2', (p) => tailShape(p, P.tailD ? 0.42 : 0.5, 0.12)));
   ctx.restore();
-  ctx.strokeStyle = P.line; ctx.lineWidth = CAP_LW; ctx.lineJoin = 'round'; ctx.stroke(outer);
   ctx.restore();
 }
 
@@ -1086,7 +1150,7 @@ function drawPaws(ctx, P, lw, pose, time, dx, dy) {
   if (pose === 'wave') back = [-0.72 + dx, -0.7 + dy - Math.abs(Math.sin(time * 9)) * 0.12];
   else if (pose === 'limp') front = [0.24 + dx, -0.2 + dy];
   for (const q of [back, front]) { ctx.moveTo(q[0] + 0.13, q[1]); ctx.ellipse(q[0], q[1], 0.13, 0.105, 0, 0, TAU); }
-  ctx.fillStyle = P.fur; ctx.fill();
+  ctx.fillStyle = P.paw || P.fur; ctx.fill();
   ctx.strokeStyle = P.line; ctx.lineWidth = CAP_LW; ctx.stroke();
   ctx.beginPath();
   for (const q of [back, front]) for (const dx of [-0.045, 0.045]) { ctx.moveTo(q[0] + dx, q[1] + 0.105); ctx.lineTo(q[0] + dx, q[1] + 0.04); }
@@ -1145,10 +1209,10 @@ export function drawCommander(ctx, x, y, s, drawAmmo) {
   if (fo.tremble) shake += Math.sin(time * 47) * 0.012;
   const wheelAng = s.wheelAngle != null ? (+s.wheelAngle || 0) : (moving ? time * 7 : 0);
   const gxLocal = LIGHT_X * f;
-  let P = CAPT[team];
+  let P = capPal(team, (s.look || EMPTY).who);
   if (hurt > 0.01) {
     const tint = Math.sin(time * 38) > 0 ? '#ffffff' : '#ff3030';
-    P = tintPal(P, ['fur', 'furD', 'cream', 'ear', 'tail', 'tailL'], tint, hurt * 0.5);
+    P = tintPal(P, ['fur', 'furD', 'cream', 'ear', 'tail', 'tailL', 'tailD', 'paw', 'markCol'], tint, hurt * 0.5);
   }
   const cy0 = bounce + capBounce;
 
@@ -1159,6 +1223,13 @@ export function drawCommander(ctx, x, y, s, drawAmmo) {
   ctx.lineJoin = 'round'; ctx.lineCap = 'round';
   ctx.save(); ctx.translate(shake, cy0);
   drawCaptainTail(ctx, P, fo.flop ? 0.28 : Math.sin(time * 2.1) * 0.045);
+  ctx.restore();
+  // chubby body with a cream belly (the head sits on it; the tub hides the rest)
+  ctx.save(); ctx.translate(shake, cy0);
+  const torso = P2('cap:torso', (p) => { p.moveTo(0.56, -0.36); p.ellipse(-0.06, -0.36, 0.62, 0.36, 0, 0, TAU); p.closePath(); });
+  ctx.strokeStyle = P.line; ctx.lineWidth = lw * 2; ctx.stroke(torso);
+  ctx.fillStyle = volFill(ctx, 'torso' + P.fur + P.furD + f, P.fur, P.furD, gxLocal, LIGHT_Y, -0.06, -0.36, 0.66); ctx.fill(torso);
+  ctx.beginPath(); ctx.ellipse(0.16, -0.32, 0.34, 0.24, 0, 0, TAU); ctx.fillStyle = P.cream; ctx.fill();
   ctx.restore();
   // fork stem + back arm (behind the captain; the tub hides the stem foot)
   ctx.beginPath();
@@ -3693,11 +3764,11 @@ export function drawCaptainIcon(canvas, team, look) {
   ctx.clearRect(0, 0, w, h);
   const m = Math.min(w, h);
   const tm = team ? 1 : 0;
-  // head unit -> px; fits ears (and the long tufts), hat and cheeks
-  const k = m / (tm ? 3.2 : 2.95);
-  ctx.setTransform(k, 0, 0, k, w / 2 - 0.05 * m, h / 2 + (tm ? 0.5 : 0.36) * k);
-  const o = { eye: 'open', blink: 0, tilt: 1, browUp: 0, mouth: 'w', puff: 0, llx: 0.5, lly: 0.1, hatId: look && look.hat };
-  drawCaptainHead(ctx, tm, CAPT[tm], o, LIGHT_X, LIGHT_Y, 0.5, CAP_LW / HEAD_K * 1.1);
+  // head unit -> px; fits the puffy cheeks, the ears and crest and the tallest hat
+  const k = m / 2.75;
+  ctx.setTransform(k, 0, 0, k, w / 2, h / 2 + 0.25 * k);
+  const o = { eye: 'open', blink: 0, tilt: 1, browUp: 0, mouth: 'w', puff: 0, llx: 0.5, lly: 0.1, hatId: look && look.hat, hat: look && look.bare ? false : undefined };
+  drawCaptainHead(ctx, tm, capPal(tm, look && look.who), o, LIGHT_X, LIGHT_Y, 0.5, CAP_LW / HEAD_K * 1.1);
   ctx.restore();
 }
 
@@ -3715,8 +3786,8 @@ export function drawCaptainFigure(canvas, team, look, time = 0) {
   ctx.restore();
 }
 
-// One 깡단 옷장 item as a little picture: a hat on the captain's head, a cart, or a trail.
-export function drawLookIcon(canvas, kind, id, team = 0) {
+// One 깡단 옷장 item as a little picture: a captain, a hat on the captain's head, a cart, or a trail.
+export function drawLookIcon(canvas, kind, id, team = 0, who) {
   if (!canvas) return;
   const ctx = canvas.getContext('2d');
   const w = canvas.width, h = canvas.height;
@@ -3724,9 +3795,9 @@ export function drawLookIcon(canvas, kind, id, team = 0) {
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.clearRect(0, 0, w, h);
   const m = Math.min(w, h);
-  if (kind === 'hat') {
+  if (kind === 'hat' || kind === 'who') {
     ctx.restore();
-    drawCaptainIcon(canvas, team, { hat: id });
+    drawCaptainIcon(canvas, team, kind === 'hat' ? { hat: id, who } : { who: id, bare: true });
     return;
   }
   if (kind === 'cart') {
@@ -3776,7 +3847,7 @@ export function drawTrailMark(ctx, kind, x, y, s, i, alpha) {
 //  깡단 꼬맹이들 — the little crew that tags along with each captain
 //  Crew-local metres, +x = facing, y down. Origin = where the feet touch the ground
 //  ('cling': the grip point of the paws, body hanging below; 'sit': its bottom).
-//  Same family as the captain: CAPT palettes, chunky outline, two-tone fur, cream muzzle and
+//  Same family as the captain: the SPECIES palettes, chunky outline, two-tone fur, cream muzzle and
 //  belly, pink blush, glossy eyes and an acorn-cap helmet with the team band.
 //    variant 0 — the tiny eager one: helmet far too big (keeps slipping over one eye),
 //                one big buck tooth, always fist-pumping
@@ -4364,33 +4435,22 @@ function drawCrewHelmet(ctx, P, V, q, lw) {
   ctx.strokeStyle = P.line; ctx.lineWidth = lw / k; ctx.stroke(P2('cap:hatOL', hatOutlinePath));
   ctx.restore();
 }
-// slightly bigger ears than the captain's so they still read under the thick crew outline
-function crewEarsPath(p) { for (const e of EARS) earShape(p, e[0], e[1], e[2], 0.64, 0.56); }
-function crewEarsInPath(p) { for (const e of EARS) earShape(p, e[0] + Math.cos(e[2]) * 0.12, e[1] + Math.sin(e[2]) * 0.12, e[2], 0.4, 0.27); }
 function drawCrewHead(ctx, P, V, v, q, gx, gy, time) {
   const lw = CREW_LW / CREW_HK;
-  if (P.tuft) { const tp = P2('cap:tufts', tuftsPath); ctx.fillStyle = P.tuft; ctx.fill(tp); ctx.strokeStyle = P.line; ctx.lineWidth = lw; ctx.stroke(tp); }
-  const ears = P2('crew:ears', crewEarsPath);
-  ctx.fillStyle = P.fur; ctx.fill(ears);
-  ctx.fillStyle = P.ear; ctx.fill(P2('crew:earsIn', crewEarsInPath));
-  ctx.strokeStyle = P.line; ctx.lineWidth = lw; ctx.stroke(ears);
   if (q.spikes) {
     // fur standing on end under the popped-up helmet
     ctx.beginPath();
     ctx.moveTo(-0.46, -0.84); ctx.lineTo(-0.36, -1.22); ctx.lineTo(-0.18, -0.94); ctx.lineTo(-0.02, -1.3);
     ctx.lineTo(0.14, -0.95); ctx.lineTo(0.34, -1.2); ctx.lineTo(0.44, -0.84); ctx.closePath();
-    ctx.fillStyle = P.fur; ctx.fill(); ctx.stroke();
+    ctx.fillStyle = P.fur; ctx.fill(); ctx.strokeStyle = P.line; ctx.lineWidth = lw; ctx.stroke();
   }
-  const pq = Math.round(clamp(q.puff, 0, 1) * 6) / 6;
-  const head = P2('cap:head' + pq, (p) => headPath(p, pq));
-  ctx.fillStyle = volFill(ctx, 'crewh' + P.fur + P.furD + Math.round(gx * 8) + Math.round(gy * 8), P.fur, P.furD, gx, gy, 0, 0, 1.05); ctx.fill(head);
-  ctx.fillStyle = P.cream; ctx.fill(P2('cap:muzzle', muzzlePath));
-  const bs = (1 + 0.5 * pq) * q.blush;
-  ctx.beginPath();
-  ctx.moveTo(-0.2 + 0.21 * bs, 0.36); ctx.ellipse(-0.2, 0.36, 0.21 * bs, 0.12 * bs, 0, 0, TAU);
-  ctx.moveTo(0.98, 0.27); ctx.ellipse(0.89, 0.27, 0.09, 0.065, 0, 0, TAU);
-  ctx.fillStyle = CREW_BLUSH; ctx.fill();
-  ctx.strokeStyle = P.line; ctx.lineWidth = lw; ctx.stroke(head);
+  drawSquirrelHead(ctx, P, gx, gy, lw, q.puff);
+  const pq = Math.round(clamp(q.puff, 0, 1) * 6) / 6, bs = (1 + 0.5 * pq) * q.blush;
+  if (!P.cheek && bs > 0.01) {
+    ctx.beginPath();
+    ctx.moveTo(-0.42 + 0.21 * bs, 0.5); ctx.ellipse(-0.42, 0.5, 0.21 * bs, 0.12 * bs, 0, 0, TAU);
+    ctx.fillStyle = CREW_BLUSH; ctx.fill();
+  }
   crewFace(ctx, P, v, q, time);
   drawCrewHelmet(ctx, P, V, q, lw);
 }
@@ -4482,7 +4542,7 @@ export function drawCrew(ctx, x, y, s) {
   s = s || EMPTY;
   const f = s.facing < 0 ? -1 : 1;
   const team = s.team ? 1 : 0, v = s.variant ? 1 : 0;
-  const P = CAPT[team], V = CREW_V[v];
+  const P = capPal(team, s.who), V = CREW_V[v];
   const time = +s.time || 0, t = Math.max(0, +s.t || 0);
   const pose = s.pose || 'idle';
   const q = crewPose(CQ, pose, V, v, t, time, clamp(+s.blink || 0, 0, 1));

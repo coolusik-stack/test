@@ -1,5 +1,6 @@
 // 깡단 옷장: what a captain wears. Looks are only drawn, never simulated, so two phones may
 // disagree about them without any harm to the match.
+//   who    which squirrel leads (토리, 다트 or 밤보; without a pick each side has its own: 토리 / 밤보)
 //   hat    on the captain's head
 //   cart   the paint on the tub cart
 //   trail  the marks a nut leaves in the air
@@ -7,6 +8,11 @@
 import { storage } from './util.js';
 
 export const LOOKS = {
+  who: [
+    { id: 'tori', name: '토리', stars: 0 },
+    { id: 'bambo', name: '밤보', stars: 0 },
+    { id: 'dart', name: '다트', stars: 5 },
+  ],
   hat: [
     { id: 'acorn', name: '도토리 모자', stars: 0 },
     { id: 'leaf', name: '나뭇잎 모자', stars: 2 },
@@ -32,8 +38,8 @@ export const LOOKS = {
     { id: 'rainbow', name: '무지개', pack: true },
   ],
 };
-export const KINDS = ['hat', 'cart', 'trail'];
-export const KIND_NAME = { hat: '모자', cart: '수레', trail: '발사 자국' };
+export const KINDS = ['who', 'hat', 'cart', 'trail'];
+export const KIND_NAME = { who: '대장', hat: '모자', cart: '수레', trail: '발사 자국' };
 export const DEFAULT_LOOK = { hat: 'acorn', cart: 'wood', trail: 'dots' };
 
 const byId = (kind, id) => LOOKS[kind].find((it) => it.id === id);
@@ -42,7 +48,7 @@ const byId = (kind, id) => LOOKS[kind].find((it) => it.id === id);
 export function cleanLook(v) {
   const out = { ...DEFAULT_LOOK };
   if (v && typeof v === 'object') for (const k of KINDS) if (typeof v[k] === 'string' && byId(k, v[k])) out[k] = v[k];
-  return out;
+  return out; // no 'who' unless one was picked: then each side keeps its own squirrel
 }
 
 export function isOpen(item, stars, owned) {

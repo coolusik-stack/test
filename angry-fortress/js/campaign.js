@@ -16,27 +16,28 @@ const GOALS = {
   drop: { text: '상대를 한 층 아래로 떨어뜨리고 이기기', test: (r, me, foe) => (foe.drops || 0) > 0 },
 };
 
-// foe: the CPU captain's name; look: what it wears (the season bosses dress up)
+// foe: the CPU captain's name; look: which squirrel it is (밤보 unless it says) and what it wears
+// (the season bosses dress up)
 export const STAGES = [
   { id: 'spring-1', season: 'spring', theme: 'oak', foe: '솔숲단 막내 솔솔', difficulty: 'easy', wind: 'off', goal: 'shots8', look: { hat: 'acorn' } },
-  { id: 'spring-2', season: 'spring', theme: 'blossom', foe: '꽃잎 줍는 솔방', difficulty: 'easy', wind: 'normal', goal: 'acorn', look: { hat: 'leaf' } },
-  { id: 'spring-paddy', season: 'spring', theme: 'paddy', foe: '다랑이 논 물꼬지기', difficulty: 'normal', wind: 'off', goal: 'drop', look: { hat: 'straw' } },
+  { id: 'spring-2', season: 'spring', theme: 'blossom', foe: '꽃잎 줍는 솔방', difficulty: 'easy', wind: 'normal', goal: 'acorn', look: { who: 'dart', hat: 'leaf' } },
+  { id: 'spring-paddy', season: 'spring', theme: 'paddy', foe: '다랑이 논 물꼬지기', difficulty: 'normal', wind: 'off', goal: 'drop', look: { who: 'tori', hat: 'straw' } },
   { id: 'spring-shrooms', season: 'spring', theme: 'shrooms', foe: '왕버섯 숲 버섯돌이', difficulty: 'normal', wind: 'normal', goal: 'hits4', look: { hat: 'mushroom', cart: 'red' } },
   { id: 'spring-3', season: 'spring', theme: 'mole', foe: '두더지 굴 수문장 솔이', difficulty: 'normal', wind: 'normal', goal: 'fall', look: { hat: 'leaf', cart: 'red' } },
-  { id: 'summer-1', season: 'summer', theme: 'sunflower', foe: '해바라기 비탈 뜀박이', difficulty: 'normal', wind: 'off', goal: 'shots8', look: { hat: 'straw' } },
-  { id: 'summer-2', season: 'summer', theme: 'night', foe: '반딧불 징검다리 길잡이', difficulty: 'normal', wind: 'normal', goal: 'hp80', look: { hat: 'mushroom', cart: 'sky' } },
+  { id: 'summer-1', season: 'summer', theme: 'sunflower', foe: '해바라기 비탈 뜀박이', difficulty: 'normal', wind: 'off', goal: 'shots8', look: { who: 'dart', hat: 'straw' } },
+  { id: 'summer-2', season: 'summer', theme: 'night', foe: '반딧불 징검다리 길잡이', difficulty: 'normal', wind: 'normal', goal: 'hp80', look: { who: 'tori', hat: 'mushroom', cart: 'sky' } },
   { id: 'summer-tiers', season: 'summer', theme: 'tiers', foe: '층층 구름섬 섬지기', difficulty: 'normal', wind: 'normal', goal: 'drop', look: { hat: 'leaf', cart: 'sky' } },
-  { id: 'summer-decks', season: 'summer', theme: 'decks', foe: '삼층 다리 다리지기', difficulty: 'normal', wind: 'off', goal: 'shots8', look: { hat: 'straw', cart: 'red' } },
-  { id: 'summer-3', season: 'summer', theme: 'arch', foe: '하늘다리 대장 무지개솔', difficulty: 'normal', wind: 'strong', goal: 'fall', look: { hat: 'straw', cart: 'red', trail: 'leaf' } },
+  { id: 'summer-decks', season: 'summer', theme: 'decks', foe: '삼층 다리 다리지기', difficulty: 'normal', wind: 'off', goal: 'shots8', look: { who: 'dart', hat: 'straw', cart: 'red' } },
+  { id: 'summer-3', season: 'summer', theme: 'arch', foe: '하늘다리 대장 무지개솔', difficulty: 'normal', wind: 'strong', goal: 'fall', look: { who: 'tori', hat: 'straw', cart: 'red', trail: 'leaf' } },
   { id: 'autumn-1', season: 'autumn', theme: 'maple', foe: '흙다리 지킴이', difficulty: 'normal', wind: 'normal', goal: 'acorn', look: { hat: 'acorn', cart: 'red' } },
-  { id: 'autumn-2', season: 'autumn', theme: 'ginkgo', foe: '은행 참호 명사수', difficulty: 'hard', wind: 'off', goal: 'hits4', look: { hat: 'mushroom', cart: 'leaf' } },
-  { id: 'autumn-cliffs', season: 'autumn', theme: 'cliffs', foe: '벼랑 선반 바위타기', difficulty: 'hard', wind: 'normal', goal: 'drop', look: { hat: 'acorn', cart: 'leaf' } },
+  { id: 'autumn-2', season: 'autumn', theme: 'ginkgo', foe: '은행 참호 명사수', difficulty: 'hard', wind: 'off', goal: 'hits4', look: { who: 'dart', hat: 'mushroom', cart: 'leaf' } },
+  { id: 'autumn-cliffs', season: 'autumn', theme: 'cliffs', foe: '벼랑 선반 바위타기', difficulty: 'hard', wind: 'normal', goal: 'drop', look: { who: 'dart', hat: 'acorn', cart: 'leaf' } },
   { id: 'autumn-well', season: 'autumn', theme: 'well', foe: '낙엽 우물 두레박', difficulty: 'hard', wind: 'off', goal: 'acorn', look: { hat: 'pinecone', trail: 'leaf' } },
-  { id: 'autumn-3', season: 'autumn', theme: 'pine', foe: '소나무 절벽 대장 솔바람', difficulty: 'hard', wind: 'normal', goal: 'fall', look: { hat: 'pinecone', cart: 'leaf', trail: 'leaf' } },
-  { id: 'winter-1', season: 'winter', theme: 'snowcliff', foe: '살얼음 썰매꾼', difficulty: 'hard', wind: 'normal', goal: 'shots8', look: { hat: 'pinecone', cart: 'sky' } },
+  { id: 'autumn-3', season: 'autumn', theme: 'pine', foe: '소나무 절벽 대장 솔바람', difficulty: 'hard', wind: 'normal', goal: 'fall', look: { who: 'tori', hat: 'pinecone', cart: 'leaf', trail: 'leaf' } },
+  { id: 'winter-1', season: 'winter', theme: 'snowcliff', foe: '살얼음 썰매꾼', difficulty: 'hard', wind: 'normal', goal: 'shots8', look: { who: 'dart', hat: 'pinecone', cart: 'sky' } },
   { id: 'winter-2', season: 'winter', theme: 'igloo', foe: '이글루 파수꾼', difficulty: 'hard', wind: 'normal', goal: 'hp80', look: { hat: 'mushroom', cart: 'sky', trail: 'star' } },
-  { id: 'winter-pavilion', season: 'winter', theme: 'pavilion', foe: '얼음 누각 문지기', difficulty: 'hard', wind: 'normal', goal: 'drop', look: { hat: 'mushroom', cart: 'sky' } },
-  { id: 'winter-crevasse', season: 'winter', theme: 'crevasse', foe: '빙하 틈새 얼음꾼', difficulty: 'hard', wind: 'strong', goal: 'fall', look: { hat: 'pinecone', cart: 'sky', trail: 'star' } },
+  { id: 'winter-pavilion', season: 'winter', theme: 'pavilion', foe: '얼음 누각 문지기', difficulty: 'hard', wind: 'normal', goal: 'drop', look: { who: 'tori', hat: 'mushroom', cart: 'sky' } },
+  { id: 'winter-crevasse', season: 'winter', theme: 'crevasse', foe: '빙하 틈새 얼음꾼', difficulty: 'hard', wind: 'strong', goal: 'fall', look: { who: 'dart', hat: 'pinecone', cart: 'sky', trail: 'star' } },
   { id: 'winter-3', season: 'winter', theme: 'aurora', foe: '솔숲단 큰대장 솔왕', difficulty: 'hard', wind: 'strong', goal: 'fall', look: { hat: 'crown', cart: 'gold', trail: 'star' }, boss: true },
 ];
 export const MAX_STARS = STAGES.length * 3;

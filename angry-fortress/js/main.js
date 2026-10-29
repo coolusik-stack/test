@@ -473,15 +473,16 @@ function renderCloset() {
   for (const it of LOOKS[closetKind]) {
     const open = lookOpen(it, stars, owned);
     const b = document.createElement('button');
-    b.className = 'look' + (look[closetKind] === it.id ? ' on' : '') + (open ? '' : ' locked');
+    const wearing = (look[closetKind] || (closetKind === 'who' ? 'tori' : null)) === it.id;
+    b.className = 'look' + (wearing ? ' on' : '') + (open ? '' : ' locked');
     b.dataset.look = it.id;
     const cv = document.createElement('canvas');
     cv.width = cv.height = 112;
-    try { Art.drawLookIcon(cv, closetKind, it.id, 0); } catch (e) { /* art not ready */ }
+    try { Art.drawLookIcon(cv, closetKind, it.id, 0, look.who); } catch (e) { /* art not ready */ }
     const name = document.createElement('span');
     name.textContent = it.name;
     const sm = document.createElement('small');
-    sm.textContent = open ? (look[closetKind] === it.id ? '입는 중' : ' ') : it.pack ? '깡단 후원 팩' : `★ ${it.stars}개 필요`;
+    sm.textContent = open ? (wearing ? (closetKind === 'who' ? '대장' : '입는 중') : ' ') : it.pack ? '깡단 후원 팩' : `★ ${it.stars}개 필요`;
     b.append(cv, name, sm);
     b.addEventListener('click', () => {
       if (!open) {
