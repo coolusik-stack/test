@@ -11,12 +11,12 @@ export default {
     await page.click('#btn-solo');
     await page.waitForSelector('#campaign:not([hidden])');
     const tiles = await page.$$eval('#camp-grid .stage', (bs) => bs.map((b) => ({ id: b.dataset.stage, open: !b.disabled })));
-    t.check(tiles.length === 20, `expected 20 stages, saw ${tiles.length}`);
+    t.check(tiles.length === 24, `expected 24 stages, saw ${tiles.length}`);
     t.check(tiles[0].open && !tiles[1].open, 'only the first stage should be open at the start');
     const rows = await page.$$eval('#camp-grid .camp-row', (rs) => rs.map((r) => r.querySelector('.camp-map').textContent));
     t.check(rows.join() === '봄,여름,가을,겨울', `the stage rows should be the four seasons, saw ${rows.join()}`);
     const themes = await game(async () => (await import('./js/campaign.js')).STAGES.map((s) => s.theme));
-    t.check(new Set(themes).size === 20, `every stage should have its own map: ${themes.join()}`);
+    t.check(new Set(themes).size === 24, `every stage should have its own map: ${themes.join()}`);
     // every season has its two 층층 maps in the middle, and the boss is still last
     const shape = await game(async () => {
       const Camp = await import('./js/campaign.js');
@@ -26,8 +26,8 @@ export default {
     });
     for (const season of ['spring', 'summer', 'autumn', 'winter']) {
       const row = shape.filter((s) => s.season === season);
-      t.check(row.map((s) => s.n).join() === '1,2,3,4,5', `${season}: stage numbers ${row.map((s) => s.n).join()}`);
-      t.check(row.map((s) => (s.floored ? 'F' : '.')).join('') === '..FF.', `${season}: the 층층 stages should be 3 and 4 (${row.map((s) => (s.floored ? 'F' : '.')).join('')})`);
+      t.check(row.map((s) => s.n).join() === '1,2,3,4,5,6', `${season}: stage numbers ${row.map((s) => s.n).join()}`);
+      t.check(row.map((s) => (s.floored ? 'F' : '.')).join('') === '...FF.', `${season}: the 층층 stages should be 4 and 5 (${row.map((s) => (s.floored ? 'F' : '.')).join('')})`);
     }
     t.check(shape[shape.length - 1].boss, 'the boss should still be the last stage');
     await t.shot(page, 'map');
@@ -111,7 +111,7 @@ export default {
       const Camp = await import('./js/campaign.js');
       localStorage.setItem('af.campaign', JSON.stringify({ stars: { 'oak-1': [true, true, true], 'oak-2': [true, false, false], 'maple-1': [true, true, false] } }));
       const p = Camp.progress();
-      return { total: Camp.totalStars(p), s2: Camp.starCount(p, 'spring-2'), s4: Camp.starCount(p, 'summer-1'), open5: Camp.isOpen(p, Camp.stageIndex('summer-2')), open3: Camp.isOpen(p, Camp.stageIndex('spring-paddy')), saved: JSON.parse(localStorage.getItem('af.campaign')).stars };
+      return { total: Camp.totalStars(p), s2: Camp.starCount(p, 'spring-2'), s4: Camp.starCount(p, 'summer-1'), open5: Camp.isOpen(p, Camp.stageIndex('summer-2')), open3: Camp.isOpen(p, Camp.stageIndex('spring-islet')), saved: JSON.parse(localStorage.getItem('af.campaign')).stars };
     });
     t.check(moved.total === 6 && moved.s2 === 1 && moved.s4 === 2 && moved.open5 && moved.open3, `old progress did not carry over: ${JSON.stringify(moved)}`);
     t.check(moved.saved['spring-1'] && !moved.saved['oak-1'], 'the carried-over progress should be saved under the new stage ids');

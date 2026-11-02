@@ -5,11 +5,13 @@
 // different heights on different ground, and each side pays for what it has in another currency
 // (height costs ground under you or cover; cover costs reach; nuts cost a drive). Which player gets
 // which home is down to the draw (terrain.js flips the map), and every map keeps one idea:
-//   도토리 숲 a hill · 벚꽃 분지 a bowl · 다랑이 논 terraces · 왕버섯 숲 giant mushrooms · 두더지 굴 산 a tunnel · 해바라기 비탈 a tilted island ·
+//   도토리 숲 a hill · 벚꽃 분지 a bowl · 다랑이 논 terraces · 왕버섯 숲 giant mushrooms · 외딴 꽃섬 close quarters ·
+//   두더지 굴 산 a tunnel · 해바라기 비탈 a tilted island · 하늘 기둥 long range ·
 //   반딧불 징검다리 stepping stones · 무지개 하늘다리 a rock arch in the sky · 층층 구름섬 shelves · 삼층 다리 three decks ·
-//   단풍 협곡 a bridge · 단풍 벼랑 선반 cliff ledges · 낙엽 우물 a well ·
+//   단풍 협곡 a bridge · 단풍 벼랑 선반 cliff ledges · 낙엽 우물 a well · 포개진 벼랑 one island over the other ·
 //   은행나무 참호 trenches · 소나무 절벽 a cliff · 살얼음 두 섬 two islands · 이글루 눈처마 an
-//   overhang and an igloo · 얼음 누각 an ice pavilion · 빙하 틈새 a crevasse · 오로라 호수 thin lake ice
+//   overhang and an igloo · 얼음 누각 an ice pavilion · 빙하 틈새 a crevasse · 고드름 동굴 a ceiling ·
+//   오로라 호수 thin lake ice
 // Nothing stands in the exact middle just for show, and no map stacks more than one or two kinds
 // of spot.
 //
@@ -82,6 +84,17 @@ const shelf = (pts, deep, crags = []) => {
   for (const c of crags) ops.push(...crag(c, cosAt(pts, c) - deep + 0.5, 0.8));
   return ops;
 };
+// a slab of rock (or ice) from x0 to x1: its top at top(x), t(x) thick, rounding off over the last
+// metre and a half at each end. For roofs and overhangs whose thickness changes along them.
+const slab = (x0, x1, top, t) => {
+  const ops = [];
+  for (let x = x0 + 0.3; x <= x1 - 0.3 + 1e-6; x += 0.3) {
+    const k = Math.max(0.8, t(x) * Math.min(1, Math.sqrt(Math.min(x - x0, x1 - x) / 1.5)));
+    ops.push({ type: 'add', x, y: top(x) - k / 2, rx: k / 2, ry: k / 2 });
+  }
+  return ops;
+};
+const smooth = (a, b, x) => { const u = Math.min(1, Math.max(0, (x - a) / (b - a))); return u * u * (3 - 2 * u); };
 // a snow dome with a room inside and a low door on each side; the road runs through it
 const igloo = (cx, ground) => {
   const ops = [{ type: 'add', x: cx, y: ground, rx: 3.4, ry: 4.5 }];
@@ -310,6 +323,39 @@ export const MAPS = {
     backs: [{ x0: 23.0, x1: 42.0, y0: 12.2, y1: 18.6, color: 'rgba(66,38,18,0.82)' }],
   }),
 
+  // 외딴 꽃섬 (spring) — close quarters. One small island in open sky and the two of you on it, 28 m
+  // apart (most maps put 50 m between the homes): a low hump between them stops a dead-flat shot,
+  // so every shot is a short lob and every hit lands close, and behind each home the island simply
+  // ends. Off each end a rock floats, a pad away: back off to it to open the range, at the price of
+  // thin rock with nothing under it. Left home: low, deep ground; its back rock 3 m above the island
+  // (a lookout). Right home: 1.6 m higher, with more island behind it and deeper ground (2 m less
+  // and the left home won 65%); its back rock lower, with a blossom tree (a nut a turn).
+  islet: () => ({
+    top: [[14.4, 13.6], [15.6, 15.4], [24.0, 15.4], [30.0, 17.0], [35.0, 18.6], [40.0, 17.6], [45.4, 17.0], [58.4, 17.0], [59.6, 15.2]],
+    flat: [[15.6, 24.0], [33.4, 36.6], [45.4, 58.4]],
+    islands: [{
+      a: 14.4, b: 59.6,
+      under: [[14.4, 13.8], [15.8, 11.6], [20, 9.6], [26, 7.6], [32, 6.2], [38, 5.6], [44, 5.6], [50, 6.4], [55, 8.4], [58.2, 11.8], [59.6, 15.0]],
+    }],
+    bases: [22.0, 51.0],
+    forts: [{ back: 15.8, facing: 1 }, { back: 58.2, facing: -1 }],
+    ops: [
+      ...crag(21.0, 8.8), ...crag(36.0, 5.4, 1.2), ...crag(50.0, 6.0, 1.0),
+      ...ledge(7.0, 18.6, 7.0), // the left home's back rock, 3 m above the island
+      ...ledge(67.0, 15.4, 7.0), // the right home's, below its home
+    ],
+    spots: [
+      { kind: 'high', team: -1, range: [33.4, 36.6], sign: null, signs: [32.8, 37.2], label: { name: '꽃섬 꼭대기', desc: '조준선이 두 배로 길어져요. 섬 한가운데라 양쪽에서 다 보여요' } },
+      { kind: 'pad', team: 0, range: [19.6, 20.2], dir: -1, to: { x: 7.0, y: 18.6 }, apex: 25.0 },
+      { kind: 'high', team: 0, range: [4.6, 8.2], sign: null, ...on(18.6), label: { name: '뒷바위 전망대', desc: '섬보다 3m 높아요. 멀어지는 대신 조준선 두 배, 바위가 얇아요' } },
+      { kind: 'pad', team: 0, range: [8.8, 9.4], dir: 1, to: { x: 23.6, y: 15.4 }, apex: 25.0, ...on(18.6) },
+      { kind: 'pad', team: 1, range: [53.4, 54.0], dir: 1, to: { x: 67.0, y: 15.4 }, apex: 24.5 },
+      { kind: 'tree', team: 1, range: [66.0, 68.0], sign: null, ...on(15.4), label: { name: '뒷바위 벚나무', desc: '내 차례가 시작될 때마다 특수 견과 +1. 섬보다 낮고 멀어요' } },
+      { kind: 'pad', team: 1, range: [64.7, 65.3], dir: -1, to: { x: 48.4, y: 17.0 }, apex: 25.0, ...on(15.4) },
+    ],
+    features: { trees: [tree(67.0, 'blossom', { h: 4.2, canopyR: 1.8 })] },
+  }),
+
   // 해바라기 비탈 (summer) — the tilted island. One long wedge of sunflower field sloping from high
   // on the left to low on the right, with nowhere to hide. Left home: the high tip, 4.6 m up and
   // shooting downhill, but the tip is thin and hangs over the clouds. Right home: low, on the
@@ -333,6 +379,39 @@ export const MAPS = {
       { kind: 'pad', team: -1, range: [44.6, 45.2], dir: 1, to: { x: 59.0, y: 12.4 }, apex: 22.0, ...on(19.6) },
     ],
     features: { trees: [tree(53.0, 'oak', { h: 5.0, canopyR: 2.2 })] },
+  }),
+
+  // 하늘 기둥 (summer) — long range. Two stone pillars at the far ends of the sky, 53 m apart (a
+  // full-power lob barely spans it) with nothing between them but three low stepping stones: the
+  // wind decides most shots. The only way forward is down: a pad at each pillar's lip drops you to
+  // the stones, closer but below and in the open, the lowest with a sunflower-field tree on it (a
+  // nut a turn). Left home: 3 m lower (with a lookout there too it won 62%); right home: the taller
+  // pillar.
+  pillars: () => ({
+    top: [[2.2, 20.4], [3.4, 22.0], [12.6, 22.0], [13.8, 20.4], [58.0, 23.4], [59.2, 25.0], [68.8, 25.0], [70.0, 23.4]],
+    flat: [[3.4, 12.6], [59.2, 68.8]],
+    islands: [
+      { a: 2.2, b: 13.8, under: [[2.2, 20.6], [3.4, 17.0], [4.4, 11.0], [5.6, 6.0], [8.0, 3.2], [10.4, 6.0], [11.8, 11.0], [12.8, 17.0], [13.8, 20.6]] },
+      { a: 58.0, b: 70.0, under: [[58.0, 23.6], [59.2, 20.0], [60.2, 13.0], [61.4, 7.0], [64.0, 3.6], [66.6, 7.0], [67.8, 13.0], [68.8, 20.0], [70.0, 23.6]] },
+    ],
+    bases: [9.4, 62.6],
+    forts: [{ back: 3.4, facing: 1 }, { back: 68.6, facing: -1 }],
+    ops: [
+      ...crag(8.0, 3.6, 1.1), ...crag(64.0, 4.0, 1.1),
+      ...ledge(24.0, 12.4, 6.6), ...ledge(36.0, 9.4, 7.4), ...ledge(48.0, 13.6, 6.6), // the stepping stones
+    ],
+    spots: [
+      { kind: 'pad', team: 0, range: [11.0, 11.6], dir: 1, to: { x: 24.0, y: 12.4 }, apex: 24.0 },
+      { kind: 'pad', team: 1, range: [60.2, 60.8], dir: -1, to: { x: 48.0, y: 13.6 }, apex: 27.0 },
+      { kind: 'pad', team: -1, range: [21.8, 22.4], dir: -1, to: { x: 8.0, y: 22.0 }, apex: 26.5, ...on(12.4) },
+      { kind: 'pad', team: -1, range: [25.6, 26.2], dir: 1, to: { x: 36.0, y: 9.4 }, apex: 16.5, ...on(12.4) },
+      { kind: 'pad', team: -1, range: [33.6, 34.2], dir: -1, to: { x: 24.4, y: 12.4 }, apex: 17.0, ...on(9.4) },
+      { kind: 'tree', team: -1, range: [35.0, 37.0], sign: null, ...on(9.4), label: { name: '징검돌 명당', desc: '가장 낮은 돌. 내 차례마다 특수 견과 +1, 대신 양쪽 기둥에서 다 내려다봐요' } },
+      { kind: 'pad', team: -1, range: [37.8, 38.4], dir: 1, to: { x: 47.6, y: 13.6 }, apex: 18.0, ...on(9.4) },
+      { kind: 'pad', team: -1, range: [46.0, 46.6], dir: -1, to: { x: 36.4, y: 9.4 }, apex: 17.0, ...on(13.6) },
+      { kind: 'pad', team: -1, range: [49.6, 50.2], dir: 1, to: { x: 61.0, y: 25.0 }, apex: 29.5, ...on(13.6) },
+    ],
+    features: { trees: [tree(36.0, 'oak', { h: 4.4, canopyR: 1.9 })] },
   }),
 
   // 반딧불 징검다리 (summer night) — hop the stones. Five floating rocks; mushroom pads throw you
@@ -652,6 +731,41 @@ export const MAPS = {
     features: { trees: [tree(36.0, 'ginkgo', { h: 4.6, canopyR: 1.9 })] },
   }),
 
+  // 포개진 벼랑 (autumn) — one island above the other. The left home's island is high in the sky and
+  // its end reaches out as a thinning overhang over the right home's island, 7 m below (at 10 m and
+  // 9 m the high side won 62%): the two homes face each other up and down as much as across. Up top
+  // you see everything and lob down at will, but the overhang's tip is thin (break it and down you
+  // go). Down below, the overhang is a roof: a burrow under its root and a hall under its tip where
+  // lobs from above can't reach, and a maple out in the open (a nut a turn). A spring up top runs
+  // off the tip. Going down is a pad off the tip; coming back up is the pad behind the right home.
+  overhang: () => ({
+    top: [[2.4, 20.2], [3.6, 21.8], [24.0, 21.8], [24.2, 13.2], [25.4, 15.0], [68.4, 15.0], [69.6, 13.2]],
+    flat: [[3.6, 24.0], [25.4, 68.4]],
+    islands: [
+      { a: 2.4, b: 24.1, under: [[2.4, 20.4], [3.8, 17.8], [8, 15.4], [14, 14.4], [20, 15.6], [24.1, 18.6]] },
+      { a: 24.1, b: 69.6, under: [[24.1, 13.0], [25.4, 11.4], [30, 9.6], [36, 7.0], [44, 5.8], [52, 6.0], [60, 7.6], [66, 9.8], [69.6, 12.6]] },
+    ],
+    bases: [11.0, 60.0],
+    forts: [{ back: 3.6, facing: 1 }, { back: 68.0, facing: -1 }],
+    ops: [
+      // the overhang: 3.2 m thick over the burrow, thinning to a 1.3 m tip
+      ...slab(23.4, 41.2, (x) => 21.8 - 0.6 * smooth(32, 41.2, x), (x) => 3.2 - (3.2 - THIN) * smooth(29.6, 33.4, x)),
+      ...crag(9.0, 14.8, 1.1), ...crag(17.0, 14.4), ...crag(36.0, 7.0, 1.1), ...crag(52.0, 6.4, 1.2), ...crag(62.0, 7.8, 0.9),
+    ],
+    streams: [{ x: 19.0, y: 21.8, dir: 1 }],
+    spots: [
+      { kind: 'high', team: 0, range: [32.6, 37.2], sign: null, ...on(21.6), label: { name: '벼랑 끝 처마', desc: '아래 섬이 훤히 내려다보여요. 조준선 두 배, 끝이 얇아서 깨지면 아래로 떨어져요' } },
+      { kind: 'pad', team: 0, range: [38.6, 39.2], dir: 1, to: { x: 46.0, y: 15.0 }, apex: 24.5, ...on(21.4) },
+      {
+        kind: 'burrow', team: 1, range: [25.6, 29.6], sign: 31.0, ...below(15.0),
+        label: { name: '벼랑 밑 굴', desc: '위 섬이 지붕이 되어 높이 쏜 공격을 막아 줘요. 낮게 쏜 건 들어와요' },
+      },
+      { kind: 'tree', team: 1, range: [48.6, 50.6], sign: 47.8, label: { name: '단풍 명당', desc: '내 차례가 시작될 때마다 특수 견과 +1. 위에서 훤히 보여요' } },
+      { kind: 'pad', team: -1, range: [63.6, 64.2], dir: 1, to: { x: 16.0, y: 21.8 }, apex: 30.0 },
+    ],
+    features: { trees: [tree(49.6, 'maple', { h: 4.6, canopyR: 2.0 })] },
+  }),
+
   // 은행나무 참호 (autumn) — shoot from behind your hill. Each home sits behind its own ridge with an
   // empty valley between. Left home: deep, behind a tall ridge (flat shots can't reach you, but you
   // must lob too), with a lookout on the ridge top. Right home: 1.6 m higher behind a low ridge (it
@@ -881,6 +995,44 @@ export const MAPS = {
       },
     ],
     features: {},
+  }),
+
+  // 고드름 동굴 (winter) — a ceiling. A long glacier roof lies over the middle of one wide island, open at
+  // both ends: inside, the ceiling (6 m up at the mouths, 8 m in the middle) stops every lob, so
+  // the cave is fought with flat shots, which only carry about 40 m: walk in to get in range.
+  // Icicles hang from the ceiling and catch the higher flat shots until they are shot away. The roof
+  // is the other floor: open sky, lob anywhere, but in plain view and only 1.3 m thick over the
+  // middle of the cave: break it and you drop in, and every hole is a skylight for the next lob.
+  // From home to home only a very high, full-power lob clears the roof. A snowy oak stands in the
+  // cave, right under the thin roof (a nut a turn). Left home: 0.6 m lower, 1.4 m farther from its
+  // mouth. Pads behind each home go up onto the roof; pads at the roof's ends come back down.
+  icecave: () => ({
+    top: [[2.0, 11.4], [3.2, 13.0], [15.2, 13.0], [19.0, 12.0], [55.0, 12.0], [60.0, 13.6], [68.8, 13.6], [70.0, 12.0]],
+    flat: [[3.2, 15.2], [19.0, 55.0], [60.0, 68.8]],
+    islands: [{
+      a: 2.0, b: 70.0, calm: [19.0, 55.0],
+      under: [[2.0, 11.6], [3.4, 9.6], [8, 8.0], [16, 7.0], [24, 6.2], [36, 5.4], [48, 6.0], [58, 7.4], [64, 8.4], [70.0, 12.0]],
+    }],
+    bases: [9.6, 64.0],
+    forts: [{ back: 3.2, facing: 1 }, { back: 69.0, facing: -1 }],
+    ops: [
+      // the roof: its top flat at 21.6, its underside 18.2 at the mouths rising to 20.3 (1.3 m thick)
+      ...slab(18.0, 57.0, () => 21.6, (x) => 3.4 - (3.4 - THIN) * smooth(25.0, 31.0, x) * (1 - smooth(44.0, 50.0, x))),
+      // icicles: the higher flat shots hit them until they are shot away
+      { type: 'add', x: 27.4, y: 17.4, rx: 0.42, ry: 1.5 }, { type: 'add', x: 27.4, y: 16.2, rx: 0.2, ry: 0.6 },
+      { type: 'add', x: 46.8, y: 17.6, rx: 0.42, ry: 1.4 }, { type: 'add', x: 46.8, y: 16.4, rx: 0.2, ry: 0.6 },
+      ...crag(8.0, 7.6), ...crag(24.0, 5.8, 1.1), ...crag(38.0, 5.0, 1.3), ...crag(54.0, 6.6, 1.0), ...crag(64.0, 8.0, 0.8),
+    ],
+    backs: [{ x0: 18.4, x1: 56.6, y0: 12.0, y1: 20.6, color: 'rgba(30,44,72,0.86)' }],
+    spots: [
+      { kind: 'pad', team: 0, range: [7.4, 8.0], dir: -1, to: { x: 23.0, y: 21.6 }, apex: 26.5 },
+      { kind: 'pad', team: 1, range: [65.4, 66.0], dir: 1, to: { x: 52.0, y: 21.6 }, apex: 26.5 },
+      { kind: 'high', team: -1, range: [29.0, 45.0], sign: null, ...on(21.6), label: { name: '동굴 지붕', desc: '동굴 위. 조준선 두 배, 가운데는 1.3m라 깨지면 동굴로 떨어져요' } },
+      { kind: 'pad', team: -1, range: [19.8, 20.4], dir: -1, to: { x: 12.0, y: 13.0 }, apex: 24.0, ...on(21.6) },
+      { kind: 'pad', team: -1, range: [54.6, 55.2], dir: 1, to: { x: 62.0, y: 13.6 }, apex: 24.0, ...on(21.6) },
+      { kind: 'tree', team: -1, range: [36.4, 38.4], sign: null, ...below(12.0), label: { name: '동굴 속 눈꽃 명당', desc: '내 차례가 시작될 때마다 특수 견과 +1. 바로 위 지붕이 가장 얇아요' } },
+    ],
+    features: { trees: [tree(37.4, 'snowoak', { h: 4.2, canopyR: 1.8, from: 17.0 })] },
   }),
 
   // 오로라 호수 (winter night) — thin ice. A frozen lake fills the middle, ice barely 1.3 m thick:

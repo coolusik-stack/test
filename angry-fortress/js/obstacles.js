@@ -103,7 +103,8 @@ export class Forest {
     const g = this.g, r = this.r;
     const canopyR = o.canopyR ?? r.range(1.9, 2.4);
     if (!o.force && !this._free(x - canopyR * 0.7, x + canopyR * 0.7)) return false;
-    const ground = o.force ? g.terrain.surfaceY(x) : this._flat(x, 1.2, 0.7);
+    // `from`: look for the ground below this height (a tree in a cave stands on its floor, not the roof)
+    const ground = o.force ? g.terrain.surfaceY(x, o.from ?? undefined) : this._flat(x, 1.2, 0.7);
     if (ground == null) return false;
     const h = o.h ?? r.range(5.0, 6.2);
     const hp = o.hp ?? TREE.hp;

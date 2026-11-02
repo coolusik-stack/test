@@ -426,8 +426,18 @@ THEMES.crevasse = { ...THEMES.igloo, id: 'crevasse', name: '빙하 틈새', desc
 // 왕버섯 숲 wears the spring of 도토리 숲.
 THEMES.shrooms = { ...THEMES.oak, id: 'shrooms', name: '왕버섯 숲', desc: '키가 다른 버섯 갓 위에서 쏘기. 가운데 왕버섯은 높지만 밑이 구름이에요', layout: { fixed: 'shrooms' } };
 
+// The four shapes the other maps don't have (distance, height, a ceiling):
+// 외딴 꽃섬 wears the spring of 벚꽃 분지.
+THEMES.islet = { ...THEMES.blossom, id: 'islet', name: '외딴 꽃섬', desc: '작은 섬 하나에 둘이. 가까워서 한 방 한 방이 크고, 섬 끝이 바로 뒤예요', layout: { fixed: 'islet' } };
+// 하늘 기둥 wears the summer of 해바라기 비탈.
+THEMES.pillars = { ...THEMES.sunflower, id: 'pillars', name: '하늘 기둥', desc: '멀리 떨어진 두 돌기둥. 바람을 읽어야 닿아요. 낮은 징검돌로 내려가면 가까워져요', layout: { fixed: 'pillars' } };
+// 포개진 벼랑 wears the autumn of 소나무 절벽.
+THEMES.overhang = { ...THEMES.pine, id: 'overhang', name: '포개진 벼랑', desc: '높은 섬이 낮은 섬 위로 뻗어 있어요. 위는 내려다보고, 아래는 처마 밑에 숨어요', layout: { fixed: 'overhang' } };
+// 고드름 동굴 wears the winter day of 살얼음 두 섬.
+THEMES.icecave = { ...THEMES.snowcliff, id: 'icecave', name: '고드름 동굴', desc: '동굴 천장 아래에선 낮게만 쏠 수 있어요. 지붕에 올라가면 높이 쏘지만 훤히 보여요', layout: { fixed: 'icecave' } };
+
 // Menu order: through the year, spring to winter.
-export const THEME_ORDER = ['oak', 'blossom', 'paddy', 'shrooms', 'mole', 'sunflower', 'night', 'arch', 'tiers', 'decks', 'maple', 'cliffs', 'well', 'ginkgo', 'pine', 'snowcliff', 'igloo', 'pavilion', 'crevasse', 'aurora'];
+export const THEME_ORDER = ['oak', 'blossom', 'paddy', 'shrooms', 'islet', 'mole', 'sunflower', 'night', 'pillars', 'arch', 'tiers', 'decks', 'maple', 'cliffs', 'well', 'overhang', 'ginkgo', 'pine', 'snowcliff', 'igloo', 'pavilion', 'crevasse', 'icecave', 'aurora'];
 export const SEASONS = { spring: '봄', summer: '여름', autumn: '가을', winter: '겨울' };
 
 // Fort blueprints. x is measured from the fort's back edge toward the enemy,
