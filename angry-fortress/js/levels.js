@@ -440,6 +440,37 @@ THEMES.ring = { ...THEMES.maple, id: 'ring', name: '고리 바위', desc: '가�
 // 고드름 동굴 wears the winter day of 살얼음 두 섬.
 THEMES.icecave = { ...THEMES.snowcliff, id: 'icecave', name: '고드름 동굴', desc: '동굴 천장 아래에선 낮게만 쏠 수 있어요. 지붕에 올라가면 높이 쏘지만 훤히 보여요', layout: { fixed: 'icecave' } };
 
+// What each map's ground is made of (see makeRockPattern in terrain.js): the rock under the topsoil,
+// the soil's colours and the stones in it. All drawn at load, so a new material costs no download.
+// A map not listed keeps its season's loam over round boulders.
+const MATERIALS = {
+  // warm layered sandstone
+  sandstone: { rock: 'strata', dirt: '#a8703e', dirtLight: '#c48a52', dirtDark: '#7a4c26', pebble: '#ecd2a8', pebble2: '#d8b282', pebbleDark: '#6e4420', root: '#5a3214',
+    rockTones: ['#c88a50', '#b07440', '#d8a368', '#a06838', '#e2b57e', '#bb7e48'], joint: '#6a3c1c', outline: '#3e200c' },
+  // red clay, laid in flat slabs
+  redclay: { rock: 'slabs', dirt: '#9a5434', dirtLight: '#b66a44', dirtDark: '#6e3820', pebble: '#e0b08a', pebble2: '#c98e6a', pebbleDark: '#5a2a16', root: '#4a2210',
+    rockTones: ['#9a4e30', '#b2603c', '#86422a', '#c47048', '#a85836'], joint: '#3e1a0c', outline: '#3a1608' },
+  // blue-grey slate
+  slate: { rock: 'slabs', dirt: '#6a5646', dirtLight: '#806a58', dirtDark: '#463830', pebble: '#b8bcc4', pebble2: '#9ea4ae', pebbleDark: '#3e424c', root: '#3a2a1e',
+    rockTones: ['#6a7280', '#5a6270', '#7c8494', '#646c7c', '#56606e'], joint: '#262a32', outline: '#22262e' },
+  // pale chalk and limestone
+  chalk: { rock: 'boulders', dirt: '#b8a080', dirtLight: '#d0bc9c', dirtDark: '#8e7a5e', pebble: '#f6efe2', pebble2: '#e6dcc8', pebbleDark: '#7a6a52', root: '#6a5038',
+    rockTones: ['#d8ccb6', '#c8bba2', '#e6dcc8', '#bfb096'], joint: '#8a7c64', outline: '#4a3e2c' },
+  // dark, rooty humus
+  humus: { rock: 'roots', dirt: '#5e4430', dirtLight: '#765638', dirtDark: '#3a2818', pebble: '#9a8a76', pebble2: '#b09a82', pebbleDark: '#2a1e12', root: '#8a5c36',
+    rockTones: ['#6a5a4e', '#766454', '#5c4e44'], joint: '#3a2c20', outline: '#22160c', deep: 'rgba(30,14,4,0.3)' },
+  // glacier ice
+  glacier: { rock: 'shards', dirt: '#9fbad4', dirtLight: '#c4dcef', dirtDark: '#7896b6', pebble: '#eef6ff', pebble2: '#d8e8f6', pebbleDark: '#5e7ea0', root: '#6a8cb0',
+    rockTones: ['#b6d2ea', '#c8e0f2', '#a2c4e2', '#d6eaf8', '#aacbe6'], joint: '#7a9cc2', outline: '#3a5678', deep: 'rgba(20,50,100,0.28)', cave: 'rgba(16,30,58,0.92)' },
+};
+const MATERIAL_OF = {
+  blossom: 'chalk', paddy: 'humus', shrooms: 'humus', islet: 'sandstone',
+  sunflower: 'sandstone', pillars: 'sandstone', bigtree: 'humus', arch: 'redclay', tiers: 'chalk', decks: 'slate',
+  maple: 'redclay', cliffs: 'sandstone', well: 'humus', overhang: 'slate', ring: 'chalk',
+  pavilion: 'glacier', crevasse: 'glacier', icecave: 'slate',
+};
+for (const [id, m] of Object.entries(MATERIAL_OF)) THEMES[id] = { ...THEMES[id], ground: { ...THEMES[id].ground, ...MATERIALS[m] }, material: m };
+
 // Menu order: through the year, spring to winter.
 export const THEME_ORDER = ['oak', 'blossom', 'paddy', 'shrooms', 'islet', 'mole', 'sunflower', 'night', 'pillars', 'bigtree', 'arch', 'tiers', 'decks', 'maple', 'cliffs', 'well', 'overhang', 'ring', 'ginkgo', 'pine', 'snowcliff', 'igloo', 'pavilion', 'crevasse', 'icecave', 'aurora'];
 export const SEASONS = { spring: '봄', summer: '여름', autumn: '가을', winter: '겨울' };

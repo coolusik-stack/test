@@ -111,7 +111,7 @@ export class Game {
     this.flip = this.opts.flip ?? ((this.seed >>> 3) & 1) === 1;
     const land = buildLandscape(this.theme.layout, this.seed, this.flip, this.opts.starts);
     this.land = land;
-    this.terrain = new Terrain({ style: this.theme.ground, seed: this.seed, heights: land.heights, under: land.under, ops: land.ops, backs: land.backs, paints: land.paints });
+    this.terrain = new Terrain({ style: this.theme.ground, seed: this.seed, heights: land.heights, under: land.under, ops: land.ops, backs: land.backs, paints: land.paints, look: land.look });
     this.terrain.attach(this.world, planck);
     this.scene.setLand(land);
     this.pattern = makeDirtPattern(this.ctx, this.theme.ground, this.seed);
@@ -163,11 +163,16 @@ export class Game {
     }
     if (this.opts.names) this.players.forEach((p, i) => { if (this.opts.names[i]) p.name = this.opts.names[i]; });
 
-    // forts (same blueprint mirrored for fairness), with a random material twist
+    // forts (same blueprint mirrored for fairness), with a random material twist on the blocks that
+    // swap: one twist per side, so the two homes don't look like mirror images (the twists come
+    // from one draw, so the sequence of random numbers is what it always was)
     const base = FORTS[r.int(0, FORTS.length - 1)];
-    const twist = r.pick(['leaf', 'wood', 'leaf', 'mushroom']);
-    const fort = { ...base, blocks: base.blocks.map((b) => (b.swap && r() < 0.5 ? { ...b, m: twist } : b)) };
+    const TWISTS = ['leaf', 'wood', 'leaf', 'mushroom'];
+    const tw = Math.floor(r() * TWISTS.length);
+    const swaps = base.blocks.map((b) => !!b.swap && r() < 0.5);
     for (const p of this.players) {
+      const twist = TWISTS[(tw + p.id * 3) % TWISTS.length];
+      const fort = { ...base, blocks: base.blocks.map((b, k) => (swaps[k] ? { ...b, m: twist } : b)) };
       const fixed = land.forts && land.forts[p.id];
       const back = fixed ? fixed.back : p.body.getPosition().x + p.facing * 3.0;
       this._placeStructure(fort, back, p.facing);

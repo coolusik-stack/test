@@ -29,6 +29,11 @@ export class Terrain {
     this.heights = opts.heights; // function x -> surface height (for generation)
     this.backs = opts.backs || []; // tunnels open at both ends: drawn dark inside while their roof stands
     this.paints = opts.paints || []; // ground of another stuff: an igloo's snow bricks, a rainbow of rock
+    // how the two ends of the map differ in look only (see buildLandscape): soil depth and how green
+    const look = opts.look || { soil: [1.5, 1.5], lush: [1, 1] };
+    const across = (pair) => (x) => { const u = Math.min(1, Math.max(0, (x - WORLD.W * 0.12) / (WORLD.W * 0.76))); const k = u * u * (3 - 2 * u); return pair[0] + (pair[1] - pair[0]) * k; };
+    this.soilAt = across(look.soil);
+    this.lushAt = across(look.lush);
     // a mushroom cap is red, not grassy, and wood and leaves aren't either: no grass or plants inside
     // a 'cap', 'stalk', 'bark' or 'leaves' paint
     this.bare = this.paints.filter((p) => p.kind === 'cap' || p.kind === 'stalk' || p.kind === 'bark' || p.kind === 'leaves');
@@ -362,7 +367,7 @@ export class Terrain {
     const holes = new Path2D();
     const grass = new Path2D();
     const tufts = new Path2D();
-    const fern = new Path2D(), fernHi = new Path2D();
+    const fern = new Path2D(), fernHi = new Path2D(), stones = new Path2D(), stonesHi = new Path2D();
     const bush = new Path2D(), bushHi = new Path2D();
     const clover = new Path2D(), needles = new Path2D();
     const roots = new Path2D(), vines = new Path2D(), vineLeaves = new Path2D();
@@ -457,7 +462,7 @@ export class Terrain {
           // roots and vines dangling from the underside of the island
           const lo = Math.min(x0, x1), hi = Math.max(x0, x1);
           for (let slot = Math.ceil(lo / SLOT); slot * SLOT < hi; slot++) {
-            if (hash(slot, 41) > 0.5) continue;
+            if (hash(slot, 41) > 0.5 * Math.min(1.5, this.lushAt(slot * SLOT))) continue; // more roots and vines on the green side
             const tx = slot * SLOT + (hash(slot, 42) - 0.5) * 0.2;
             const t = (tx - x0) / dx;
             if (t < 0 || t > 1) continue;
@@ -517,8 +522,15 @@ export class Terrain {
           tufts.lineTo(tx + lean + 0.06, -ty - hgt * 0.75);
           tufts.lineTo(tx + 0.07, -ty + 0.02);
           tufts.closePath();
-          // sparse: a plant here and there (a sunflower field stays a sunflower field)
-          if (decor.length && hash(slot, 11) < (decor[Math.floor(hash(slot, 3) * decor.length)] === 'sunflower' ? 0.14 : 0.065)) addDecor(slot, tx, ty);
+          // sparse: a plant here and there (a sunflower field stays a sunflower field), more of them on
+          // the map's green side; stones lying in the grass on its stony side
+          const lush = this.lushAt(tx);
+          if (decor.length && hash(slot, 11) < (decor[Math.floor(hash(slot, 3) * decor.length)] === 'sunflower' ? 0.14 : 0.065) * lush) addDecor(slot, tx, ty);
+          else if (lush < 0.9 && hash(slot, 60) < (0.9 - lush) * 0.16) {
+            const w = 0.12 + hash(slot, 61) * 0.2, hh = w * (0.5 + hash(slot, 62) * 0.25), sx = tx + (hash(slot, 63) - 0.5) * 0.1;
+            stones.moveTo(sx + w, -ty - hh * 0.55); stones.ellipse(sx, -ty - hh * 0.55, w, hh, (hash(slot, 64) - 0.5) * 0.4, 0, Math.PI * 2);
+            stonesHi.moveTo(sx - w * 0.2 + w * 0.45, -ty - hh * 0.85); stonesHi.ellipse(sx - w * 0.2, -ty - hh * 0.85, w * 0.45, hh * 0.3, 0, 0, Math.PI * 2);
+          }
         }
       }
     }
@@ -545,7 +557,7 @@ export class Terrain {
     this.tuftPath = tufts;
     this.flowers = flowers;
     this.sunflowers = sunflowers;
-    this.decor = { fern, fernHi, bush, bushHi, clover, needles, shrooms, leaves };
+    this.decor = { fern, fernHi, bush, bushHi, clover, needles, shrooms, leaves, stones, stonesHi };
     this.hanging = { roots, vines, vineLeaves, rim, drips };
   }
 
@@ -685,7 +697,7 @@ export class Terrain {
   _stoneLayer() {
     const p = new Path2D(), h = this.heights, n = noise1D(this.seed + 91);
     p.moveTo(-2, 2);
-    for (let x = -2; x <= WORLD.W + 2; x += 0.25) p.lineTo(x, -(h(x) - 1.5 - n(x * 0.35) * 0.35 - Math.sin(x * 1.7) * 0.08));
+    for (let x = -2; x <= WORLD.W + 2; x += 0.25) p.lineTo(x, -(h(x) - this.soilAt(x) - n(x * 0.35) * 0.35 - Math.sin(x * 1.7) * 0.08));
     p.lineTo(WORLD.W + 2, 2);
     p.closePath();
     return p;
@@ -722,6 +734,13 @@ export class Terrain {
     ctx.globalAlpha = 1;
     ctx.fillStyle = this._depthGrad;
     ctx.fillRect(-2, -WORLD.H, WORLD.W + 4, WORLD.H + 2);
+    // a soft shadow under the grass lip, so the turf sits on the soil instead of being drawn on it
+    ctx.save();
+    ctx.translate(0, 0.32);
+    ctx.lineWidth = 0.5;
+    ctx.strokeStyle = 'rgba(20,8,0,0.16)';
+    ctx.stroke(this.grassPath);
+    ctx.restore();
     // the underside catches a little light from the sky below
     if (this.hanging) {
       ctx.lineWidth = 0.55;
@@ -793,6 +812,16 @@ export class Terrain {
     ctx.translate(0, -0.09);
     ctx.stroke(this.grassPath);
     ctx.restore();
+    // stones lying in the grass (the map's stony side)
+    if (d) {
+      ctx.fillStyle = s.pebble2 || s.pebble;
+      ctx.fill(d.stones);
+      ctx.lineWidth = 0.04;
+      ctx.strokeStyle = s.outline;
+      ctx.stroke(d.stones);
+      ctx.fillStyle = 'rgba(255,255,255,0.35)';
+      ctx.fill(d.stonesHi);
+    }
     for (const fl of this.flowers) {
       ctx.fillStyle = fl.c;
       for (let p = 0; p < 5; p++) {
@@ -964,7 +993,19 @@ export function buildLandscape(layout, seed, flip = false, pick = null) {
     bases = startAt.map((k, t) => def.starts[t][k].x);
     baseY = startAt.map((k, t) => def.starts[t][k].y);
   }
+  // the two ends differ in look (never in physics): one side's soil runs deep and green, the
+  // other's is thin, with rock near the surface and stones in the grass. Which is which is the
+  // map's own (raw.look, left to right), or comes from its name, and follows the map when flipped.
+  let look = raw.look;
+  if (!look) {
+    let hsh = 7;
+    for (const ch of layout.fixed) hsh = Math.imul(hsh ^ ch.charCodeAt(0), 0x5bd1e995) >>> 0;
+    const greenLeft = ((hsh >>> 7) & 1) === 1;
+    look = { soil: greenLeft ? [2.3, 0.8] : [0.8, 2.3], lush: greenLeft ? [1.5, 0.45] : [0.45, 1.5] };
+  }
+  if (flip) look = { soil: [look.soil[1], look.soil[0]], lush: [look.lush[1], look.lush[0]] };
   return {
+    look,
     heights, under, onIsland, spans, ops: def.ops, bases, baseY, startAt, homes: [home[0] - 2.9, home[1] + 2.9], mid: W / 2,
     starts: def.starts || null, streams: def.streams || [],
     features: { ...(def.features || {}), fixed: true }, spots: def.spots, forts: def.forts,
@@ -1015,8 +1056,13 @@ const hex2 = (c) => [1, 3, 5].map((i) => parseInt(c.slice(i, i + 2), 16));
 const rgba = (c, a) => `rgba(${hex2(c).join(',')},${a})`;
 const mixHex = (a, b, t) => '#' + hex2(a).map((v, i) => Math.round(v + (hex2(b)[i] - v) * t).toString(16).padStart(2, '0')).join('');
 
-// Tileable stone texture for the island's deep rock, 64px per meter: packed boulders of mixed size,
-// each with a lit top and a shaded bottom, in the soil's own tones pulled toward warm grey.
+// Tileable stone texture for the island's deep rock, 64px per meter. Each map has its own rock
+// (style.rock, see MATERIALS in levels.js), all drawn here at load (no image files):
+//   boulders  packed round boulders, each with a lit top and a shaded bottom (the default)
+//   strata    sandstone: wavy horizontal beds of warm tones, with grit and the odd shell
+//   slabs     clay or slate: flat stones laid in rows like a dry-stone wall
+//   shards    glacier ice: overlapping faceted crystals and a few cracks
+//   roots     dark humus: small sunk stones and roots winding through
 export function makeRockPattern(ctx, style, seed) {
   const S = 256;
   const c = document.createElement('canvas');
@@ -1024,34 +1070,135 @@ export function makeRockPattern(ctx, style, seed) {
   const g = c.getContext('2d');
   const r = rng(seed + 7);
   const base = mixHex(style.dirtDark, '#7d7680', 0.45);
-  const joint = mixHex(base, '#1e1a1c', 0.35);
-  const tones = [base, mixHex(base, style.dirt, 0.35), mixHex(base, '#8a8590', 0.25)];
+  const joint = style.joint || mixHex(base, '#1e1a1c', 0.35);
+  const tones = style.rockTones || [base, mixHex(base, style.dirt, 0.35), mixHex(base, '#8a8590', 0.25)];
+  // draw `f(dx, dy)` at the tile and its wrapped copies so the pattern repeats seamlessly
+  const wrap = (f) => { for (const ox of [-S, 0, S]) for (const oy of [-S, 0, S]) f(ox, oy); };
   g.fillStyle = joint;
   g.fillRect(0, 0, S, S);
-  // pack boulders: biggest first, each kept off the others
-  const stones = [];
-  for (let tries = 0; tries < 1400 && stones.length < 60; tries++) {
-    const rad = stones.length < 12 ? 22 + r() * 16 : 9 + r() * 14;
-    const x = r() * S, y = r() * S;
-    let ok = true;
-    for (const q of stones) {
-      for (const ox of [-S, 0, S]) for (const oy of [-S, 0, S]) {
-        if (Math.hypot(x - q.x - ox, y - q.y - oy) < rad + q.rad + 2) ok = false;
-      }
-      if (!ok) break;
+  const kind = style.rock || 'boulders';
+  if (kind === 'strata') {
+    let y = 0, k = 0;
+    const beds = [];
+    while (y < S) { const h = Math.min(S - y, 12 + r() * 24); beds.push({ y, h, c: tones[k++ % tones.length], ph: r() * 6.28, amp: 1.5 + r() * 3 }); y += h; }
+    const edge = (b, x) => b.y + Math.sin((x / S) * Math.PI * 2 * 2 + b.ph) * b.amp;
+    for (const b of beds) {
+      g.fillStyle = b.c;
+      g.beginPath();
+      g.moveTo(0, edge(b, 0));
+      for (let x = 8; x <= S; x += 8) g.lineTo(x, edge(b, x));
+      g.lineTo(S, S + 8); g.lineTo(0, S + 8); g.closePath();
+      g.fill();
     }
-    if (ok) stones.push({ x, y, rad, sq: 0.7 + r() * 0.25, rot: (r() - 0.5) * 0.6, tone: tones[Math.floor(r() * tones.length)] });
-  }
-  for (const q of stones) {
-    for (const ox of [-S, 0, S]) for (const oy of [-S, 0, S]) {
-      const x = q.x + ox, y = q.y + oy;
-      if (x < -q.rad * 2 || x > S + q.rad * 2 || y < -q.rad * 2 || y > S + q.rad * 2) continue;
-      g.fillStyle = q.tone;
-      g.beginPath(); g.ellipse(x, y, q.rad, q.rad * q.sq, q.rot, 0, Math.PI * 2); g.fill();
-      g.fillStyle = 'rgba(0,0,0,0.16)'; // shaded underside
-      g.beginPath(); g.ellipse(x + 1, y + q.rad * q.sq * 0.35, q.rad * 0.85, q.rad * q.sq * 0.55, q.rot, 0, Math.PI * 2); g.fill();
-      g.fillStyle = 'rgba(255,255,255,0.13)'; // lit top
-      g.beginPath(); g.ellipse(x - q.rad * 0.2, y - q.rad * q.sq * 0.4, q.rad * 0.55, q.rad * q.sq * 0.28, q.rot, 0, Math.PI * 2); g.fill();
+    for (const b of beds) {
+      // a dark seam with a lit lip under it
+      g.lineWidth = 2; g.strokeStyle = 'rgba(40,18,6,0.35)';
+      g.beginPath(); for (let x = 0; x <= S; x += 8) g.lineTo(x, edge(b, x)); g.stroke();
+      g.lineWidth = 1.5; g.strokeStyle = 'rgba(255,240,210,0.22)';
+      g.beginPath(); for (let x = 0; x <= S; x += 8) g.lineTo(x, edge(b, x) + 2.5); g.stroke();
+    }
+    // grit, and a shell or two
+    for (let n = 0; n < 140; n++) { const x = r() * S, y2 = r() * S; g.fillStyle = r() < 0.5 ? 'rgba(60,26,8,0.25)' : 'rgba(255,236,200,0.25)'; g.fillRect(x, y2, 2, 2); }
+    for (let n = 0; n < 3; n++) {
+      const x = r() * S, y2 = r() * S, rr = 5 + r() * 4;
+      wrap((ox, oy) => {
+        g.strokeStyle = 'rgba(255,240,215,0.45)'; g.lineWidth = 1.4;
+        g.beginPath();
+        for (let t = 0; t < 14; t++) { const a = t * 0.7, q = rr * (1 - t / 16); g.lineTo(x + ox + Math.cos(a) * q, y2 + oy + Math.sin(a) * q); }
+        g.stroke();
+      });
+    }
+  } else if (kind === 'slabs') {
+    // flat stones stacked dry: rows of uneven height, each stone its own size, sag and tilt
+    let y = 0;
+    while (y < S) {
+      const h = Math.min(S - y, 18 + r() * 16);
+      let x = -r() * 70;
+      while (x < S) {
+        const w = 34 + r() * 60, hh = h * (0.72 + r() * 0.28), dy = (h - hh) * r(), tone = tones[Math.floor(r() * tones.length)];
+        const tilt = (r() - 0.5) * 5, bulge = 2 + r() * 4, rad = 5 + r() * 4;
+        wrap((ox, oy) => {
+          const x0 = x + ox + 2, y0 = y + dy + oy + 2, ww = w - 4, h2 = hh - 4;
+          g.fillStyle = tone;
+          g.beginPath();
+          g.moveTo(x0 + rad, y0 + tilt);
+          g.quadraticCurveTo(x0 + ww / 2, y0 - bulge, x0 + ww - rad, y0 - tilt);
+          g.quadraticCurveTo(x0 + ww, y0 - tilt, x0 + ww, y0 + rad);
+          g.lineTo(x0 + ww - 1, y0 + h2 - rad);
+          g.quadraticCurveTo(x0 + ww - 1, y0 + h2, x0 + ww - rad, y0 + h2);
+          g.quadraticCurveTo(x0 + ww / 2, y0 + h2 + bulge * 0.5, x0 + rad, y0 + h2);
+          g.quadraticCurveTo(x0 + 1, y0 + h2, x0 + 1, y0 + h2 - rad);
+          g.lineTo(x0, y0 + rad + tilt);
+          g.quadraticCurveTo(x0, y0 + tilt, x0 + rad, y0 + tilt);
+          g.fill();
+          g.fillStyle = 'rgba(255,255,255,0.14)';
+          g.beginPath(); g.ellipse(x0 + ww * 0.45, y0 + 3, ww * 0.38, 2.2, 0, 0, Math.PI * 2); g.fill(); // lit top
+          g.fillStyle = 'rgba(0,0,0,0.16)';
+          g.beginPath(); g.ellipse(x0 + ww * 0.52, y0 + h2 - 2.5, ww * 0.42, 2.6, 0, 0, Math.PI * 2); g.fill(); // shaded bottom
+        });
+        x += w;
+      }
+      y += h;
+    }
+  } else if (kind === 'shards') {
+    for (let n = 0; n < 48; n++) {
+      const x = r() * S, y = r() * S, R = 16 + r() * 28, a0 = r() * Math.PI, tone = tones[Math.floor(r() * tones.length)];
+      const pts = [];
+      const m = 4 + Math.floor(r() * 3);
+      for (let k = 0; k < m; k++) { const a = a0 + (k / m) * Math.PI * 2, q = R * (0.55 + r() * 0.45) * (k % 2 ? 0.6 : 1); pts.push([Math.cos(a) * q, Math.sin(a) * q * 0.75]); }
+      wrap((ox, oy) => {
+        g.beginPath(); pts.forEach(([px, py], k) => (k ? g.lineTo(x + ox + px, y + oy + py) : g.moveTo(x + ox + px, y + oy + py))); g.closePath();
+        g.fillStyle = tone; g.globalAlpha = 0.9; g.fill(); g.globalAlpha = 1;
+        g.strokeStyle = 'rgba(255,255,255,0.5)'; g.lineWidth = 1.4; g.stroke();
+      });
+    }
+    g.strokeStyle = 'rgba(40,80,130,0.22)'; g.lineWidth = 1.2;
+    for (let n = 0; n < 4; n++) {
+      let x = r() * S, y = r() * S;
+      g.beginPath(); g.moveTo(x, y);
+      for (let k = 0; k < 6; k++) { x += (r() - 0.5) * 30; y += 6 + r() * 14; g.lineTo(x, y); }
+      g.stroke();
+    }
+  } else {
+    // boulders (and, sparser and sunk in humus, for roots)
+    const roots = kind === 'roots';
+    const stones = [];
+    const big = roots ? 4 : 12, count = roots ? 26 : 60;
+    for (let tries = 0; tries < 1400 && stones.length < count; tries++) {
+      const rad = stones.length < big ? (roots ? 14 : 22) + r() * 16 : (roots ? 6 : 9) + r() * (roots ? 10 : 14);
+      const x = r() * S, y = r() * S;
+      let ok = true;
+      for (const q of stones) {
+        for (const ox of [-S, 0, S]) for (const oy of [-S, 0, S]) {
+          if (Math.hypot(x - q.x - ox, y - q.y - oy) < rad + q.rad + (roots ? 10 : 2)) ok = false;
+        }
+        if (!ok) break;
+      }
+      if (ok) stones.push({ x, y, rad, sq: 0.7 + r() * 0.25, rot: (r() - 0.5) * 0.6, tone: tones[Math.floor(r() * tones.length)] });
+    }
+    for (const q of stones) {
+      wrap((ox, oy) => {
+        const x = q.x + ox, y = q.y + oy;
+        if (x < -q.rad * 2 || x > S + q.rad * 2 || y < -q.rad * 2 || y > S + q.rad * 2) return;
+        g.fillStyle = q.tone;
+        g.beginPath(); g.ellipse(x, y, q.rad, q.rad * q.sq, q.rot, 0, Math.PI * 2); g.fill();
+        g.fillStyle = 'rgba(0,0,0,0.16)'; // shaded underside
+        g.beginPath(); g.ellipse(x + 1, y + q.rad * q.sq * 0.35, q.rad * 0.85, q.rad * q.sq * 0.55, q.rot, 0, Math.PI * 2); g.fill();
+        g.fillStyle = 'rgba(255,255,255,0.13)'; // lit top
+        g.beginPath(); g.ellipse(x - q.rad * 0.2, y - q.rad * q.sq * 0.4, q.rad * 0.55, q.rad * q.sq * 0.28, q.rot, 0, Math.PI * 2); g.fill();
+      });
+    }
+    if (roots) {
+      g.lineCap = 'round';
+      for (let n = 0; n < 10; n++) {
+        const x = r() * S, y = r() * S, dx = (r() - 0.5) * 150, dy = 30 + r() * 70, w = 3 + r() * 4;
+        const c1 = [x + (r() - 0.5) * 90, y + dy * 0.3], c2 = [x + dx + (r() - 0.5) * 60, y + dy * 0.7];
+        wrap((ox, oy) => {
+          g.beginPath(); g.moveTo(x + ox, y + oy); g.bezierCurveTo(c1[0] + ox, c1[1] + oy, c2[0] + ox, c2[1] + oy, x + dx + ox, y + dy + oy);
+          g.strokeStyle = 'rgba(20,10,4,0.55)'; g.lineWidth = w + 2; g.stroke();
+          g.strokeStyle = style.root || '#6a4428'; g.lineWidth = w; g.stroke();
+        });
+      }
     }
   }
   const pat = ctx.createPattern(c, 'repeat');
