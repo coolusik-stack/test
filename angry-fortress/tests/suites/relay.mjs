@@ -31,7 +31,7 @@ export default {
         document.dispatchEvent(new Event('visibilitychange'));
       }, hidden);
       const want = t.quick ? 5 : 7;
-      const { turns, mismatches } = await playTurns(A, B, want, async (n) => {
+      const { turns, mismatches, over } = await playTurns(A, B, want, async (n) => {
         if (n === 3) {
           await setHidden(B, true);
           awayShown = await A.waitForFunction(() => !document.querySelector('#away').hidden, null, { timeout: 5000 }).then(() => true, () => false);
@@ -63,7 +63,8 @@ export default {
       t.check(awayGone, 'the "stepped away" notice stayed after the guest came back');
       t.check(reloaded, 'the guest did not come back to the match by itself after a reload');
       t.check(overlay, 'no "connection lost" cover when the link broke');
-      t.check(turns >= Math.min(want, 5), `only ${turns} turns were played`);
+      // every trouble above happens by turn 4; a match that someone wins after that has done its job
+      t.check(turns >= Math.min(want, 5) || (over && turns >= 4), `only ${turns} turns were played`);
       t.check(!mismatches, `${mismatches} of ${turns} turns ended with different state on the two phones`);
       for (const [tag, P] of [['host', A], ['guest', B]]) {
         const n = await drift(P);

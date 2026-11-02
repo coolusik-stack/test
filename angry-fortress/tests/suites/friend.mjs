@@ -23,15 +23,16 @@ const state = (P) => P.evaluate(() => {
 });
 
 // Whoever's turn it is aims like a normal CPU and shoots; wait until both phones have the turn's
-// result. Returns { turns, mismatches } (turns whose final state differs between the phones).
+// result. Returns { turns, mismatches, over } (mismatches: turns whose final state differs between
+// the phones; over: someone won before `want` turns, which a match with a random seed can do).
 // `between(turn)` runs after each turn (to break the connection, say).
 export async function playTurns(A, B, want, between) {
-  let turns = 0, mismatches = 0;
+  let turns = 0, mismatches = 0, over = false;
   const deadline = Date.now() + 6 * 60 * 1000;
   while (turns < want && Date.now() < deadline) {
     const sa = await state(A), sb = await state(B);
     if (!sa || !sb) { await A.waitForTimeout(300); continue; }
-    if (sa.over && sb.over) break;
+    if (sa.over && sb.over) { over = true; break; }
     let fired = false;
     for (const P of [A, B]) {
       const s = P === A ? sa : sb;
@@ -60,7 +61,7 @@ export async function playTurns(A, B, want, between) {
     if (snapA !== snapB) mismatches++;
     if (between) await between(turns);
   }
-  return { turns, mismatches };
+  return { turns, mismatches, over };
 }
 
 // Replays on each phone that came out different from the shooter's own result.
