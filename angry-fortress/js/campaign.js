@@ -68,7 +68,7 @@ export function stageName(s) {
   return `${SEASONS[s.season]} ${stageNumber(s)} · ${THEMES[s.theme].name}`;
 }
 
-// where a stage stands in its season (1 to 5), whatever its id says
+// where a stage stands in its season (1 to 6), whatever its id says
 export const stageNumber = (s) => STAGES.filter((q) => q.season === s.season).indexOf(s) + 1;
 
 // The three goals of a stage, in star order.
