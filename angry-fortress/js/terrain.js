@@ -29,8 +29,9 @@ export class Terrain {
     this.heights = opts.heights; // function x -> surface height (for generation)
     this.backs = opts.backs || []; // tunnels open at both ends: drawn dark inside while their roof stands
     this.paints = opts.paints || []; // ground of another stuff: an igloo's snow bricks, a rainbow of rock
-    // a mushroom cap is red, not grassy: no grass or plants inside a 'cap' paint
-    this.bare = this.paints.filter((p) => p.kind === 'cap' || p.kind === 'stalk');
+    // a mushroom cap is red, not grassy, and wood and leaves aren't either: no grass or plants inside
+    // a 'cap', 'stalk', 'bark' or 'leaves' paint
+    this.bare = this.paints.filter((p) => p.kind === 'cap' || p.kind === 'stalk' || p.kind === 'bark' || p.kind === 'leaves');
     this.opLog = []; // every carve since generation, [x, y, r] in centimetres (quantised so peers agree)
     this._generate(opts);
     this.f0 = this.f.slice();
@@ -378,7 +379,7 @@ export class Terrain {
       return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
     };
     const SLOT = 0.3;
-    const bare = (x, y) => this.bare.some((b) => ((x - b.x) / b.rx) ** 2 + ((y - b.y) / b.ry) ** 2 < 1);
+    const bare = (x, y) => this.bare.some((b) => (b.box ? x > b.box[0] && x < b.box[2] && y > b.box[1] && y < b.box[3] : ((x - b.x) / b.rx) ** 2 + ((y - b.y) / b.ry) ** 2 < 1));
     const isScar = (x, y) => {
       const i = Math.round(x / cell), j = Math.round(y / cell);
       return scar[j * stride + i] === 1;
@@ -550,8 +551,9 @@ export class Terrain {
 
   // Part of the ground painted as something else (already clipped to what's left of the ground):
   // 'snow' packed snow bricks inside an ellipse (only above `above`, if given), 'rainbow' bands
-  // following an elliptical arch, 'cap' a red, spotted mushroom cap and 'stalk' its cream stalk (no
-  // grass or moss on either).
+  // following an elliptical arch, 'cap' a red, spotted mushroom cap and 'stalk' its cream stalk,
+  // 'bark' wood (inside `box` [x0, y0, x1, y1], or an ellipse; `grain` 'v' for a trunk, 'h' for a
+  // branch) and 'leaves' a leafy crown (no grass or moss on the last four).
   _paint(ctx, p) {
     ctx.save();
     if (p.kind === 'snow') {
@@ -613,6 +615,56 @@ export class Terrain {
       ctx.beginPath();
       for (const dx of [-0.25, 0.05, 0.3]) { ctx.moveTo(p.x + dx, -(p.y - p.ry)); ctx.lineTo(p.x + dx, -(p.y + p.ry)); }
       ctx.stroke();
+    } else if (p.kind === 'bark') {
+      ctx.beginPath();
+      if (p.box) ctx.rect(p.box[0], -p.box[3], p.box[2] - p.box[0], p.box[3] - p.box[1]);
+      else ctx.ellipse(p.x, -p.y, p.rx, p.ry, 0, 0, Math.PI * 2);
+      ctx.clip();
+      const [x0, y0, x1, y1] = p.box || [p.x - p.rx, p.y - p.ry, p.x + p.rx, p.y + p.ry];
+      const v = p.grain !== 'h';
+      const g = v ? ctx.createLinearGradient(x0, 0, x1, 0) : ctx.createLinearGradient(0, -y1, 0, -y0);
+      g.addColorStop(0, '#5e3618');
+      g.addColorStop(0.4, '#94602f');
+      g.addColorStop(0.7, '#7c4e26');
+      g.addColorStop(1, '#4e2c12');
+      ctx.fillStyle = g;
+      ctx.fillRect(x0, -y1, x1 - x0, y1 - y0);
+      // grain: long wavy lines along the wood, and a knot or two
+      ctx.strokeStyle = 'rgba(52,28,10,0.45)';
+      ctx.lineWidth = 0.07;
+      ctx.beginPath();
+      if (v) {
+        for (let x = x0 + 0.35; x < x1; x += 0.55) {
+          ctx.moveTo(x, -y0);
+          for (let y = y0; y <= y1; y += 0.5) ctx.lineTo(x + Math.sin(y * 0.9 + x * 3.1) * 0.08, -y);
+        }
+      } else {
+        for (let y = y0 + 0.3; y < y1; y += 0.42) {
+          ctx.moveTo(x0, -y);
+          for (let x = x0; x <= x1; x += 0.5) ctx.lineTo(x, -(y + Math.sin(x * 0.8 + y * 2.7) * 0.06));
+        }
+      }
+      ctx.stroke();
+      ctx.fillStyle = 'rgba(52,28,10,0.55)';
+      for (let k = 0; k < (p.knots || 0); k++) {
+        const kx = x0 + (x1 - x0) * (0.25 + 0.5 * ((k * 0.618) % 1)), ky = y0 + (y1 - y0) * (0.2 + 0.6 * ((k * 0.382 + 0.3) % 1));
+        ctx.beginPath(); ctx.ellipse(kx, -ky, v ? 0.22 : 0.3, v ? 0.32 : 0.18, 0, 0, Math.PI * 2); ctx.fill();
+      }
+    } else if (p.kind === 'leaves') {
+      // a leafy crown: layered green clumps, lighter on top
+      ctx.beginPath();
+      ctx.ellipse(p.x, -p.y, p.rx, p.ry, 0, 0, Math.PI * 2);
+      ctx.clip();
+      ctx.fillStyle = '#3f8a2e';
+      ctx.fillRect(p.x - p.rx, -(p.y + p.ry), p.rx * 2, p.ry * 2);
+      const cols = ['#4f9c36', '#62b240', '#7cc64e'];
+      for (let row = 0; row < 3; row++) {
+        ctx.fillStyle = cols[row];
+        const y = p.y - p.ry + (row + 0.8) * (p.ry * 2) / 3.4;
+        for (let x = p.x - p.rx - 0.3 + (row % 2) * 0.55; x < p.x + p.rx + 0.5; x += 1.1) {
+          ctx.beginPath(); ctx.ellipse(x, -y, 0.75, 0.55, 0, 0, Math.PI * 2); ctx.fill();
+        }
+      }
     } else if (p.kind === 'rainbow') {
       const cols = ['#ff8a8a', '#ffbf6a', '#ffe680', '#9de08c', '#86c4ff', '#b79cf2'];
       const w = p.w / cols.length;
@@ -943,7 +995,7 @@ function flipped(d, W) {
   const f = d.features || {};
   o.features = { ...f, trees: (f.trees || []).map((t) => ({ ...t, x: fx(t.x) })), crates: (f.crates || []).map((c) => ({ ...c, x: fx(c.x) })) };
   o.backs = (d.backs || []).map((b) => ({ ...b, x0: fx(b.x1), x1: fx(b.x0) }));
-  o.paints = (d.paints || []).map((p) => ({ ...p, x: fx(p.x) }));
+  o.paints = (d.paints || []).map((p) => ({ ...p, x: p.x == null ? p.x : fx(p.x), box: p.box && [W - p.box[2], p.box[1], W - p.box[0], p.box[3]] }));
   return o;
 }
 

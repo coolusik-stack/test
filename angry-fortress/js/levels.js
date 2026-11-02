@@ -431,13 +431,17 @@ THEMES.shrooms = { ...THEMES.oak, id: 'shrooms', name: '왕버섯 숲', desc: '�
 THEMES.islet = { ...THEMES.blossom, id: 'islet', name: '외딴 꽃섬', desc: '작은 섬 하나에 둘이. 가까워서 한 방 한 방이 크고, 섬 끝이 바로 뒤예요', layout: { fixed: 'islet' } };
 // 하늘 기둥 wears the summer of 해바라기 비탈.
 THEMES.pillars = { ...THEMES.sunflower, id: 'pillars', name: '하늘 기둥', desc: '멀리 떨어진 두 돌기둥. 바람을 읽어야 닿아요. 낮은 징검돌로 내려가면 가까워져요', layout: { fixed: 'pillars' } };
+// 천년 참나무 wears the summer sky of 무지개 하늘다리 (without its rainbow).
+THEMES.bigtree = { ...THEMES.arch, id: 'bigtree', name: '천년 참나무', desc: '가운데 거대한 나무. 넘겨 쏠까, 옹이 구멍으로 낮게 쏠까, 가지를 타고 오를까', layout: { fixed: 'bigtree' }, rainbow: false };
 // 포개진 벼랑 wears the autumn of 소나무 절벽.
 THEMES.overhang = { ...THEMES.pine, id: 'overhang', name: '포개진 벼랑', desc: '높은 섬이 낮은 섬 위로 뻗어 있어요. 위는 내려다보고, 아래는 처마 밑에 숨어요', layout: { fixed: 'overhang' } };
+// 고리 바위 wears the autumn of 단풍 협곡.
+THEMES.ring = { ...THEMES.maple, id: 'ring', name: '고리 바위', desc: '가운데 떠 있는 고리 모양 바위. 넘겨 쏘거나, 꼭대기에 오르거나, 고리 속에 숨어요', layout: { fixed: 'ring' } };
 // 고드름 동굴 wears the winter day of 살얼음 두 섬.
 THEMES.icecave = { ...THEMES.snowcliff, id: 'icecave', name: '고드름 동굴', desc: '동굴 천장 아래에선 낮게만 쏠 수 있어요. 지붕에 올라가면 높이 쏘지만 훤히 보여요', layout: { fixed: 'icecave' } };
 
 // Menu order: through the year, spring to winter.
-export const THEME_ORDER = ['oak', 'blossom', 'paddy', 'shrooms', 'islet', 'mole', 'sunflower', 'night', 'pillars', 'arch', 'tiers', 'decks', 'maple', 'cliffs', 'well', 'overhang', 'ginkgo', 'pine', 'snowcliff', 'igloo', 'pavilion', 'crevasse', 'icecave', 'aurora'];
+export const THEME_ORDER = ['oak', 'blossom', 'paddy', 'shrooms', 'islet', 'mole', 'sunflower', 'night', 'pillars', 'bigtree', 'arch', 'tiers', 'decks', 'maple', 'cliffs', 'well', 'overhang', 'ring', 'ginkgo', 'pine', 'snowcliff', 'igloo', 'pavilion', 'crevasse', 'icecave', 'aurora'];
 export const SEASONS = { spring: '봄', summer: '여름', autumn: '가을', winter: '겨울' };
 
 // Fort blueprints. x is measured from the fort's back edge toward the enemy,

@@ -46,6 +46,12 @@ const ROUTES = {
     1: [[59, 'pad→stone', null, true, 'once'], [45, 'pad→low stone', '징검돌 명당', true, 'once'], [33, 'pad→far stone', null, true, 'once'], [27, 'pad→low stone', null, true, 'once'],
       [39, 'pad→near stone', null, true, 'once'], [51, 'pad→home pillar', null, true, 'once'], [62.6, 'home', null]],
   },
+  bigtree: {
+    0: [[36.0, 'knot hole', '옹이 구멍'], [11.0, 'home', null], [8, 'pad→low branch', null, true, 'once'], [17.5, 'pad→high branch', null, true, 'once'], [32.0, 'nest', '까치둥지'],
+      [27, 'pad→crown', '나무 꼭대기', true, 'once'], [31, 'pad→ground', null, true, 'once'], [11.0, 'home', null]],
+    1: [[36.0, 'knot hole', '옹이 구멍'], [61.0, 'home', null], [63, 'pad→middle branch', null, true, 'once'], [44.0, 'under the top branch', '가지 밑 그늘'],
+      [51.5, 'pad→top branch', null, true, 'once'], [46.5, 'pad→crown', '나무 꼭대기', true, 'once'], [41, 'pad→ground', null, true, 'once'], [61.0, 'home', null]],
+  },
   arch: {
     0: [[26, 'pad→arch', '무지개 꼭대기', true, 'once'], [30, 'pad→home', null, true, 'once']],
     1: [[56.0, 'tree', '여름 그늘'], [45, 'pad→arch', '무지개 꼭대기', true, 'once'], [50, 'pad→field', null, true, 'once']],
@@ -84,6 +90,12 @@ const ROUTES = {
       ['tp', 63.0, 15.0], [66, 'pad→top', null, true, 'once'], [11.0, 'home', null]],
     1: [[49.6, 'tree', '단풍 명당'], [27.6, 'under the overhang', '벼랑 밑 굴'], [60.0, 'home', null], [66, 'pad→top', null, true, 'once'], [34.6, 'out on the overhang', '벼랑 끝 처마'],
       [40, 'pad→lower island', null, true, 'once'], [60.0, 'home', null]],
+  },
+  ring: {
+    0: [[18, 'pad→bowl', '고리 속 단풍', true, 'once'], [34, 'pad→out', null, true, 'once'], [10.0, 'home', null], [7, 'pad→ring top', '고리 꼭대기', true, 'once'],
+      [33.2, 'pad→down', null, true, 'once'], [10.0, 'home', null]],
+    1: [[54, 'pad→bowl', '고리 속 단풍', true, 'once'], [38, 'pad→out', null, true, 'once'], [62.0, 'home', null], [64, 'pad→ring top', '고리 꼭대기', true, 'once'],
+      [38.8, 'pad→down', null, true, 'once'], [62.0, 'home', null]],
   },
   ginkgo: {
     0: [[5, 'pad→bunker roof', '벙커 지붕', true, 'once'], [25, 'pad→ridge', '은행 봉우리', true, 'once'], [35.0, 'into the bunker', '골짜기 벙커'], [9.6, 'home', null]],

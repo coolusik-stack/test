@@ -7,8 +7,8 @@
 // which home is down to the draw (terrain.js flips the map), and every map keeps one idea:
 //   도토리 숲 a hill · 벚꽃 분지 a bowl · 다랑이 논 terraces · 왕버섯 숲 giant mushrooms · 외딴 꽃섬 close quarters ·
 //   두더지 굴 산 a tunnel · 해바라기 비탈 a tilted island · 하늘 기둥 long range ·
-//   반딧불 징검다리 stepping stones · 무지개 하늘다리 a rock arch in the sky · 층층 구름섬 shelves · 삼층 다리 three decks ·
-//   단풍 협곡 a bridge · 단풍 벼랑 선반 cliff ledges · 낙엽 우물 a well · 포개진 벼랑 one island over the other ·
+//   반딧불 징검다리 stepping stones · 천년 참나무 a giant tree · 무지개 하늘다리 a rock arch in the sky · 층층 구름섬 shelves · 삼층 다리 three decks ·
+//   단풍 협곡 a bridge · 단풍 벼랑 선반 cliff ledges · 낙엽 우물 a well · 포개진 벼랑 one island over the other · 고리 바위 a broken ring ·
 //   은행나무 참호 trenches · 소나무 절벽 a cliff · 살얼음 두 섬 two islands · 이글루 눈처마 an
 //   overhang and an igloo · 얼음 누각 an ice pavilion · 빙하 틈새 a crevasse · 고드름 동굴 a ceiling ·
 //   오로라 호수 thin lake ice
@@ -91,6 +91,16 @@ const slab = (x0, x1, top, t) => {
   for (let x = x0 + 0.3; x <= x1 - 0.3 + 1e-6; x += 0.3) {
     const k = Math.max(0.8, t(x) * Math.min(1, Math.sqrt(Math.min(x - x0, x1 - x) / 1.5)));
     ops.push({ type: 'add', x, y: top(x) - k / 2, rx: k / 2, ry: k / 2 });
+  }
+  return ops;
+};
+// an arc of rock: centre (cx, cy), the arc's middle radius r, t thick, from angle a0 to a1 (degrees,
+// counterclockwise from +x, y up), as a row of circles
+const arc = (cx, cy, r, t, a0, a1) => {
+  const ops = [];
+  for (let a = a0; a <= a1 + 1e-6; a += 4) {
+    const q = (a * Math.PI) / 180;
+    ops.push({ type: 'add', x: cx + Math.cos(q) * r, y: cy + Math.sin(q) * r, rx: t / 2, ry: t / 2 });
   }
   return ops;
 };
@@ -454,6 +464,70 @@ export const MAPS = {
     features: { trees: [tree(31.5, 'chestnut', { h: 4.4, canopyR: 1.8 })] },
   }),
 
+  // 천년 참나무 (summer) — a giant tree in the middle. Its trunk stands between the homes from the
+  // ground to well above a normal lob, so there are three ways to reach the other side: over it (a
+  // high, full lob), through it (a knot hole at the foot of the trunk, a burrow that only flat shots
+  // from close by get through) or up it. The branches are thin wood a floor apart, reached by pads:
+  // the higher, the easier to lob over the crown and see down the other side, but one hit under a
+  // cart and down it goes, a floor at a time. The leafy crown on top is the lookout, and under its
+  // rim the highest branch on each side has a nest it roofs. Left home: 1.4 m lower, two branches
+  // (a long low one and a high one); right home: two branches (a middle one roofed by the top one).
+  bigtree: () => ({
+    top: [[4.0, 10.4], [5.2, 12.0], [24.0, 12.0], [30.0, 13.0], [42.0, 13.0], [48.0, 13.4], [67.2, 13.4], [68.4, 11.8]],
+    flat: [[5.2, 24.0], [30.0, 42.0], [48.0, 67.2]],
+    islands: [{
+      a: 4.0, b: 68.4,
+      under: [[4.0, 10.6], [5.4, 8.6], [10, 7.4], [18, 6.6], [26, 5.4], [36, 4.4], [46, 5.0], [56, 6.4], [64, 8.0], [68.4, 11.6]],
+    }],
+    bases: [11.0, 61.0],
+    forts: [{ back: 5.0, facing: 1 }, { back: 67.0, facing: -1 }],
+    ops: [
+      // the trunk, flaring into roots at its foot, and the knot hole through it
+      ...Array.from({ length: 52 }, (_, k) => ({ type: 'add', x: 36.0, y: 12.8 + k * 0.3, rx: 3.0 + 1.6 * Math.max(0, 1 - k / 8) ** 2, ry: 0.5 })),
+      ...passage(31.6, 40.4, 13.0, 1.45),
+      // the branches (thin: a hit under a cart drops it a floor) and the crown
+      ...shelf([[17.0, 18.6], [33.4, 19.2]], THIN), // left, low and long
+      ...shelf([[26.6, 24.8], [33.4, 25.0]], THIN), // left, high, its inner end under the crown
+      ...shelf([[38.6, 20.0], [52.0, 19.6]], THIN), // right, middle, roofed by the top one
+      ...shelf([[38.6, 24.6], [47.0, 24.2]], THIN), // right, top
+      ...shelf([[30.6, 29.4], [41.4, 29.4]], 1.9), // the crown
+      ...crag(10.0, 7.2), ...crag(22.0, 6.0, 1.1), ...crag(36.0, 4.2, 1.3), ...crag(52.0, 5.8, 1.1), ...crag(62.0, 7.4, 0.8),
+    ],
+    paints: [
+      { kind: 'bark', box: [32.0, 12.6, 40.0, 28.6], grain: 'v', knots: 3 },
+      { kind: 'bark', box: [16.8, 17.2, 33.0, 19.4], grain: 'h' },
+      { kind: 'bark', box: [26.4, 23.4, 33.0, 25.2], grain: 'h' },
+      { kind: 'bark', box: [39.0, 18.6, 52.2, 20.2], grain: 'h' },
+      { kind: 'bark', box: [39.0, 23.2, 47.2, 24.8], grain: 'h' },
+      { kind: 'leaves', x: 36.0, y: 28.5, rx: 5.9, ry: 1.6 },
+    ],
+    backs: [{ x0: 31.8, x1: 40.2, y0: 13.0, y1: 16.0, color: 'rgba(40,22,8,0.85)' }],
+    spots: [
+      { kind: 'pad', team: 0, range: [8.6, 9.2], dir: -1, to: { x: 20.6, y: 18.6 }, apex: 22.5 },
+      { kind: 'pad', team: -1, range: [18.0, 18.6], dir: -1, to: { x: 29.0, y: 24.8 }, apex: 28.0, ...on(18.7) },
+      { kind: 'pad', team: -1, range: [27.2, 27.8], dir: -1, to: { x: 33.4, y: 29.4 }, apex: 31.6, ...on(24.8) },
+      {
+        kind: 'burrow', team: 0, range: [30.8, 33.0], sign: null, ...below(24.9),
+        label: { name: '까치둥지', desc: '잎 꼭대기가 지붕이에요. 위에서 오는 공격을 막아 줘요. 가지가 얇아요' },
+      },
+      { kind: 'pad', team: 1, range: [62.0, 62.6], dir: 1, to: { x: 49.0, y: 19.8 }, apex: 24.0 },
+      { kind: 'pad', team: -1, range: [50.6, 51.2], dir: 1, to: { x: 43.4, y: 24.4 }, apex: 27.6, ...on(19.7) },
+      { kind: 'pad', team: -1, range: [45.6, 46.2], dir: 1, to: { x: 38.8, y: 29.4 }, apex: 31.6, ...on(24.3) },
+      {
+        kind: 'burrow', team: 1, range: [39.6, 46.0], sign: null, ...below(19.9),
+        label: { name: '가지 밑 그늘', desc: '위 가지가 지붕이에요. 위에서 오는 공격을 막아 줘요. 가지가 얇아요' },
+      },
+      { kind: 'high', team: -1, range: [32.6, 39.4], sign: null, ...on(29.4), label: { name: '나무 꼭대기', desc: '양쪽이 다 내려다보여요. 조준선 두 배, 대신 훤히 보여요' } },
+      { kind: 'pad', team: -1, range: [31.8, 32.4], dir: -1, to: { x: 13.6, y: 12.0 }, apex: 31.0, ...on(29.4) },
+      { kind: 'pad', team: -1, range: [39.6, 40.2], dir: 1, to: { x: 57.0, y: 13.4 }, apex: 31.0, ...on(29.4) },
+      {
+        kind: 'burrow', team: -1, range: [33.6, 38.4], sign: 30.0, ...below(13.0),
+        label: { name: '옹이 구멍', desc: '줄기 밑동의 굴. 위는 막혀 있고 양쪽으로 뚫려 있어 낮게 쏜 것만 들어와요' },
+      },
+    ],
+    features: {},
+  }),
+
   // 무지개 하늘다리 (summer) — under it, or over it? A rainbow of rock floats high over the middle
   // of the field like a ceiling: the easy high lob hits it, so shoot under it or very high over it. Mushroom pads throw you onto its
   // crest (lookout), and pads up there drop you home. Left home: a rise 2.2 m up, nearer the arch.
@@ -764,6 +838,45 @@ export const MAPS = {
       { kind: 'pad', team: -1, range: [63.6, 64.2], dir: 1, to: { x: 16.0, y: 21.8 }, apex: 30.0 },
     ],
     features: { trees: [tree(49.6, 'maple', { h: 4.6, canopyR: 2.0 })] },
+  }),
+
+  // 고리 바위 (autumn) — a broken ring of rock floats between the homes: an arch on top, a bowl
+  // underneath and a gap on each side. Over it is a normal lob from home to home. Inside the bowl
+  // the arch is a roof, so no lob gets in, but the side gaps leave you open to a flat shot from
+  // either island's edge (a maple grows in there, a nut a turn); on top of the arch you see both
+  // sides and lob down at will, in plain view. A pad at each island's lip throws you through the
+  // gap into the bowl, pads in the bowl throw you back out, and pads behind the homes go up onto
+  // the arch. Left home: 0.8 m lower, the bigger island (at 1.6 m it won 62%: the higher home's
+  // flatter lobs clip the arch); right home: higher, the smaller island.
+  ring: () => ({
+    top: [[2.4, 16.4], [3.6, 18.0], [18.8, 18.0], [20.0, 16.4], [52.0, 17.2], [53.2, 18.8], [68.4, 18.8], [69.6, 17.2]],
+    flat: [[3.6, 18.8], [53.2, 68.4]],
+    islands: [
+      { a: 2.4, b: 20.0, under: [[2.4, 16.6], [3.8, 13.0], [7, 9.6], [12, 8.2], [17, 9.6], [18.8, 13.0], [20.0, 16.6]] },
+      { a: 52.0, b: 69.6, under: [[52.0, 17.4], [53.2, 14.4], [56, 11.6], [61, 10.2], [66, 11.8], [68.4, 15.0], [69.6, 18.2]] },
+    ],
+    bases: [10.0, 62.0],
+    forts: [{ back: 3.6, facing: 1 }, { back: 68.0, facing: -1 }],
+    ops: [
+      ...arc(36.0, 21.0, 6.75, 3.5, 36, 144), // the arch
+      ...arc(36.0, 21.0, 6.75, 3.5, 216, 324), // the bowl (the gaps between them are 4.4 m)
+      ...crag(36.0, 12.4, 1.0),
+      ...crag(9.0, 8.4, 1.0), ...crag(15.0, 9.0, 0.8), ...crag(58.0, 10.6, 0.9), ...crag(64.0, 11.0, 0.8),
+    ],
+    spots: [
+      { kind: 'pad', team: 0, range: [7.6, 8.2], dir: -1, to: { x: 35.0, y: 29.4 }, apex: 33.0 },
+      { kind: 'pad', team: 1, range: [63.4, 64.0], dir: 1, to: { x: 37.0, y: 29.4 }, apex: 33.0 },
+      { kind: 'high', team: -1, range: [33.4, 38.6], sign: null, ...on(29.3), label: { name: '고리 꼭대기', desc: '양쪽이 다 내려다보여요. 조준선 두 배, 대신 훤히 보여요' } },
+      { kind: 'pad', team: -1, range: [33.0, 33.5], dir: -1, to: { x: 14.0, y: 18.0 }, apex: 32.0, ...on(29.1) },
+      { kind: 'pad', team: -1, range: [38.5, 39.0], dir: 1, to: { x: 58.0, y: 18.8 }, apex: 32.0, ...on(29.1) },
+      // through the gaps into the bowl, and back out
+      { kind: 'pad', team: 0, range: [17.0, 17.6], dir: 1, to: { x: 35.6, y: 16.0 }, apex: 21.0 },
+      { kind: 'pad', team: 1, range: [54.4, 55.0], dir: -1, to: { x: 36.4, y: 16.0 }, apex: 22.0 },
+      { kind: 'pad', team: -1, range: [34.2, 34.7], dir: -1, to: { x: 14.0, y: 18.0 }, apex: 22.0, ...below(16.2) },
+      { kind: 'pad', team: -1, range: [37.3, 37.8], dir: 1, to: { x: 58.0, y: 18.8 }, apex: 23.0, ...below(16.2) },
+      { kind: 'tree', team: -1, range: [35.0, 37.0], sign: null, ...below(16.2), label: { name: '고리 속 단풍', desc: '내 차례마다 특수 견과 +1. 위는 막혀 있지만 양옆 틈으로 낮게 쏜 건 들어와요' } },
+    ],
+    features: { trees: [tree(36.0, 'maple', { h: 4.0, canopyR: 1.7, from: 20.0 })] },
   }),
 
   // 은행나무 참호 (autumn) — shoot from behind your hill. Each home sits behind its own ridge with an
