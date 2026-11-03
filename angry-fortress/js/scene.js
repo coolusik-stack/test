@@ -329,7 +329,10 @@ export class Scene {
     const art = this.art;
     if (art && art.complete && art.naturalWidth) {
       this._painted(ctx, art, cam, vw, vh);
-      for (const c of this.clouds) this._drawCloud(ctx, c, cam, vw, vh, dpr);
+      // the stars, moon and rainbow are in the picture; the northern lights keep moving over it
+      if (t.aurora) this._aurora(ctx, cam, vw, vh, time);
+      // a few clouds drift across in daylight; at night they'd only read as grey smudges
+      if (!t.night) for (const c of this.clouds) this._drawCloud(ctx, c, cam, vw, vh, dpr);
       return;
     }
     if (t.night) {

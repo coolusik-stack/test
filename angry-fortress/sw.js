@@ -1,6 +1,6 @@
 // Offline cache for the game shell. Bump VERSION when files change (the web build stamps its own
 // copy with the version and commit, see scripts/build-www.mjs).
-const VERSION = 'af-v29';
+const VERSION = 'af-v30';
 const SHELL = [
   './',
   './index.html',
@@ -40,12 +40,32 @@ const SHELL = [
   './assets/icon-512.png',
   './assets/fonts/BlackHanSans.woff2',
   './assets/fonts/Jua.woff2',
-  './assets/sky/oak.webp',
+  './assets/sky/arch.webp',
+  './assets/sky/aurora.webp',
+  './assets/sky/bigtree.webp',
   './assets/sky/blossom.webp',
-  './assets/sky/paddy.webp',
-  './assets/sky/shrooms.webp',
+  './assets/sky/cliffs.webp',
+  './assets/sky/crevasse.webp',
+  './assets/sky/decks.webp',
+  './assets/sky/ginkgo.webp',
+  './assets/sky/icecave.webp',
+  './assets/sky/igloo.webp',
   './assets/sky/islet.webp',
+  './assets/sky/maple.webp',
   './assets/sky/mole.webp',
+  './assets/sky/night.webp',
+  './assets/sky/oak.webp',
+  './assets/sky/overhang.webp',
+  './assets/sky/paddy.webp',
+  './assets/sky/pavilion.webp',
+  './assets/sky/pillars.webp',
+  './assets/sky/pine.webp',
+  './assets/sky/ring.webp',
+  './assets/sky/shrooms.webp',
+  './assets/sky/snowcliff.webp',
+  './assets/sky/sunflower.webp',
+  './assets/sky/tiers.webp',
+  './assets/sky/well.webp',
 ];
 
 self.addEventListener('install', (e) => {

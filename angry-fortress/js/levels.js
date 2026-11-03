@@ -518,11 +518,10 @@ for (const [id, b] of Object.entries(BACKDROP)) {
   };
 }
 
-// Maps whose distance is one painted picture (assets/sky/<id>.webp, made from the BACKDROP idea
+// Every map's distance is one painted picture (assets/sky/<id>.webp, made from the BACKDROP idea
 // above) instead of the drawn sky, sun and two layers of far islands. scene.js falls back to the
 // drawn backdrop until the picture has loaded, or if it can't.
-const PAINTED = ['oak', 'blossom', 'paddy', 'shrooms', 'islet', 'mole'];
-for (const id of PAINTED) THEMES[id] = { ...THEMES[id], skyArt: `assets/sky/${id}.webp` };
+for (const id of Object.keys(THEMES)) THEMES[id] = { ...THEMES[id], skyArt: `assets/sky/${id}.webp` };
 
 // Menu order: through the year, spring to winter.
 export const THEME_ORDER = ['oak', 'blossom', 'paddy', 'shrooms', 'islet', 'mole', 'sunflower', 'night', 'pillars', 'bigtree', 'arch', 'tiers', 'decks', 'maple', 'cliffs', 'well', 'overhang', 'ring', 'ginkgo', 'pine', 'snowcliff', 'igloo', 'pavilion', 'crevasse', 'icecave', 'aurora'];
