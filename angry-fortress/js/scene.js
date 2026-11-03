@@ -154,10 +154,29 @@ function crown(shape, cx, w, g, sc, r, canopy, hi) {
   }
 }
 
+// Painted skies, loaded once and kept: a battle on a painted map draws its picture as soon as it
+// has arrived (preloadSkies at boot means that's normally before the first frame).
+const SKIES = new Map();
+function skyArt(src) {
+  if (!src || typeof Image === 'undefined') return null;
+  let im = SKIES.get(src);
+  if (!im) {
+    im = new Image();
+    im.decoding = 'async';
+    im.src = src;
+    SKIES.set(src, im);
+  }
+  return im;
+}
+export function preloadSkies(themes) {
+  for (const t of themes) skyArt(t.skyArt);
+}
+
 export class Scene {
   constructor(theme, seed) {
     this.t = theme;
     this.seed = seed;
+    this.art = skyArt(theme.skyArt);
     const r = rng(seed * 3 + 5);
     this.r = r;
     const shape = theme.backdrop || 'round';
@@ -307,6 +326,12 @@ export class Scene {
     g.addColorStop(1, t.sky[2]);
     ctx.fillStyle = g;
     ctx.fillRect(0, 0, vw, vh);
+    const art = this.art;
+    if (art && art.complete && art.naturalWidth) {
+      this._painted(ctx, art, cam, vw, vh);
+      for (const c of this.clouds) this._drawCloud(ctx, c, cam, vw, vh, dpr);
+      return;
+    }
     if (t.night) {
       ctx.fillStyle = '#fff';
       for (const s of this.stars) {
@@ -352,6 +377,18 @@ export class Scene {
     if (t.rays) this._rays(ctx, vw, vh, dpr, sx, sy);
     this._isles(ctx, this.mid, layerT, this.midColor[0], this.midColor[1], 0.08);
     this._mist(ctx, vw, vh, dpr, cam, this.mid.par, WORLD.SEA + 8, 0.8);
+  }
+
+  // A painted sky stands in for sky, sun and far islands: it covers the screen with a little to
+  // spare, its cloud sea along the bottom, and slides slowly as the camera pans (further away than
+  // the drawn far islands, so it moves less).
+  _painted(ctx, art, cam, vw, vh) {
+    const iw = art.naturalWidth, ih = art.naturalHeight;
+    const k = Math.max((vh * 1.1) / ih, (vw * 1.12) / iw);
+    const w = iw * k, h = ih * k;
+    const x = (vw - w) / 2 - (cam.x - WORLD.W / 2) * cam.zoom * 0.1;
+    const y = vh - h + (vh * 0.04) + (cam.y - 14) * cam.zoom * 0.06;
+    ctx.drawImage(art, clamp(x, vw - w, 0), clamp(y, vh - h, 0), w, h);
   }
 
   // Still, flat, unoutlined: scenery, not something to shoot at.

@@ -1,6 +1,6 @@
 // Offline cache for the game shell. Bump VERSION when files change (the web build stamps its own
 // copy with the version and commit, see scripts/build-www.mjs).
-const VERSION = 'af-v28';
+const VERSION = 'af-v29';
 const SHELL = [
   './',
   './index.html',
@@ -40,6 +40,12 @@ const SHELL = [
   './assets/icon-512.png',
   './assets/fonts/BlackHanSans.woff2',
   './assets/fonts/Jua.woff2',
+  './assets/sky/oak.webp',
+  './assets/sky/blossom.webp',
+  './assets/sky/paddy.webp',
+  './assets/sky/shrooms.webp',
+  './assets/sky/islet.webp',
+  './assets/sky/mole.webp',
 ];
 
 self.addEventListener('install', (e) => {

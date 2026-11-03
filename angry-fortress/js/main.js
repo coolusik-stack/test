@@ -2,6 +2,7 @@
 import { Game } from './game.js';
 import { THEMES, THEME_ORDER, SEASONS } from './levels.js';
 import { buildLandscape, WORLD } from './terrain.js';
+import { preloadSkies } from './scene.js';
 import * as Art from './art.js';
 import Sound from './audio.js';
 import { storage, prefs, clamp, josa } from './util.js';
@@ -1709,6 +1710,7 @@ async function boot() {
     await Promise.race([document.fonts.ready, new Promise((r) => setTimeout(r, 1500))]);
   } catch (e) { /* fonts optional */ }
   goTitle();
+  preloadSkies(Object.values(THEMES)); // painted skies, ready before the first battle
   if (!window.claude) loadSite();
   if (Shop.shopAvailable()) Shop.restore(false); // quietly pick up purchases made on another phone
   hookBackButton();
