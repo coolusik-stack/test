@@ -10,6 +10,18 @@ export const WORLD = { W: 72, H: 40, CELL: 0.25, SEA: 1.0, SEA0: 1.0 };
 
 const SDF_MAX = 3;
 
+// What hangs under the islands, picked by the ground's `under` (levels.js MATERIALS): soft loam
+// grows a moss fringe with roots and vines; rock grows stone teeth and few roots; humus grows long
+// moss beards and a tangle of roots. Icicles come from the season (style.drip).
+// dense: share of slots with a drip; beard: share of moss tufts that hang long; roots: share of
+// slots with a root or vine; reach: their length; rootShare: roots over vines.
+const UNDER = {
+  loam: { kind: 'moss', dense: 0.5, beard: 0.25, beardL: 0.3, roots: 0.2, reach: 1, rootShare: 0.55 },
+  stone: { kind: 'stone', dense: 0.42, w: [0.09, 0.2], L: [0.14, 0.62], roots: 0.09, reach: 0.8, rootShare: 0.7 },
+  soft: { kind: 'stone', blunt: true, dense: 0.42, w: [0.1, 0.24], L: [0.16, 0.6], roots: 0.12, reach: 0.9, rootShare: 0.6 },
+  beard: { kind: 'moss', dense: 0.75, beard: 0.55, beardL: 0.65, roots: 0.34, reach: 1.25, rootShare: 0.6 },
+};
+
 export class Terrain {
   constructor(opts) {
     const { W, H, CELL } = WORLD;
@@ -376,6 +388,8 @@ export class Terrain {
     const { stride, cell, scar } = this;
     const st = this.style;
     const decor = st.decor || [];
+    // what hangs under the islands, by what the ground is made of (see UNDER)
+    const under = { ...UNDER.loam, ...UNDER[st.under] };
     // Decor is keyed to fixed world slots so it stays put when craters rebuild the mesh.
     const seed = this.seed;
     const hash = (i, k) => {
@@ -462,12 +476,32 @@ export class Terrain {
           // roots and vines dangling from the underside of the island
           const lo = Math.min(x0, x1), hi = Math.max(x0, x1);
           for (let slot = Math.ceil(lo / SLOT); slot * SLOT < hi; slot++) {
-            if (hash(slot, 41) > 0.5 * Math.min(1.5, this.lushAt(slot * SLOT))) continue; // more roots and vines on the green side
+            if (hash(slot, 41) > under.dense * Math.min(1.5, this.lushAt(slot * SLOT))) continue; // more roots and vines on the green side
             const tx = slot * SLOT + (hash(slot, 42) - 0.5) * 0.2;
             const t = (tx - x0) / dx;
             if (t < 0 || t > 1) continue;
             const ty = -(y0 + dy * t) - 0.06;
-            if (st.drip === 'ice') {
+            if (under.kind === 'stone' && st.drip !== 'ice') {
+              // rock teeth: a stalactite with a kink, blunt and drop-like in soft stone, sharp in hard
+              const L = under.L[0] + Math.pow(hash(slot, 43), 1.8) * (under.L[1] - under.L[0]);
+              const w = under.w[0] + hash(slot, 44) * (under.w[1] - under.w[0]);
+              const lean = (hash(slot, 45) - 0.5) * 0.12, kink = 0.35 + hash(slot, 46) * 0.3;
+              const bx = tx + lean, by = ty + L;
+              drips.moveTo(tx - w, ty - 0.03);
+              drips.lineTo(tx - w * 0.55 + lean * kink, ty + L * kink);
+              if (under.blunt) drips.quadraticCurveTo(bx - w * 0.35, by + w * 0.3, bx + w * 0.1, by - w * 0.05);
+              else drips.lineTo(bx, by);
+              drips.lineTo(tx + w * 0.5 + lean * kink, ty + L * (kink - 0.08));
+              drips.lineTo(tx + w, ty - 0.03);
+              drips.closePath();
+              if (hash(slot, 47) < 0.3) { // now and then a little one beside it
+                const x2 = tx + w * 1.2, L2 = L * 0.4;
+                drips.moveTo(x2 - w * 0.4, ty - 0.03);
+                drips.lineTo(x2 + lean * 0.3, ty + L2);
+                drips.lineTo(x2 + w * 0.4, ty - 0.03);
+                drips.closePath();
+              }
+            } else if (st.drip === 'ice') {
               // icicles: thin, a few long ones
               const L = 0.15 + Math.pow(hash(slot, 43), 2.2) * 0.75, w = 0.05 + hash(slot, 44) * 0.06;
               drips.moveTo(tx - w, ty);
@@ -476,20 +510,20 @@ export class Terrain {
               drips.closePath();
             } else {
               // moss: a soft scalloped fringe, now and then a longer tuft
-              const rr = 0.09 + hash(slot, 43) * 0.1, L = hash(slot, 44) < 0.25 ? 0.18 + hash(slot, 45) * 0.3 : 0;
+              const rr = 0.09 + hash(slot, 43) * 0.1, L = hash(slot, 44) < under.beard ? 0.18 + hash(slot, 45) * under.beardL : 0;
               drips.moveTo(tx + rr, ty);
               drips.ellipse(tx, ty, rr, rr * 0.9 + L * 0.5, 0, 0, Math.PI);
             }
           }
           for (let slot = Math.ceil(lo / SLOT); slot * SLOT < hi; slot++) {
-            if (hash(slot, 31) > 0.2) continue;
+            if (hash(slot, 31) > under.roots) continue;
             const tx = slot * SLOT;
             const t = (tx - x0) / dx;
             if (t < 0 || t > 1) continue;
             const ty = -(y0 + dy * t) - 0.04;
-            const L = 0.3 + Math.pow(hash(slot, 32), 1.6) * 1.3;
+            const L = (0.3 + Math.pow(hash(slot, 32), 1.6) * 1.3) * under.reach;
             const bend = (hash(slot, 33) - 0.5) * 0.7 * L;
-            if (hash(slot, 34) < 0.55) {
+            if (hash(slot, 34) < under.rootShare) {
               roots.moveTo(tx, ty);
               roots.quadraticCurveTo(tx + bend, ty + L * 0.55, tx + bend * 0.4, ty + L);
             } else {
@@ -769,9 +803,11 @@ export class Terrain {
     ctx.stroke(this.path);
     const hg = this.hanging;
     if (hg) {
-      ctx.fillStyle = s.drip === 'ice' ? 'rgba(232,244,255,0.92)' : s.grassDark;
+      const stone = UNDER[s.under]?.kind === 'stone' && s.drip !== 'ice';
+      ctx.fillStyle = stone ? (s.rockTones?.[1] || s.dirtDark) : s.drip === 'ice' ? 'rgba(232,244,255,0.92)' : s.grassDark;
       ctx.fill(hg.drips);
-      if (s.drip === 'ice') { ctx.lineWidth = 0.025; ctx.strokeStyle = 'rgba(150,185,220,0.8)'; ctx.stroke(hg.drips); }
+      if (stone) { ctx.lineWidth = 0.05; ctx.strokeStyle = s.outline; ctx.stroke(hg.drips); }
+      else if (s.drip === 'ice') { ctx.lineWidth = 0.025; ctx.strokeStyle = 'rgba(150,185,220,0.8)'; ctx.stroke(hg.drips); }
       ctx.lineCap = 'round';
       ctx.strokeStyle = s.root || '#3e2210';
       ctx.lineWidth = 0.075;

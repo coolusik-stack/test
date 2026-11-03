@@ -16,18 +16,159 @@ function mix(a, b, t) {
   return '#' + x.map((v, i) => Math.round(v + (y[i] - v) * t).toString(16).padStart(2, '0')).join('');
 }
 
+// A closed polygon from [x, y] points.
+function poly(p, pts) {
+  p.moveTo(pts[0][0], pts[0][1]);
+  for (let k = 1; k < pts.length; k++) p.lineTo(pts[k][0], pts[k][1]);
+  p.closePath();
+}
+
+// One distant tree standing at (tx, g): a round broadleaf of three puffs, or a three-tier pine.
+function farTree(kind, tx, g, s2, canopy, hi) {
+  if (kind === 'pine') {
+    for (let k = 0; k < 3; k++) {
+      const ww = (1.0 - k * 0.25) * s2, yy = g - 0.3 * s2 - k * 0.7 * s2;
+      poly(canopy, [[tx - ww, yy], [tx, yy - 1.1 * s2], [tx + ww, yy]]);
+      poly(hi, [[tx - ww * 0.5, yy - 0.15 * s2], [tx - 0.05, yy - 1.0 * s2], [tx + ww * 0.05, yy - 0.15 * s2]]);
+    }
+    return;
+  }
+  const cy = g - 0.9 * s2;
+  for (const [dx, dy, rr] of [[-0.45, 0.25, 0.6], [0.45, 0.3, 0.6], [0, -0.2, 0.75]]) {
+    canopy.moveTo(tx + dx * s2 + rr * s2, cy + dy * s2);
+    canopy.arc(tx + dx * s2, cy + dy * s2, rr * s2, 0, TAU);
+    hi.moveTo(tx + dx * s2 - 0.15 * s2 + rr * s2 * 0.5, cy + dy * s2 - 0.2 * s2);
+    hi.arc(tx + dx * s2 - 0.15 * s2, cy + dy * s2 - 0.2 * s2, rr * s2 * 0.5, 0, TAU);
+  }
+}
+
+// What stands on a distant island, by the map's backdrop (levels.js BACKDROP). The island runs
+// from cx - w to cx + w with its ground at g (canvas y, up is negative); sc is the layer's scale.
+function crown(shape, cx, w, g, sc, r, canopy, hi) {
+  const row = (kind, a, b, size = 1) => {
+    for (let tx = a; tx <= b; tx += r.range(0.9, 1.6) * sc * size) farTree(kind, tx, g, r.range(0.75, 1.2) * sc * size, canopy, hi);
+  };
+  const edgeTrees = (kind, a, b, size) => { // a tree or two on what's left of the island beside the landmark
+    if (a - (cx - w) > 0.9 * sc) row(kind, cx - w + 0.5 * sc, a - 0.4 * sc, size);
+    if (cx + w - b > 0.9 * sc) row(kind, b + 0.4 * sc, cx + w - 0.5 * sc, size);
+  };
+  if (shape === 'mesa') {
+    // a flat-topped sandstone butte, its layers catching the light
+    const bw = Math.min(w * 0.85, r.range(1.6, 3) * sc), H = r.range(2.2, 4.2) * sc, tw = bw * r.range(0.45, 0.7);
+    const mx = cx + r.range(-0.3, 0.3) * (w - bw);
+    poly(canopy, [[mx - bw, g], [mx - bw * 0.82, g - H * 0.5], [mx - tw * 1.05, g - H * 0.92], [mx - tw, g - H], [mx + tw, g - H], [mx + tw * 1.1, g - H * 0.9], [mx + bw * 0.8, g - H * 0.45], [mx + bw, g]]);
+    for (let k = 1; k <= 3; k++) {
+      const f = k / 4, half = (bw + (tw - bw) * f) * 0.86;
+      hi.rect(mx - half, g - H * f - 0.08 * sc, half * 1.7, 0.15 * sc);
+    }
+    hi.rect(mx - tw, g - H, tw * 2, 0.2 * sc);
+    edgeTrees('round', mx - bw, mx + bw, 0.6);
+  } else if (shape === 'spire') {
+    // rock needles, one to three, a sunlit sliver down each
+    const n = w > 3.4 * sc ? 2 + (r() < 0.4 ? 1 : 0) : 1;
+    for (let k = 0; k < n; k++) {
+      const b = r.range(0.45, 0.85) * sc, H = r.range(3, 6.5) * sc * (k ? 0.7 : 1);
+      const x = n === 1 ? cx + r.range(-0.3, 0.3) * w : cx - w * 0.6 + (1.2 * w * k) / (n - 1) + r.range(-0.3, 0.3) * sc;
+      poly(canopy, [[x - b, g], [x - b * 0.75, g - H * 0.4], [x - b * 0.45, g - H * 0.8], [x - b * 0.15, g - H], [x + b * 0.25, g - H * 0.96], [x + b * 0.5, g - H * 0.7], [x + b * 0.8, g - H * 0.35], [x + b, g]]);
+      poly(hi, [[x - b * 0.7, g - 0.2 * sc], [x - b * 0.45, g - H * 0.75], [x - b * 0.18, g - H * 0.96], [x - b * 0.28, g - H * 0.6], [x - b * 0.42, g - 0.2 * sc]]);
+      if (r() < 0.5) farTree('pine', x + 0.05 * b, g - H + 0.05 * sc, 0.32 * sc, canopy, hi);
+    }
+  } else if (shape === 'shroom') {
+    // giant mushrooms: a leaning stalk under a spotted dome
+    const n = w > 3.4 * sc ? 2 : 1;
+    for (let k = 0; k < n + 1; k++) {
+      const small = k === n;
+      const R = (small ? r.range(0.45, 0.7) : r.range(1.1, 2.1)) * sc, H = (small ? r.range(0.7, 1.1) : r.range(1.8, 4.2)) * sc;
+      const x = cx + (n === 1 ? (small ? 0.6 * w : r.range(-0.3, 0.2) * w) : small ? 0 : (k ? 0.55 : -0.55) * w);
+      const st = R * 0.24, lean = r.range(-0.35, 0.35) * R, cy = g - H;
+      canopy.moveTo(x - st, g);
+      canopy.quadraticCurveTo(x - st * 0.4 + lean * 0.3, g - H * 0.5, x - st * 0.7 + lean, cy);
+      canopy.lineTo(x + st * 0.7 + lean, cy);
+      canopy.quadraticCurveTo(x + st * 0.6 + lean * 0.3, g - H * 0.5, x + st, g);
+      canopy.closePath();
+      canopy.moveTo(x + lean + R, cy + 0.12 * R);
+      canopy.ellipse(x + lean, cy + 0.12 * R, R, R * 0.62, 0, 0, Math.PI, true);
+      canopy.closePath();
+      for (const [u, v, rr] of [[-0.45, 0.25, 0.16], [0.1, 0.42, 0.13], [0.5, 0.18, 0.11], [-0.1, 0.12, 0.09]]) {
+        const sx = x + lean + u * R, sy = cy + 0.12 * R - v * R;
+        hi.moveTo(sx + rr * R, sy);
+        hi.ellipse(sx, sy, rr * R, rr * R * 0.75, 0, 0, TAU);
+      }
+    }
+  } else if (shape === 'bigtree') {
+    // one giant tree: a flared trunk under a heaped crown, small trees around its feet
+    const x = cx + r.range(-0.25, 0.25) * w, H = r.range(2.8, 4.6) * sc, tw = r.range(0.3, 0.45) * sc;
+    poly(canopy, [[x - tw * 2, g], [x - tw * 1.05, g - H * 0.25], [x - tw * 0.8, g - H], [x + tw * 0.8, g - H], [x + tw * 1.05, g - H * 0.25], [x + tw * 2, g]]);
+    const Rc = r.range(1.7, 2.6) * sc, top = g - H - Rc * 0.35;
+    for (let k = 0; k < 6; k++) {
+      const px = x + (k / 5 - 0.5) * 2 * Rc * 0.8 + r.range(-0.2, 0.2) * Rc, py = top - Math.sin((k / 5) * Math.PI) * Rc * 0.45 + r.range(-0.1, 0.15) * Rc;
+      const rr = r.range(0.5, 0.72) * Rc;
+      canopy.moveTo(px + rr, py);
+      canopy.arc(px, py, rr, 0, TAU);
+      hi.moveTo(px - rr * 0.25 + rr * 0.45, py - rr * 0.3);
+      hi.arc(px - rr * 0.25, py - rr * 0.3, rr * 0.45, 0, TAU);
+    }
+    edgeTrees('round', x - Rc * 1.2, x + Rc * 1.2, 0.6);
+  } else if (shape === 'arch') {
+    // a stone arch, a bush or two on its back
+    const A = Math.min(w * 0.85, r.range(1.6, 2.8) * sc), ry = A * r.range(0.75, 1.15), L = A * r.range(0.3, 0.42);
+    const x = cx + r.range(-0.25, 0.25) * (w - A), yc = g - ry * 0.35;
+    canopy.moveTo(x - A, g);
+    canopy.lineTo(x - A, yc);
+    canopy.ellipse(x, yc, A, ry, 0, Math.PI, TAU, false);
+    canopy.lineTo(x + A, g);
+    canopy.lineTo(x + A - L, g);
+    canopy.lineTo(x + A - L, yc);
+    canopy.ellipse(x, yc, A - L, ry - L * 0.8, 0, 0, Math.PI, true);
+    canopy.lineTo(x - A + L, g);
+    canopy.closePath();
+    hi.moveTo(x - A * 0.45 + A * 0.32, yc - ry * 0.78);
+    hi.ellipse(x - A * 0.45, yc - ry * 0.78, A * 0.32, 0.16 * sc, -0.45, 0, TAU);
+    hi.rect(x - A + 0.12 * sc, yc - ry * 0.3, 0.14 * sc, ry * 0.3 + (g - yc) - 0.1 * sc);
+    farTree('round', x + r.range(-0.3, 0.3) * A, yc - ry + 0.12 * sc, 0.42 * sc, canopy, hi);
+    edgeTrees('round', x - A, x + A, 0.6);
+  } else if (shape === 'peak') {
+    // snowy peaks with pines at their feet
+    const n = w > 3.6 * sc ? 2 : 1;
+    for (let k = 0; k < n; k++) {
+      const B = r.range(1.5, 2.6) * sc, H = r.range(2.6, 5.2) * sc * (k ? 0.75 : 1);
+      const x = n === 1 ? cx + r.range(-0.2, 0.2) * w : cx + (k ? 0.4 : -0.35) * w;
+      poly(canopy, [[x - B, g], [x - B * 0.55, g - H * 0.45], [x - B * 0.3, g - H * 0.7], [x - B * 0.05, g - H], [x + B * 0.2, g - H * 0.82], [x + B * 0.35, g - H * 0.86], [x + B * 0.6, g - H * 0.5], [x + B, g]]);
+      poly(hi, [[x - B * 0.05, g - H], [x + B * 0.2, g - H * 0.82], [x + B * 0.35, g - H * 0.86], [x + B * 0.44, g - H * 0.7], [x + B * 0.26, g - H * 0.74], [x + B * 0.12, g - H * 0.62], [x - B * 0.06, g - H * 0.72], [x - B * 0.2, g - H * 0.6], [x - B * 0.3, g - H * 0.7]]);
+    }
+    row('pine', cx - w + 0.5 * sc, cx + w - 0.5 * sc, 0.55);
+  } else if (shape === 'terrace') {
+    // stepped paddies, water shining along each step, a tree on the top one
+    let x0 = cx - w * 0.92, x1 = cx + w * 0.92, y = g;
+    for (let k = 0; k < 3 && x1 - x0 > 1 * sc; k++) {
+      const hgt = r.range(0.45, 0.7) * sc;
+      canopy.rect(x0, y - hgt, x1 - x0, hgt + 0.05);
+      hi.rect(x0 + 0.12 * sc, y - hgt, x1 - x0 - 0.24 * sc, 0.1 * sc);
+      y -= hgt;
+      x0 += r.range(0.25, 0.45) * (x1 - x0) * 0.5;
+      x1 -= r.range(0.2, 0.45) * (x1 - x0) * 0.5;
+    }
+    farTree('round', (x0 + x1) / 2, y, 0.6 * sc, canopy, hi);
+  } else {
+    row(shape === 'pine' ? 'pine' : 'round', cx - w + 0.5 * sc, cx + w - 0.5 * sc);
+  }
+}
+
 export class Scene {
   constructor(theme, seed) {
     this.t = theme;
     this.seed = seed;
     const r = rng(seed * 3 + 5);
     this.r = r;
-    const shape = theme.bgTree === 'pine' ? 'pine' : 'round';
+    const shape = theme.backdrop || 'round';
     this.far = this._islandLayer(0.18, seed + 1, 13, 0.7, shape, r);
     this.mid = this._islandLayer(0.42, seed + 2, 9.5, 1.0, shape, r);
-    // the backdrop's colours, washed toward the sky so they sit back
+    // the backdrop's colours, washed toward the sky so they sit back; snow, strata, mushroom spots
+    // and sunlit rock faces show on the far layer too (trees there stay one flat colour)
     this.farColor = mix(theme.far, theme.sky[1], 0.45);
     this.midColor = [mix(theme.mid[0], theme.sky[1], 0.35), mix(theme.mid[1], theme.sky[1], 0.35)];
+    this.farHi = shape === 'round' || shape === 'pine' ? null : mix(theme.mid[1], theme.sky[1], 0.5);
+    this.hiA = shape === 'peak' ? 0.85 : 0.4;
     this.clouds = [];
     for (let i = 0; i < Math.min(3, theme.clouds ?? 3); i++) {
       this.clouds.push({
@@ -101,32 +242,7 @@ export class Scene {
         rock.lineTo(cx + w - 2 * w * t, -top + d);
       }
       rock.closePath();
-      // trees along the top
-      for (let tx = cx - w + 0.5 * scale; tx <= cx + w - 0.5 * scale; tx += r.range(0.9, 1.6) * scale) {
-        const s2 = r.range(0.75, 1.2) * scale;
-        const g = -top + 0.1;
-        if (shape === 'pine') {
-          for (let k = 0; k < 3; k++) {
-            const ww = (1.0 - k * 0.25) * s2, yy = g - 0.3 * s2 - k * 0.7 * s2;
-            canopy.moveTo(tx - ww, yy);
-            canopy.lineTo(tx, yy - 1.1 * s2);
-            canopy.lineTo(tx + ww, yy);
-            canopy.closePath();
-            hi.moveTo(tx - ww * 0.5, yy - 0.15 * s2);
-            hi.lineTo(tx - 0.05, yy - 1.0 * s2);
-            hi.lineTo(tx + ww * 0.05, yy - 0.15 * s2);
-            hi.closePath();
-          }
-        } else {
-          const cy = g - 0.9 * s2;
-          for (const [dx, dy, rr] of [[-0.45, 0.25, 0.6], [0.45, 0.3, 0.6], [0, -0.2, 0.75]]) {
-            canopy.moveTo(tx + dx * s2 + rr * s2, cy + dy * s2);
-            canopy.arc(tx + dx * s2, cy + dy * s2, rr * s2, 0, TAU);
-            hi.moveTo(tx + dx * s2 - 0.15 * s2 + rr * s2 * 0.5, cy + dy * s2 - 0.2 * s2);
-            hi.arc(tx + dx * s2 - 0.15 * s2, cy + dy * s2 - 0.2 * s2, rr * s2 * 0.5, 0, TAU);
-          }
-        }
-      }
+      crown(shape, cx, w, -top + 0.1, scale, r, canopy, hi);
       canopy.rect(cx - w, -top - 0.15 * scale, 2 * w, 0.3 * scale);
       // a few vines trailing from the underside
       const vines = new Path2D();
@@ -230,7 +346,7 @@ export class Scene {
     // the cloud sea stretching to the horizon far below
     this._horizon(ctx, vw, vh, dpr, cam, time, layerT);
     // distant floating islands + mist, nearer ones darker and bigger
-    this._isles(ctx, this.far, layerT, this.farColor, null, 0);
+    this._isles(ctx, this.far, layerT, this.farColor, this.farHi, 0);
     this._mist(ctx, vw, vh, dpr, cam, this.far.par, WORLD.SEA + 12, 0.9);
     // faint light shafts across the middle distance
     if (t.rays) this._rays(ctx, vw, vh, dpr, sx, sy);
@@ -252,7 +368,7 @@ export class Scene {
       ctx.fill(is.canopy);
       if (hiColor) {
         ctx.fillStyle = hiColor;
-        ctx.globalAlpha = 0.4;
+        ctx.globalAlpha = this.hiA;
         ctx.fill(is.hi);
         ctx.globalAlpha = 1;
       }

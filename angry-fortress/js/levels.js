@@ -23,7 +23,6 @@ export const THEMES = {
     near: ['#94c49b', '#7d9272'], // big background trunks: canopy, trunk
     mist: 'rgba(235,250,235,0.35)',
     trees: ['oak', 'oak', 'chestnut'],
-    bgTree: 'round',
     ambient: 'pollen',
     leaf: ['rgba(120,200,80,0.75)', 'rgba(170,215,90,0.7)'],
     sea: { top: 'rgba(70,170,200,0.78)', bottom: 'rgba(26,92,120,0.95)', foam: '#e8fbff', reed: '#5d8f3a' },
@@ -54,7 +53,6 @@ export const THEMES = {
     near: ['#dd9166', '#9a6a4c'],
     mist: 'rgba(255,230,200,0.35)',
     trees: ['maple', 'maple', 'oak'],
-    bgTree: 'round',
     ambient: 'leaf',
     leaf: ['rgba(230,110,40,0.85)', 'rgba(245,170,50,0.85)', 'rgba(205,60,40,0.8)'],
     sea: { top: 'rgba(70,175,190,0.8)', bottom: 'rgba(24,100,120,0.95)', foam: '#eafffb', reed: '#8a7a3a' },
@@ -86,7 +84,6 @@ export const THEMES = {
     near: ['#7ea396', '#6a5a4a'],
     mist: 'rgba(240,248,245,0.55)',
     trees: ['pine', 'pine', 'chestnut'],
-    bgTree: 'pine',
     ambient: 'mist',
     leaf: ['rgba(90,140,90,0.7)'],
     sea: { top: 'rgba(90,160,180,0.8)', bottom: 'rgba(30,80,100,0.95)', foam: '#f2fbff', reed: '#6b7f3f' },
@@ -118,7 +115,6 @@ export const THEMES = {
     mist: 'rgba(120,150,210,0.18)',
     night: true,
     trees: ['chestnut', 'oak', 'chestnut'],
-    bgTree: 'round',
     ambient: 'firefly',
     leaf: ['rgba(120,170,140,0.5)'],
     sea: { top: 'rgba(60,100,160,0.8)', bottom: 'rgba(12,28,60,0.97)', foam: '#bfd6ff', reed: '#2f4a3a' },
@@ -151,7 +147,6 @@ export const THEMES = {
     near: ['#f2b3cb', '#7a5658'],
     mist: 'rgba(255,235,242,0.38)',
     trees: ['blossom', 'blossom', 'oak'],
-    bgTree: 'round',
     ambient: 'petal',
     leaf: ['rgba(255,190,214,0.85)'],
     sea: { top: 'rgba(90,180,210,0.78)', bottom: 'rgba(30,100,130,0.95)', foam: '#fff4f8', reed: '#6aa04a' },
@@ -184,7 +179,6 @@ export const THEMES = {
     near: ['#a6d48e', '#7a6448'],
     mist: 'rgba(240,255,230,0.32)',
     trees: ['blossom', 'oak', 'chestnut'],
-    bgTree: 'round',
     ambient: 'pollen',
     leaf: ['rgba(140,210,90,0.75)'],
     sea: { top: 'rgba(70,175,200,0.78)', bottom: 'rgba(26,96,120,0.95)', foam: '#effffb', reed: '#5d9a3a' },
@@ -217,7 +211,6 @@ export const THEMES = {
     near: ['#86c46c', '#7a5e3a'],
     mist: 'rgba(240,255,235,0.25)',
     trees: ['oak', 'chestnut', 'oak'],
-    bgTree: 'round',
     ambient: 'pollen',
     leaf: ['rgba(120,200,80,0.75)'],
     sea: { top: 'rgba(60,170,215,0.8)', bottom: 'rgba(20,90,130,0.95)', foam: '#effaff', reed: '#5d9a3a' },
@@ -250,7 +243,6 @@ export const THEMES = {
     near: ['#7cc4a0', '#6e5a44'],
     mist: 'rgba(235,255,250,0.28)',
     trees: ['oak', 'chestnut', 'oak'],
-    bgTree: 'round',
     ambient: 'pollen',
     leaf: ['rgba(120,200,80,0.75)'],
     sea: { top: 'rgba(40,170,210,0.8)', bottom: 'rgba(12,84,128,0.95)', foam: '#f0fcff', reed: '#5d9a3a' },
@@ -283,7 +275,6 @@ export const THEMES = {
     near: ['#ecc24a', '#7e6448'],
     mist: 'rgba(255,244,210,0.32)',
     trees: ['ginkgo', 'ginkgo', 'maple'],
-    bgTree: 'round',
     ambient: 'leaf',
     leaf: ['rgba(245,196,40,0.9)', 'rgba(255,220,90,0.85)', 'rgba(230,160,30,0.85)'],
     sea: { top: 'rgba(70,170,190,0.8)', bottom: 'rgba(24,96,118,0.95)', foam: '#f6fff8', reed: '#a08a3a' },
@@ -316,7 +307,6 @@ export const THEMES = {
     near: ['#b8cad8', '#5e5a5c'],
     mist: 'rgba(245,250,255,0.5)',
     trees: ['snowpine', 'snowpine', 'snowoak'],
-    bgTree: 'pine',
     ambient: 'snow',
     leaf: ['rgba(255,255,255,0.9)'],
     sea: { top: 'rgba(130,180,215,0.8)', bottom: 'rgba(50,90,130,0.95)', foam: '#ffffff', reed: '#7a8a8a' },
@@ -349,7 +339,6 @@ export const THEMES = {
     near: ['#b2c6d6', '#5a5658'],
     mist: 'rgba(248,252,255,0.45)',
     trees: ['snowpine', 'snowpine', 'snowoak'],
-    bgTree: 'pine',
     ambient: 'snow',
     leaf: ['rgba(255,255,255,0.9)'],
     sea: { top: 'rgba(130,180,215,0.8)', bottom: 'rgba(50,90,130,0.95)', foam: '#ffffff', reed: '#7a8a8a' },
@@ -384,7 +373,6 @@ export const THEMES = {
     night: true,
     aurora: true,
     trees: ['snowpine', 'snowoak', 'snowpine'],
-    bgTree: 'pine',
     ambient: 'snow',
     leaf: ['rgba(255,255,255,0.85)'],
     sea: { top: 'rgba(80,120,180,0.8)', bottom: 'rgba(14,30,64,0.97)', foam: '#d6e6ff', reed: '#40505a' },
@@ -445,19 +433,19 @@ THEMES.icecave = { ...THEMES.snowcliff, id: 'icecave', name: '고드름 동굴',
 // A map not listed keeps its season's loam over round boulders.
 const MATERIALS = {
   // warm layered sandstone
-  sandstone: { rock: 'strata', dirt: '#a8703e', dirtLight: '#c48a52', dirtDark: '#7a4c26', pebble: '#ecd2a8', pebble2: '#d8b282', pebbleDark: '#6e4420', root: '#5a3214',
+  sandstone: { under: 'soft', rock: 'strata', dirt: '#a8703e', dirtLight: '#c48a52', dirtDark: '#7a4c26', pebble: '#ecd2a8', pebble2: '#d8b282', pebbleDark: '#6e4420', root: '#5a3214',
     rockTones: ['#c88a50', '#b07440', '#d8a368', '#a06838', '#e2b57e', '#bb7e48'], joint: '#6a3c1c', outline: '#3e200c' },
   // red clay, laid in flat slabs
-  redclay: { rock: 'slabs', dirt: '#9a5434', dirtLight: '#b66a44', dirtDark: '#6e3820', pebble: '#e0b08a', pebble2: '#c98e6a', pebbleDark: '#5a2a16', root: '#4a2210',
+  redclay: { under: 'stone', rock: 'slabs', dirt: '#9a5434', dirtLight: '#b66a44', dirtDark: '#6e3820', pebble: '#e0b08a', pebble2: '#c98e6a', pebbleDark: '#5a2a16', root: '#4a2210',
     rockTones: ['#9a4e30', '#b2603c', '#86422a', '#c47048', '#a85836'], joint: '#3e1a0c', outline: '#3a1608' },
   // blue-grey slate
-  slate: { rock: 'slabs', dirt: '#6a5646', dirtLight: '#806a58', dirtDark: '#463830', pebble: '#b8bcc4', pebble2: '#9ea4ae', pebbleDark: '#3e424c', root: '#3a2a1e',
+  slate: { under: 'stone', rock: 'slabs', dirt: '#6a5646', dirtLight: '#806a58', dirtDark: '#463830', pebble: '#b8bcc4', pebble2: '#9ea4ae', pebbleDark: '#3e424c', root: '#3a2a1e',
     rockTones: ['#6a7280', '#5a6270', '#7c8494', '#646c7c', '#56606e'], joint: '#262a32', outline: '#22262e' },
   // pale chalk and limestone
-  chalk: { rock: 'boulders', dirt: '#b8a080', dirtLight: '#d0bc9c', dirtDark: '#8e7a5e', pebble: '#f6efe2', pebble2: '#e6dcc8', pebbleDark: '#7a6a52', root: '#6a5038',
+  chalk: { under: 'soft', rock: 'boulders', dirt: '#b8a080', dirtLight: '#d0bc9c', dirtDark: '#8e7a5e', pebble: '#f6efe2', pebble2: '#e6dcc8', pebbleDark: '#7a6a52', root: '#6a5038',
     rockTones: ['#d8ccb6', '#c8bba2', '#e6dcc8', '#bfb096'], joint: '#8a7c64', outline: '#4a3e2c' },
   // dark, rooty humus
-  humus: { rock: 'roots', dirt: '#5e4430', dirtLight: '#765638', dirtDark: '#3a2818', pebble: '#9a8a76', pebble2: '#b09a82', pebbleDark: '#2a1e12', root: '#8a5c36',
+  humus: { under: 'beard', rock: 'roots', dirt: '#5e4430', dirtLight: '#765638', dirtDark: '#3a2818', pebble: '#9a8a76', pebble2: '#b09a82', pebbleDark: '#2a1e12', root: '#8a5c36',
     rockTones: ['#6a5a4e', '#766454', '#5c4e44'], joint: '#3a2c20', outline: '#22160c', deep: 'rgba(30,14,4,0.3)' },
   // glacier ice
   glacier: { rock: 'shards', dirt: '#9fbad4', dirtLight: '#c4dcef', dirtDark: '#7896b6', pebble: '#eef6ff', pebble2: '#d8e8f6', pebbleDark: '#5e7ea0', root: '#6a8cb0',
@@ -470,6 +458,65 @@ const MATERIAL_OF = {
   pavilion: 'glacier', crevasse: 'glacier', icecave: 'slate',
 };
 for (const [id, m] of Object.entries(MATERIAL_OF)) THEMES[id] = { ...THEMES[id], ground: { ...THEMES[id].ground, ...MATERIALS[m] }, material: m };
+
+// What each map sees in the distance (scene.js draws it): the shape of the far islands, the colour
+// they fade to, where the sun hangs and the time of day. Maps that share a season's sky still get
+// their own horizon. shape: round | pine trees, mesa (sandstone buttes), spire (rock needles),
+// shroom (giant mushrooms), bigtree (giant trees), arch (stone arches), peak (snowy peaks),
+// terrace (stepped paddies). sun: [x, y] as a share of the screen. tint: morning | noon | evening |
+// haze (leans the season's sky that way). far/mid: the distant colours, as in THEMES.
+const BACKDROP = {
+  oak: { shape: 'round' },
+  blossom: { shape: 'round', tint: 'morning' },
+  paddy: { shape: 'terrace', sun: [0.22, 0.2], far: '#b2d3a6', mid: ['#8cbc7c', '#c6e6a6'] },
+  shrooms: { shape: 'shroom', sun: [0.3, 0.19], tint: 'haze', far: '#c8b4a6', mid: ['#c07c62', '#f2d0b8'] },
+  islet: { shape: 'arch', sun: [0.34, 0.13], tint: 'noon', far: '#d8c0b0', mid: ['#d49a7c', '#f4c8b0'] },
+  mole: { shape: 'round', sun: [0.62, 0.18] },
+  sunflower: { shape: 'mesa', far: '#dcc394', mid: ['#cf9a5c', '#f0c88a'] },
+  night: { shape: 'round' },
+  pillars: { shape: 'spire', sun: [0.5, 0.1], tint: 'evening', far: '#d8b58e', mid: ['#b9845a', '#e8b07a'] },
+  bigtree: { shape: 'bigtree', sun: [0.64, 0.14], tint: 'noon' },
+  arch: { shape: 'arch', far: '#d9b8a0', mid: ['#c4805e', '#eaa882'] },
+  tiers: { shape: 'round', sun: [0.84, 0.2], tint: 'morning' },
+  decks: { shape: 'spire', sun: [0.3, 0.22], tint: 'evening', far: '#a9b4c2', mid: ['#7f8c9e', '#b4c0d0'] },
+  maple: { shape: 'mesa', far: '#dba486', mid: ['#bd6c48', '#e69466'] },
+  cliffs: { shape: 'mesa', sun: [0.82, 0.24], tint: 'evening', far: '#e2b08a', mid: ['#c87c4c', '#eeaa76'] },
+  well: { shape: 'round', sun: [0.42, 0.12], tint: 'haze' },
+  overhang: { shape: 'spire', sun: [0.2, 0.17], far: '#9fb0b8', mid: ['#6c7f88', '#93a6ae'] },
+  ring: { shape: 'arch', sun: [0.56, 0.12], tint: 'noon', far: '#e2d0bc', mid: ['#c8b096', '#ede0cc'] },
+  ginkgo: { shape: 'round' },
+  pine: { shape: 'pine' },
+  snowcliff: { shape: 'peak', far: '#cfdbe8', mid: ['#93abc2', '#ffffff'] },
+  igloo: { shape: 'pine' },
+  pavilion: { shape: 'peak', sun: [0.62, 0.15], tint: 'morning', far: '#d6dcea', mid: ['#9aa8c6', '#ffffff'] },
+  crevasse: { shape: 'peak', sun: [0.36, 0.2], tint: 'noon', far: '#c4d8ec', mid: ['#7c9cc0', '#ffffff'] },
+  icecave: { shape: 'peak', sun: [0.86, 0.22], tint: 'haze', far: '#d0dae4', mid: ['#8fa2b6', '#f4f8fc'] },
+  aurora: { shape: 'peak', far: '#34507a', mid: ['#2c4468', '#c8d8ec'] },
+};
+// leans a sky toward a time of day: [top, middle, bottom] targets and how far
+const TINTS = {
+  morning: [['#7cbcef', 0.15], ['#ffd8cc', 0.3], ['#ffe8d8', 0.45]],
+  noon: [['#2a86de', 0.3], ['#78c2f0', 0.2], ['#e8f6ff', 0.2]],
+  evening: [['#5a8fd0', 0.2], ['#ffd29a', 0.35], ['#ffc884', 0.5]],
+  haze: [['#a8c0d0', 0.35], ['#dce4e8', 0.3], ['#eef0ee', 0.3]],
+};
+const hexMix = (a, b, t) => {
+  const p = (c) => [1, 3, 5].map((i) => parseInt(c.slice(i, i + 2), 16));
+  const [x, y] = [p(a), p(b)];
+  return '#' + x.map((v, i) => Math.round(v + (y[i] - v) * t).toString(16).padStart(2, '0')).join('');
+};
+for (const [id, b] of Object.entries(BACKDROP)) {
+  const t = THEMES[id];
+  const tint = TINTS[b.tint];
+  THEMES[id] = {
+    ...t,
+    backdrop: b.shape,
+    sun: b.sun ? { ...t.sun, x: b.sun[0], y: b.sun[1] } : t.sun,
+    sky: tint ? t.sky.map((c, i) => hexMix(c, tint[i][0], tint[i][1])) : t.sky,
+    far: b.far || t.far,
+    mid: b.mid || t.mid,
+  };
+}
 
 // Menu order: through the year, spring to winter.
 export const THEME_ORDER = ['oak', 'blossom', 'paddy', 'shrooms', 'islet', 'mole', 'sunflower', 'night', 'pillars', 'bigtree', 'arch', 'tiers', 'decks', 'maple', 'cliffs', 'well', 'overhang', 'ring', 'ginkgo', 'pine', 'snowcliff', 'igloo', 'pavilion', 'crevasse', 'icecave', 'aurora'];
